@@ -1,0 +1,13 @@
+name: Deploy to NPM
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  npm:
+    uses: tree-sitter/workflows/.github/workflows/package-npm.yml@main
+    secrets:
+      NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+    with:
+      generate: true

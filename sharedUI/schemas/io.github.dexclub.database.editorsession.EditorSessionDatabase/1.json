@@ -1,0 +1,404 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "97d661975eac402d4fb44838883a596d",
+    "entities": [
+      {
+        "tableName": "open_tabs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`tabId` TEXT NOT NULL, `targetType` TEXT NOT NULL, `targetKey` TEXT NOT NULL, `title` TEXT NOT NULL, `subtitle` TEXT NOT NULL, `layoutMode` TEXT NOT NULL, `activePaneIndex` INTEGER NOT NULL, `activeKind` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `lastViewedAt` INTEGER NOT NULL, `pinned` INTEGER NOT NULL, PRIMARY KEY(`tabId`))",
+        "fields": [
+          {
+            "fieldPath": "tabId",
+            "columnName": "tabId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetType",
+            "columnName": "targetType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetKey",
+            "columnName": "targetKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "subtitle",
+            "columnName": "subtitle",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "layoutMode",
+            "columnName": "layoutMode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "activePaneIndex",
+            "columnName": "activePaneIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "activeKind",
+            "columnName": "activeKind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastViewedAt",
+            "columnName": "lastViewedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pinned",
+            "columnName": "pinned",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "tabId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_open_tabs_targetType_targetKey",
+            "unique": true,
+            "columnNames": [
+              "targetType",
+              "targetKey"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_open_tabs_targetType_targetKey` ON `${TABLE_NAME}` (`targetType`, `targetKey`)"
+          }
+        ]
+      },
+      {
+        "tableName": "open_tab_contents",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`tabId` TEXT NOT NULL, `kind` TEXT NOT NULL, `codePath` TEXT NOT NULL, `scrollOffsetY` INTEGER NOT NULL, `scrollOffsetX` INTEGER NOT NULL, `cursorLine` INTEGER NOT NULL, `cursorOffset` INTEGER NOT NULL, `selectionStartLine` INTEGER NOT NULL, `selectionStartOffset` INTEGER NOT NULL, `selectionEndLine` INTEGER NOT NULL, `selectionEndOffset` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`tabId`, `kind`), FOREIGN KEY(`tabId`) REFERENCES `open_tabs`(`tabId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "tabId",
+            "columnName": "tabId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "codePath",
+            "columnName": "codePath",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scrollOffsetY",
+            "columnName": "scrollOffsetY",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scrollOffsetX",
+            "columnName": "scrollOffsetX",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cursorLine",
+            "columnName": "cursorLine",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cursorOffset",
+            "columnName": "cursorOffset",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "selectionStartLine",
+            "columnName": "selectionStartLine",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "selectionStartOffset",
+            "columnName": "selectionStartOffset",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "selectionEndLine",
+            "columnName": "selectionEndLine",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "selectionEndOffset",
+            "columnName": "selectionEndOffset",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "tabId",
+            "kind"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_open_tab_contents_tabId",
+            "unique": false,
+            "columnNames": [
+              "tabId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_open_tab_contents_tabId` ON `${TABLE_NAME}` (`tabId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "open_tabs",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "tabId"
+            ],
+            "referencedColumns": [
+              "tabId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "open_tab_panes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`tabId` TEXT NOT NULL, `paneIndex` INTEGER NOT NULL, `kind` TEXT NOT NULL, `weight` REAL NOT NULL, PRIMARY KEY(`tabId`, `paneIndex`), FOREIGN KEY(`tabId`) REFERENCES `open_tabs`(`tabId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "tabId",
+            "columnName": "tabId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "paneIndex",
+            "columnName": "paneIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "weight",
+            "columnName": "weight",
+            "affinity": "REAL",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "tabId",
+            "paneIndex"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_open_tab_panes_tabId",
+            "unique": false,
+            "columnNames": [
+              "tabId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_open_tab_panes_tabId` ON `${TABLE_NAME}` (`tabId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "open_tabs",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "tabId"
+            ],
+            "referencedColumns": [
+              "tabId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "open_tab_kind_priority",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`tabId` TEXT NOT NULL, `kind` TEXT NOT NULL, `priority` INTEGER NOT NULL, PRIMARY KEY(`tabId`, `kind`), FOREIGN KEY(`tabId`) REFERENCES `open_tabs`(`tabId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "tabId",
+            "columnName": "tabId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "priority",
+            "columnName": "priority",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "tabId",
+            "kind"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_open_tab_kind_priority_tabId",
+            "unique": false,
+            "columnNames": [
+              "tabId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_open_tab_kind_priority_tabId` ON `${TABLE_NAME}` (`tabId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "open_tabs",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "tabId"
+            ],
+            "referencedColumns": [
+              "tabId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "side_panel_state",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`stateId` INTEGER NOT NULL, `firstVisibleItemIndex` INTEGER NOT NULL, `firstVisibleItemScrollOffset` INTEGER NOT NULL, `horizontalScrollOffset` INTEGER NOT NULL, `selectedNodeType` TEXT, `selectedNodeKey` TEXT, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`stateId`))",
+        "fields": [
+          {
+            "fieldPath": "stateId",
+            "columnName": "stateId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstVisibleItemIndex",
+            "columnName": "firstVisibleItemIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstVisibleItemScrollOffset",
+            "columnName": "firstVisibleItemScrollOffset",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "horizontalScrollOffset",
+            "columnName": "horizontalScrollOffset",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "selectedNodeType",
+            "columnName": "selectedNodeType",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "selectedNodeKey",
+            "columnName": "selectedNodeKey",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "stateId"
+          ]
+        }
+      },
+      {
+        "tableName": "side_panel_expanded_paths",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`fullPath` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`fullPath`))",
+        "fields": [
+          {
+            "fieldPath": "fullPath",
+            "columnName": "fullPath",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "fullPath"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '97d661975eac402d4fb44838883a596d')"
+    ]
+  }
+}

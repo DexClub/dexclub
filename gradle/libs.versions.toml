@@ -1,0 +1,81 @@
+[versions]
+agp = "9.1.0"
+kotlin = "2.3.10"
+compose-multiplatform = "1.10.1"
+material3 = "1.10.0-alpha05"
+androidx-activityCompose = "1.12.4"
+androidx-lifecycle = "2.10.0-alpha08"
+androidx-nav3 = "1.1.0-alpha03"
+kotlinx-coroutines = "1.10.2"
+kotlinx-serialization = "1.10.0"
+coil = "3.4.0"
+room = "2.8.4"
+sqlite = "2.6.2"
+ksp = "2.3.5"
+kstore = "1.0.0"
+buildConfig = "6.0.9"
+documentfile = "1.1.0"
+coreKtx = "1.17.0"
+ktreesitter = "0.24.1"
+smali = "3.0.9"
+jadx = "1.5.5"
+logback = "1.5.32"
+filekit = "0.13.0"
+binary-compatibility-validator = "0.17.0"
+code-view = "0.1.0"
+
+[libraries]
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-multiplatform" }
+compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-multiplatform" }
+compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-multiplatform" }
+compose-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose-multiplatform" }
+compose-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "compose-multiplatform" }
+compose-ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "compose-multiplatform" }
+compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "material3" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
+androidx-activityCompose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
+androidx-lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-runtime = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
+compose-nav3 = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "androidx-nav3" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+coil = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-network-ktor = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
+room-runtime = { module = "androidx.room:room-runtime", version.ref = "room" }
+room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
+sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite" }
+kstore = { module = "io.github.xxfast:kstore", version.ref = "kstore" }
+kstore-file = { module = "io.github.xxfast:kstore-file", version.ref = "kstore" }
+androidx-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+ktreesitter = { module = "io.github.tree-sitter:ktreesitter", version.ref = "ktreesitter" }
+smali-dexlib2 = { module = "com.android.tools.smali:smali-dexlib2", version.ref = "smali" }
+smali-baksmali = { module = "com.android.tools.smali:smali-baksmali", version.ref = "smali" }
+jadx-core = { module = "io.github.skylot:jadx-core", version.ref = "jadx" }
+jadx-dex-input = { module = "io.github.skylot:jadx-dex-input", version.ref = "jadx" }
+jadx-kotlin-metadata = { module = "io.github.skylot:jadx-kotlin-metadata", version.ref = "jadx" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+filekit-core = { module = "io.github.vinceglb:filekit-core", version.ref = "filekit" }
+filekit-dialogs-compose = { module = "io.github.vinceglb:filekit-dialogs-compose", version.ref = "filekit" }
+code-view-bom = { module = "io.github.dexclub:code-view-bom", version.ref = "code-view" }
+code-view-compose = { module = "io.github.dexclub:code-view-compose", version.ref = "code-view" }
+code-view-runtime = { module = "io.github.dexclub:code-view-runtime", version.ref = "code-view" }
+code-view-tree-sitter = { module = "io.github.dexclub:code-view-tree-sitter", version.ref = "code-view" }
+code-view-tree-sitter-java = { module = "io.github.dexclub:code-view-tree-sitter-java", version.ref = "code-view" }
+code-view-tree-sitter-smali = { module = "io.github.dexclub:code-view-tree-sitter-smali", version.ref = "code-view" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+android-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlinx-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+room = { id = "androidx.room", version.ref = "room" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+buildConfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildConfig" }
+ktreesitter-plugin = { id = "io.github.tree-sitter.ktreesitter-plugin", version.ref = "ktreesitter" }
+binary-compatibility-validator = { id = "org.jetbrains.kotlinx.binary-compatibility-validator", version.ref = "binary-compatibility-validator" }

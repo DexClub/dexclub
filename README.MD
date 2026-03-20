@@ -1,0 +1,60 @@
+# DexClub
+
+## 初始化
+
+首次克隆后请初始化子模块：
+
+```bash
+git submodule update --init --recursive
+```
+
+## 构建与运行
+
+### Android
+
+- 在 Android Studio 中运行导入的 Android 运行配置
+- 构建 Debug APK：
+
+```bash
+./gradlew :androidApp:assembleDebug
+```
+
+APK 输出路径：
+
+`androidApp/build/outputs/apk/debug/androidApp-debug.apk`
+
+### Desktop
+
+- 运行桌面版：
+
+```bash
+./gradlew :desktopApp:run
+```
+
+- 热重载运行：
+
+```bash
+./gradlew :desktopApp:hotRunJvm --auto
+```
+
+### 其他常用命令
+
+```bash
+./gradlew build
+./gradlew clean
+```
+
+## 测试
+
+- 运行所有测试：
+
+```bash
+./gradlew allTests
+```
+
+- 运行 sharedUI 单个测试：
+
+```bash
+./gradlew :sharedUI:jvmTest --tests 类名.方法名
+```
+

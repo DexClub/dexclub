@@ -1,0 +1,41 @@
+.DS_Store
+.vscode
+.idea
+bin
+build
+local
+public
+node_modules
+*.swp
+*.wasm
+
+# Windows compiler
+*.exp
+*.lib
+*.obj
+
+# Wasm
+*.asm.js
+*.wasm
+*.wasm.mem
+
+# Rust build artifacts
+target
+
+# C
+/*.a
+/*.dylib
+/*.so*
+*.o
+/bindings/c/*.h
+/bindings/c/tree-sitter-*.pc
+
+# Swift
+.build
+__pycache__/
+
+# Vendored JetBrains fixtures (fetched on demand via npm run vendor-fixtures)
+tools/cross-validation/fixtures/
+
+# Generated cross-validation report (regenerated via npm run cross-validate)
+tools/cross-validation/report.md

@@ -1,0 +1,822 @@
+# Code View Canvas 自绘改造计划
+
+## 文档关系
+
+- 主计划文档：`CANVAS_EDITOR_REFACTOR_PLAN.md`
+- 进度跟踪文档：`CANVAS_EDITOR_REFACTOR_PROGRESS.md`
+
+两份文档的分工如下：
+
+- 本文档负责记录目标、范围、设计方案、阶段拆分、风险和验收标准
+- 进度文档负责记录当前状态、阶段推进情况、已确认决议、最近变更和阻塞项
+
+使用约定：
+
+- 阶段编号必须与进度文档保持一致
+- 如果设计方案发生变更，先更新本文档，再同步更新进度文档中的“决议记录”
+- 如果只是执行状态变化，只更新进度文档即可
+- 如果阶段被拆成更细的子任务，优先写入进度文档，不强制回写到计划文档
+
+## 背景
+
+当前 `code-view-compose` 中的 `CodeViewer` 与 `CodeEditorContent` 仍是占位实现：
+
+- `CodeViewer` 仅使用 `BasicText` 直接显示全文
+- `CodeEditorContent` 仅使用 `BasicTextField` 直接编辑全文
+- 对外已经暴露的 `initialFirstVisibleLine`、`initialScrollOffsetX`、`selection`、`searchHighlight`、`cursorTarget`、`onScrollChange`、`onViewportChange`、`onAnnotationHit`、`onContextMenu` 等参数，尚未真正接入内部布局和交互逻辑
+
+这意味着当前实现无法稳定承载以下能力：
+
+- 基于行号的 viewport 恢复与同步
+- 行列坐标和全局文本偏移之间的准确映射
+- Canvas 级别的高亮、选区、搜索命中、自绘光标
+- 面向大文件的可视区裁剪渲染
+- 后续编辑态需要的命中测试、输入桥接、自动滚动
+
+因此，这次改造不能只做“把 `BasicText` / `BasicTextField` 替换成 `Canvas`”。必须先补齐一层共享的布局与 viewport 核心，再让 Viewer / Editor 共用。
+
+## 目标
+
+### 主要目标
+
+1. 将 `CodeViewer` 改为基于 `Canvas` 的自绘渲染
+2. 将 `CodeEditorContent` 改为“Canvas 显示 + 透明输入桥接层”的编辑模型
+3. 正式引入 viewport 概念，并让只读态与编辑态共享同一套滚动和可见区定义
+4. 将现有公开参数真正接入内部逻辑，保证外部调用方状态可恢复、可同步
+5. 建立后续可扩展的代码坐标系统，为折叠、行号栏、诊断波浪线、代码补全定位等能力打基础
+
+### 次要目标
+
+- 将渲染限制在可见区内，避免每帧处理整份文本
+- 将语法高亮 token、annotation 命中、选区命中统一到同一套布局模型
+- 为大文件降级路径保留扩展位
+
+## 非目标
+
+本轮改造默认不把以下内容作为必须完成项：
+
+- 行号栏、断点栏、折叠 gutter
+- 代码补全、悬浮提示、诊断波浪线
+- 复杂富文本编辑命令系统
+- 多光标、矩形选区
+- 软换行布局
+
+默认先按“单行不换行、横向滚动、基于逻辑行渲染”的模型推进。
+
+## 现状问题
+
+### 1. UI 层没有真实布局模型
+
+当前外部状态以 `LineSelection`、首可见行、横向滚动为主，但内部没有：
+
+- `line -> offset`
+- `offset -> line / column`
+- token 按行切片结果
+- 可视区内行范围
+- 文本像素坐标和字符坐标映射
+
+这会导致任何选区、点击定位、程序化滚动都缺少稳定基础。
+
+### 2. 只读态与编辑态没有共享坐标体系
+
+如果直接分别实现两个版本：
+
+- Viewer 单独做 Canvas 绘制
+- Editor 单独做输入处理
+
+那么后面会出现双份命中测试、双份滚动逻辑、双份选区映射，维护成本高，而且行为容易不一致。
+
+### 3. “透明 BasicTextField 跟随选区”存在较高风险
+
+这个思路不是完全不可行，但不适合作为第一阶段主方案，主要风险包括：
+
+- IME 候选框、焦点和输入连接与组件真实位置强耦合
+- 多行选区时不存在单一“输入层位置”
+- Android / Desktop 行为差异较大
+- 拖拽选区与输入层位置同步复杂
+- 透明输入层频繁重定位会增加组合、测量与焦点抖动风险
+
+因此第一阶段更推荐：
+
+- `Canvas` 负责完整显示
+- 一个透明的 `BasicTextField` 固定覆盖在编辑区域内
+- 文本、选区、光标、滚动都由我们自己的状态驱动
+- 后续如果需要更精确的 IME 锚点，再考虑“仅在折叠 caret 状态下按光标定位输入锚点”的增强方案
+
+## 核心设计
+
+### 零、公开 API 预调整
+
+在进入 Canvas / viewport 重构前，先补齐公开参数语义，避免底层实现完成后再因 API 不完整返工。
+
+#### 1. 新增 `cursor: Cursor?`
+
+建议新增独立的公开类型：
+
+```kotlin
+@CodeViewApi
+public data class Cursor(
+    val line: Int,
+    val offset: Int,
+)
+```
+
+设计意图：
+
+- `selection: LineSelection?` 只表达范围选区
+- `cursor: Cursor?` 只表达 caret 位置与是否绘制
+- `cursor == null` 表示不绘制 caret
+- `cursor != null` 表示在指定位置绘制 caret
+
+不建议继续复用折叠态 `selection` 作为唯一光标语义，原因是：
+
+- 范围选区和活动 caret 是两个不同概念
+- 上层状态当前本来就将 `cursorLine` / `cursorOffset` 与 `selection` 分开保存
+- 后续编辑态命中、滚动 reveal、只读态是否显示 caret 都更适合由独立 `cursor` 表达
+
+#### 2. `CodeViewer` 的光标语义
+
+- `CodeViewer` 通过 `cursor: Cursor?` 控制 caret 是否显示
+- `cursor == null` 时，不绘制 caret
+- `cursor != null` 时，在对应位置绘制 caret
+- `cursorTarget` 继续只负责程序化滚动定位，不承担 caret 可见性语义
+
+#### 3. `CodeEditor` 的光标语义
+
+`CodeEditor` 需要先补 `readOnly` 概念，再定义 caret 行为：
+
+- `readOnly = false` 时，caret 强制显示
+- `readOnly = false` 时，即使 `cursor == null`，也只表示“位置由内部编辑态决定”，不表示隐藏 caret
+- `readOnly = false` 且 `cursor != null` 时，可视为受控 caret 位置
+- `readOnly = true` 时，才允许由 `cursor: Cursor?` 控制是否显示 caret
+
+也就是说：
+
+- 编辑态：始终显示 caret
+- 只读态：允许隐藏 caret
+
+#### 4. `CodeEditor` 参数面需要与 `CodeViewer` 对齐
+
+当前 `CodeEditor` 参数明显不足，后续至少需要补齐以下能力：
+
+- `textStyle: TextStyle = CodeViewDefaults.CodeTextStyle`
+- `readOnly: Boolean = false`
+- `selection: LineSelection? = null`
+- `cursor: Cursor? = null`
+- `searchHighlight: LineSelection? = null`
+- `initialFirstVisibleLine: Int = 0`
+- `initialScrollOffsetX: Int = 0`
+- `cursorTarget: CodeViewerCursorTarget? = null`
+- `interactionOptions: CodeViewerInteractionOptions = CodeViewerInteractionOptions()`
+- `onSelectionChange: ((LineSelection?) -> Unit)? = null`
+- `onCursorChange: ((Cursor?) -> Unit)? = null`
+- `onScrollChange: ((firstVisibleLine: Int, scrollOffsetX: Int) -> Unit)? = null`
+- `onViewportChange: ((firstVisibleLine: Int, lastVisibleLine: Int) -> Unit)? = null`
+- `onAnnotationHit: ((CodeAnnotationHit) -> Unit)? = null`
+- `onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)? = null`
+
+这些参数不要求在 API 调整阶段全部完成实现，但至少要先确定公开语义。
+
+#### 5. 推荐的 V1 API 草案
+
+建议将 `Cursor` 放在 `code-view-core` 的 `text` 包下，与 `LineSelection` 保持同级。
+
+推荐签名如下：
+
+```kotlin
+@CodeViewApi
+public data class Cursor(
+    val line: Int,
+    val offset: Int,
+)
+
+@CodeViewApi
+@Composable
+public fun CodeViewer(
+    document: CodeDocument,
+    addons: CodeAddons,
+    modifier: Modifier = Modifier,
+    runtime: CodeRuntime = remember { CodeRuntime() },
+    textStyle: TextStyle = CodeViewDefaults.CodeTextStyle,
+    initialFirstVisibleLine: Int = 0,
+    initialScrollOffsetX: Int = 0,
+    selection: LineSelection? = null,
+    cursor: Cursor? = null,
+    searchHighlight: LineSelection? = null,
+    cursorTarget: CodeViewerCursorTarget? = null,
+    interactionOptions: CodeViewerInteractionOptions = CodeViewerInteractionOptions(),
+    onScrollChange: ((firstVisibleLine: Int, scrollOffsetX: Int) -> Unit)? = null,
+    onViewportChange: ((firstVisibleLine: Int, lastVisibleLine: Int) -> Unit)? = null,
+    onAnnotationHit: ((CodeAnnotationHit) -> Unit)? = null,
+    onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)? = null,
+)
+
+@CodeViewApi
+@Composable
+public fun CodeEditor(
+    text: String,
+    onTextChange: (String) -> Unit,
+    languageId: CodeLanguageId,
+    addons: CodeAddons,
+    modifier: Modifier = Modifier,
+    runtime: CodeRuntime = remember { CodeRuntime() },
+    textStyle: TextStyle = CodeViewDefaults.CodeTextStyle,
+    readOnly: Boolean = false,
+    selection: LineSelection? = null,
+    cursor: Cursor? = null,
+    searchHighlight: LineSelection? = null,
+    initialFirstVisibleLine: Int = 0,
+    initialScrollOffsetX: Int = 0,
+    cursorTarget: CodeViewerCursorTarget? = null,
+    interactionOptions: CodeViewerInteractionOptions = CodeViewerInteractionOptions(),
+    onSelectionChange: ((LineSelection?) -> Unit)? = null,
+    onCursorChange: ((Cursor?) -> Unit)? = null,
+    onScrollChange: ((firstVisibleLine: Int, scrollOffsetX: Int) -> Unit)? = null,
+    onViewportChange: ((firstVisibleLine: Int, lastVisibleLine: Int) -> Unit)? = null,
+    onAnnotationHit: ((CodeAnnotationHit) -> Unit)? = null,
+    onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)? = null,
+)
+
+@CodeViewApi
+@Composable
+public fun CodeEditor(
+    document: CodeDocument,
+    addons: CodeAddons,
+    modifier: Modifier = Modifier,
+    runtime: CodeRuntime = remember { CodeRuntime() },
+    textStyle: TextStyle = CodeViewDefaults.CodeTextStyle,
+    readOnly: Boolean = false,
+    selection: LineSelection? = null,
+    cursor: Cursor? = null,
+    searchHighlight: LineSelection? = null,
+    initialFirstVisibleLine: Int = 0,
+    initialScrollOffsetX: Int = 0,
+    cursorTarget: CodeViewerCursorTarget? = null,
+    interactionOptions: CodeViewerInteractionOptions = CodeViewerInteractionOptions(),
+    onTextChange: ((String) -> Unit)? = null,
+    onSelectionChange: ((LineSelection?) -> Unit)? = null,
+    onCursorChange: ((Cursor?) -> Unit)? = null,
+    onScrollChange: ((firstVisibleLine: Int, scrollOffsetX: Int) -> Unit)? = null,
+    onViewportChange: ((firstVisibleLine: Int, lastVisibleLine: Int) -> Unit)? = null,
+    onAnnotationHit: ((CodeAnnotationHit) -> Unit)? = null,
+    onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)? = null,
+)
+```
+
+说明：
+
+- `CodeViewer` 与 `CodeEditor` 在滚动、viewport、注解交互参数上尽量对齐
+- `CodeEditor(text, onTextChange, ...)` 作为受控文本重载，符合常规 Compose 使用习惯
+- `CodeEditor(document, ...)` 作为工作区主路径和高级场景重载，方便直接复用 `CodeDocument`
+- `initialText` 形式的非受控重载可以保留给简单示例，但不建议继续扩展太多高级参数
+
+#### 6.1 `textStyle` 约束
+
+- `CodeViewer` 与 `CodeEditor` 都应允许显式传入 `textStyle`
+- `Canvas` 测量、正文绘制和透明输入层必须使用同一套 `textStyle`，避免桌面端出现 caret 偏移和编辑抖动
+- Desktop 侧已经观察到“光标定位不准确”和“输入时编辑行抖动”，因此 `textStyle` 需要作为首个排查入口保留给上层显式控制
+- 若继续沿用“单字符整数宽度”测量，Desktop 侧会积累列宽误差，因此字符宽度和行高应优先使用长样本平均值测量
+- 对包含汉字的文本和 IME composing，单纯的固定列宽模型仍然不够，编辑态需要进一步使用按行真实宽度测量的 x 坐标来绘制分段文本、选区、caret 和 reveal
+- 当前实现仍基于“固定字符宽度”模型，因此自定义 `textStyle` 最好保持等宽字体并提供明确 `lineHeight`
+- 若只覆盖部分样式属性，未指定部分应回退到 `CodeViewDefaults.CodeTextStyle`
+
+#### 6. `selection` 与 `cursor` 的配套语义
+
+引入 `cursor` 之后，需要同时约束它与 `selection` 的关系：
+
+- 在 `CodeViewer` 与 `CodeEditor(readOnly = true)` 中：
+  - `selection == null && cursor == null`
+    表示没有外部受控选区，也不绘制 caret
+  - `selection == null && cursor != null`
+    表示仅绘制 caret，无范围选区
+  - `selection != null && selection.isCollapsed && cursor != null`
+    表示折叠选区，caret 位置应与折叠选区一致
+  - `selection != null && !selection.isCollapsed && cursor != null`
+    表示存在范围选区，`cursor` 表示当前活动端点
+
+- 在 `CodeEditor(readOnly = false)` 中：
+  - `cursor != null`
+    表示受控 caret 位置
+  - `cursor == null`
+    表示 caret 位置由内部编辑态维护，但 caret 仍然必须显示
+  - `selection != null && !selection.isCollapsed`
+    表示存在范围选区，若同时传入 `cursor`，则 `cursor` 表示当前活动端点
+
+之所以需要 `cursor` 独立存在，是因为当前 `LineSelection` 并不表达 anchor / caret 方向，只表达范围。后续编辑态如果要支持键盘扩选、拖拽扩选、Shift 方向扩展，就需要一个单独的活动 caret 概念。
+
+#### 7. 回调语义建议
+
+- `onSelectionChange`
+  用于回传当前范围选区
+- `onCursorChange`
+  用于回传当前 caret 位置
+- `onSelectionChange` 与 `onCursorChange` 在编辑态应成对更新，避免上层状态割裂
+- 若后续发现上层需要更强一致性，可再评估引入 `CodeEditorSelectionState` 之类的组合值对象，但第一阶段不强制
+
+### 一、共享布局层
+
+先建立一层内部布局快照，作为 Viewer / Editor 的共同基础。该层职责：
+
+- 维护文本逻辑行切分
+- 建立全局 offset 与 `(line, column)` 的双向映射
+- 维护每行文本内容、长度、起始 offset
+- 将 `CodeTokenSpan` 按逻辑行切片
+- 提供 annotation 的命中区间映射
+- 提供 viewport 裁剪后的可见行范围
+
+建议的内部模型示意：
+
+```kotlin
+internal data class CodeLayoutSnapshot(
+    val text: String,
+    val lineStarts: IntArray,
+    val lines: List<CodeLineLayout>,
+    val maxLineLength: Int,
+    val tokensByLine: List<List<CodeLineTokenSpan>>,
+    val annotations: List<CodeAnnotationRange>,
+)
+
+internal data class CodeLineLayout(
+    val lineIndex: Int,
+    val startOffset: Int,
+    val endOffsetExclusive: Int,
+    val content: String,
+    val length: Int,
+)
+```
+
+这一层优先放在 `code-view-compose` 内部实现，先不要急着公开 API。等坐标模型稳定后，再决定是否下沉到 `code-view-core`。
+
+### 布局层需要提供的能力
+
+- `offsetToLineColumn(offset)`
+- `lineColumnToOffset(line, column)`
+- `clampLineSelection(selection)`
+- `toGlobalSelection(lineSelection)`
+- `toLineSelection(globalSelection)`
+- `findVisibleLines(firstVisibleLine, viewportHeightPx, lineHeightPx)`
+- `findOffsetByPosition(x, y, viewport)`
+- `findAnnotationHit(offset)`
+
+### 二、视口模型
+
+需要正式定义内部 viewport，而不是把它散落在参数和回调里。
+
+建议最少包含：
+
+```kotlin
+internal data class CodeViewportState(
+    val firstVisibleLine: Int,
+    val horizontalScrollPx: Float,
+    val viewportWidthPx: Float,
+    val viewportHeightPx: Float,
+    val lineHeightPx: Float,
+)
+```
+
+基于该状态，可以稳定导出：
+
+- `visibleLineCount`
+- `lastVisibleLine`
+- `contentHeightPx`
+- `contentWidthPx`
+- 某一行在屏幕中的 `y`
+- 某一列在屏幕中的 `x`
+
+### viewport 需要承接的行为
+
+- 初始化恢复 `initialFirstVisibleLine`
+- 初始化恢复 `initialScrollOffsetX`
+- 用户滚动后的 `onScrollChange`
+- 可见行变化后的 `onViewportChange`
+- 处理 `cursorTarget` 的程序化 reveal
+- 输入后自动将 caret 保持在可见区域
+
+### 滚动模型建议
+
+- 垂直方向先按“整行逻辑滚动”实现，状态继续使用 `firstVisibleLine`
+- 水平方向使用像素滚动值 `horizontalScrollPx`
+- 如果后续需要更细粒度纵向滚动，可扩展为 `verticalScrollPx`，但第一阶段不强制引入
+
+### 三、Canvas 渲染层
+
+Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 caret 与处理输入桥接。
+
+渲染顺序建议固定为：
+
+1. 背景
+2. 搜索高亮背景
+3. 普通选区背景
+4. 当前行或光标行背景（如果需要）
+5. 语法高亮文本
+6. 光标
+7. 调试辅助绘制（可选）
+
+### 文本渲染策略
+
+第一阶段优先采用“按可见行逐行绘制”的策略：
+
+- 每一帧只处理 viewport 内可见行
+- 每行按 token 分段绘制
+- 横向位置基于固定字符宽度计算
+
+这要求字体使用等宽字体，且列宽按测量结果统一确定。否则命中测试和横向滚动会非常不稳定。
+
+### 文本测量建议
+
+需要在组件初始化时测出：
+
+- `lineHeightPx`
+- `charWidthPx`
+- `baselinePx`
+
+后续所有坐标都基于这三个值推导，而不是依赖每次点击时重新做全文布局。
+
+### 四、输入桥接层
+
+编辑态采用“显示层”和“输入层”分离：
+
+- `Canvas` 负责真实视觉输出
+- 透明 `BasicTextField` 负责接收键盘输入、删除、粘贴、IME 事件、焦点
+- 不引入外部封装的 `TextField` 组件，避免 `code-view` 与其他 UI 模块形成反向依赖；后续如需真实布局信息，直接使用 `BasicTextField` 提供的 `onTextLayout`
+
+### 第一阶段输入方案
+
+优先方案：
+
+- 透明 `BasicTextField` 固定覆盖整个编辑区域
+- `CodeEditor` 不再二次嵌套 `CodeViewer`，而是直接复用同一个 `CodeViewerCanvas` 和同一组滚动容器
+- 使用我们自己的文本状态作为单一真源
+- 将 `TextFieldValue.selection` 与内部全局 offset 选区保持同步
+- 由 Canvas 渲染自定义选区和 caret
+
+这样做的好处是：
+
+- IME 连接更稳定
+- Viewer / Editor 共用同一套 scroll state，避免双层滚动不同步
+- 焦点行为更自然
+- 无需在每次选区变化时重建输入层位置
+- Android / Desktop 更容易统一
+
+第一阶段交互约束：
+
+- `CodeViewer` 可以响应 annotation 主点击与上下文命中
+- `CodeEditor` 的主点击优先保留给文本选择和 caret 定位
+- `CodeEditor` 如需暴露 annotation 交互，第一阶段优先只开放上下文命中，不抢占主点击
+
+### 不建议第一阶段采用的方案
+
+“透明 `BasicTextField` 跟随选区或 caret 位置移动”暂不作为主路线，理由：
+
+- 选区是范围，不是点
+- 多行选区无法自然映射到一个输入框位置
+- 透明控件位置变化会影响输入法候选框锚点和焦点稳定性
+- 容易引入平台差异 bug
+
+### 第二阶段可评估增强
+
+如果后续需要更精确的 IME 候选框定位，可在“折叠选区”下引入输入锚点：
+
+- 透明输入层仍负责输入
+- 但额外维护一个 caret 锚点坐标，供平台输入法定位使用
+
+这应作为增强项，而不是第一阶段基础方案。
+
+### 五、交互命中模型
+
+需要统一处理以下命中逻辑：
+
+- 点击定位 caret
+- 拖拽更新选区
+- 双击选词
+- 程序化跳转到指定行列
+- annotation 点击
+- annotation 右键菜单命中
+
+推荐统一走：
+
+1. 屏幕坐标
+2. viewport 坐标系
+3. `(line, column)`
+4. 全局 offset
+5. selection / annotation / token
+
+避免在多个层级重复做坐标换算。
+
+## 模块与文件调整建议
+
+### 重点修改模块
+
+- `code-view/code-view-compose`
+
+### 可能新增的内部文件
+
+- `CodeLayoutSnapshot.kt`
+- `CodeViewportState.kt`
+- `CodeCoordinateMapper.kt`
+- `CodeCanvasRenderer.kt`
+- `CodeViewerState.kt`
+- `CodeEditorInputBridge.kt`
+- `CodeSelectionMapper.kt`
+
+### 预计需要修改的现有文件
+
+- `code-view/code-view-compose/src/commonMain/kotlin/io/github/dexclub/codeview/compose/CodeViewer.kt`
+- `code-view/code-view-compose/src/commonMain/kotlin/io/github/dexclub/codeview/compose/CodeEditor.kt`
+- `code-view/code-view-compose/src/commonMain/kotlin/io/github/dexclub/codeview/compose/CodeViewerOptions.kt`
+- `code-view/code-view-core/src/commonMain/kotlin/io/github/dexclub/codeview/core/text/*`
+
+### 是否需要修改其他模块
+
+第一阶段尽量不改 `code-view-core` 公开结构，优先把布局实现收敛在 `compose` 模块内部。
+
+只有在出现以下情况时，才考虑下沉到 `core`：
+
+- 多个平台 UI 层都需要共享布局模型
+- `LineSelection` / `CodeSelection` 的转换能力需要对外公开
+- annotation 命中结构需要跨模块复用
+
+## 分阶段实施计划
+
+### 阶段 0：基线整理
+
+目标：
+
+- 清点现有参数的真实使用方式
+- 明确首批必须兼容的外部行为
+- 先确定 `cursor: Cursor?` 与 `readOnly` 的公开语义
+
+任务：
+
+- 核对 `CodeViewPane` 对 `CodeViewer` 的依赖
+- 确定 `selection`、`searchHighlight`、`cursorTarget`、`onScrollChange`、`onViewportChange` 为首批必须落地的能力
+- 确定 `CodeViewer` 与 `CodeEditor` 的 caret 语义
+- 补齐 `CodeEditor` 的参数设计，至少在文档层明确对齐目标
+- 保留公开 API 形状，尽量不破坏上层调用
+
+交付：
+
+- 文档确认
+- 变更边界明确
+- 公开 API 草案确定
+
+### 阶段 1：共享布局快照
+
+目标：
+
+- 让文本拥有稳定的“行与偏移坐标系”
+
+任务：
+
+- 解析全文并生成 `lineStarts`
+- 建立 `offset <-> line/column` 双向映射
+- 将 token 切分到每一逻辑行
+- 提供选区裁剪与转换工具
+- 统一处理空文本、末尾换行、超界 offset
+
+风险点：
+
+- 末尾换行时最后一行边界容易出错
+- token 跨行切片需要避免 off-by-one
+
+验收：
+
+- 同一份文本在任意 offset 上都能稳定映射回行列
+- `LineSelection` 与全局选区往返转换不丢信息
+
+### 阶段 2：viewport 状态层
+
+目标：
+
+- 让滚动与可见区成为正式状态，而不是临时计算
+
+任务：
+
+- 定义内部 viewport 状态对象
+- 建立首可见行和最后可见行计算
+- 接入 `initialFirstVisibleLine`
+- 接入 `initialScrollOffsetX`
+- 对外回调 `onScrollChange`
+- 对外回调 `onViewportChange`
+- 接入 `cursorTarget` 的 reveal 逻辑
+
+风险点：
+
+- 需要避免 `cursorTarget` 重复触发滚动
+- 回调和内部状态之间要避免循环更新
+
+验收：
+
+- 外部恢复滚动后画面正确
+- 导航跳转时能自动滚动到目标行
+- viewport 变化能稳定回传给上层
+
+### 阶段 3：CodeViewer Canvas 化
+
+目标：
+
+- 先完成只读态渲染闭环
+
+任务：
+
+- 用 `Canvas` 替换 `BasicText`
+- 仅绘制可见行
+- 按 token 分段绘制颜色和字形样式
+- 绘制 `selection`
+- 绘制 `searchHighlight`
+- 支持基础点击命中 annotation
+- 支持右键菜单命中 annotation
+
+风险点：
+
+- token 样式到 Canvas 文本样式的映射需要一致
+- 横向滚动后命中坐标必须同步扣除偏移
+
+验收：
+
+- 只读模式下显示效果正确
+- 搜索高亮和已有选区可见
+- annotation 点击和右键上下文可正常工作
+
+### 阶段 4：Viewer 交互与命中细化
+
+目标：
+
+- 补齐 Viewer 的完整坐标交互
+
+任务：
+
+- 点击空白区时定位到行尾
+- 点击文本时按最近列命中
+- 统一坐标换算工具
+- 处理超长行与横向滚动场景
+
+验收：
+
+- 不同行宽、不同滚动位置下点击结果一致
+
+### 阶段 5：CodeEditor 输入桥接
+
+目标：
+
+- 在不放弃 IME 的前提下，将显示逻辑完全切到 Canvas
+
+任务：
+
+- 引入内部 `TextFieldValue` 状态
+- 透明 `BasicTextField` 固定覆盖编辑区
+- 将 `TextFieldValue.selection` 与内部选区映射同步
+- 文本变化后更新 `CodeDocument`
+- Canvas 绘制 caret 和选区
+- 输入后自动 reveal caret
+- 接入基础键盘操作
+
+需要优先保证的输入路径：
+
+- 普通输入
+- 删除 / 退格
+- 替换选区
+- 粘贴
+- 全选
+
+风险点：
+
+- `String` 与 `TextFieldValue` 双状态不同步
+- 输入法 composing 区域可能需要额外处理
+- 编辑后 token 刷新存在异步延迟
+
+验收：
+
+- 文本编辑正确
+- 选区替换正确
+- 光标始终可见
+- 焦点切换不丢输入
+
+### 阶段 6：性能与稳定性
+
+目标：
+
+- 保证大文本场景下仍可用
+- 避免 decoration 刷新时重复计算与文本本身无关的布局基础数据
+
+任务：
+
+- 限制每帧只绘制可见行
+- 对布局快照做必要缓存
+- 将“按文本分行的基础布局”和“按 token / annotation 装饰”拆层缓存
+- 避免高频滚动下重复解析整份文本
+- 评估长行场景下的横向滚动成本
+- 保持大文件降级路径兼容 runtime 当前策略
+
+验收：
+
+- 普通代码文件滚动平稳
+- 大文件下不出现明显卡死
+
+### 阶段 7：回归与收尾
+
+目标：
+
+- 确认新架构与现有工作区主路径兼容
+- 为核心非 UI 逻辑补自动回归，避免后续交互重构引入坐标退化
+
+任务：
+
+- 检查 `CodeViewPane` 的滚动恢复
+- 检查搜索高亮恢复
+- 检查导航跳转 reveal
+- 检查 annotation 点击与右键菜单
+- 为布局快照、坐标映射、viewport reveal 增补 `commonTest`
+- 编译 `code-view-compose` 双端
+- 视情况编译主工程使用路径
+
+建议至少在 `code-view` 目录内执行：
+
+- `./gradlew :code-view-compose:compileKotlinJvm`
+- `./gradlew :code-view-compose:compileAndroidMain`
+
+如果联动主工程验证，则补：
+
+- `./gradlew :sharedUI:compileKotlinJvm`
+- `./gradlew :sharedUI:compileAndroidMain`
+
+## 风险与取舍
+
+### 1. 输入层方案取舍
+
+主张：
+
+- 第一阶段使用固定覆盖式透明 `BasicTextField`
+
+原因：
+
+- 工程复杂度可控
+- 焦点和 IME 稳定性更高
+- 更容易把问题收敛到“状态同步”而不是“输入控件定位”
+
+代价：
+
+- 需要自己绘制选区和 caret
+- 需要自己维护命中与自动滚动
+
+### 2. 是否一次性做完整编辑器
+
+不建议一次性把所有编辑功能堆进去。
+
+建议先后顺序：
+
+1. 只读 Canvas Viewer
+2. viewport 与命中测试稳定
+3. Editor 输入桥接
+4. 输入法与边角行为打磨
+
+原因：
+
+- 这样能把可视化问题和输入问题分开排查
+- 避免同时引入绘制、滚动、IME、选区四类问题
+
+### 3. 是否公开布局 API
+
+第一阶段不建议公开。
+
+原因：
+
+- 内部模型还在探索期
+- 过早公开会增加后续重构成本
+
+## 验收标准
+
+以下能力全部满足后，可视为本轮改造达标：
+
+- `CodeViewer` 不再依赖 `BasicText` 显示正文
+- `CodeEditorContent` 不再依赖 `BasicTextField` 直接负责视觉显示
+- `viewport` 成为内部正式状态，并能正确回调外部
+- `selection` / `searchHighlight` / `cursorTarget` 都能在 Canvas 模式下工作
+- annotation 点击与右键菜单命中正常
+- 编辑态下普通输入、删除、替换选区、粘贴可正常工作
+- Android / JVM 均可编译通过
+
+## 推荐执行顺序
+
+建议实际落地时按下面顺序推进：
+
+1. 共享布局快照
+2. viewport 状态层
+3. CodeViewer Canvas 渲染
+4. Viewer 命中测试
+5. CodeEditor 输入桥接
+6. 自动滚动与焦点/IME 修正
+7. 双端编译与工作区主路径回归
+
+## 结论
+
+这次改造的关键不是“换个控件”，而是把 `code-view` 从占位 UI 提升为具备独立布局系统的代码视图组件。
+
+在实现路径上，推荐优先采用：
+
+- 共享布局核心
+- 正式 viewport 状态
+- Canvas 自绘 Viewer
+- 固定覆盖式透明 `BasicTextField` 作为第一阶段输入桥接
+
+而不是一开始就使用“透明输入框跟随选区移动”的方案。后者可以作为后续增强项，但不适合作为首版基础架构。

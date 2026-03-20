@@ -1,0 +1,81 @@
+package io.github.dexclub.app.scene.workspace
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import io.github.shadcn.ui.compose.Card
+import io.github.shadcn.ui.compose.Checkbox
+import io.github.shadcn.ui.compose.Dialog
+import io.github.shadcn.ui.compose.OutlineButton
+import io.github.shadcn.ui.compose.ShadcnTheme
+
+@Composable
+internal fun WorkspaceSettingsDialog(
+    uiState: WorkspaceSettingsUiState,
+    visible: Boolean,
+    onDismissRequest: () -> Unit,
+    onAutoUnicodeDecodeChange: (Boolean) -> Unit,
+) {
+    if (!visible) return
+
+    Dialog(
+        onDismissRequest = onDismissRequest,
+    ) {
+        Card(
+            contentPadding = PaddingValues(24.dp),
+            modifier = Modifier.width(320.dp),
+        ) {
+            Column {
+                Text(
+                    text = "设置",
+                    style = ShadcnTheme.textStyles.titleLarge,
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Checkbox(
+                    checked = uiState.autoUnicodeDecodeEnabled,
+                    onCheckedChange = onAutoUnicodeDecodeChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = {
+                        Column {
+                            Text(
+                                text = "自动Unicode解码",
+                                style = ShadcnTheme.textStyles.bodySmall,
+                            )
+                            Text(
+                                text = "导出 Smali 时将 \\uXXXX 转为实际字符",
+                                style = ShadcnTheme.textStyles.labelMedium.copy(
+                                    color = ShadcnTheme.colors.primary.copy(alpha = 0.6f),
+                                ),
+                            )
+                        }
+                    },
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    OutlineButton(
+                        onClick = onDismissRequest,
+                    ) {
+                        Text(
+                            text = "关闭",
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
