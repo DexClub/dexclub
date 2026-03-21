@@ -11,27 +11,29 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import io.github.dexclub.codeview.compose.CodeViewerCursorTarget
 import io.github.dexclub.codeview.compose.CodeViewerInteractionOptions
-import io.github.dexclub.codeview.compose.PlatformEditorBridge
+import io.github.dexclub.codeview.compose.rememberPlatformEditorBridge
+import io.github.dexclub.codeview.compose.rememberPlatformSelectionToolbarBridge
 import io.github.dexclub.codeview.compose.internal.layout.CodeLayoutSnapshot
 import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerCanvas
-import io.github.dexclub.codeview.compose.rememberPlatformEditorBridge
 import io.github.dexclub.codeview.core.annotation.CodeAnnotationHit
 import io.github.dexclub.codeview.core.document.DocumentId
 import io.github.dexclub.codeview.core.document.DocumentRevision
 import io.github.dexclub.codeview.core.text.Cursor
 import io.github.dexclub.codeview.core.text.LineSelection
-import kotlinx.coroutines.CoroutineScope
 
 // 调试开关：用于临时显示输入锚点边框，定位 Desktop IME 锚点问题。
 // 保留该常量，后续如需继续排查输入法候选窗问题可直接打开；不要直接删除。
@@ -63,11 +65,42 @@ internal fun CodeEditorContent(
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val platformEditorBridge = rememberPlatformEditorBridge()
+    val selectionToolbarBridge = rememberPlatformSelectionToolbarBridge()
     val inputAnchorState = rememberCodeEditorInputAnchorState(documentId)
     val imeFocusRequester = remember(documentId) { FocusRequester() }
     var preferredColumn by remember(documentId) { mutableStateOf<Int?>(null) }
     var pendingAnchorFocusRequest by remember(documentId) { mutableStateOf(false) }
+    var contentBoundsInWindow by remember(documentId) { mutableStateOf(Rect.Zero) }
     val composingOverlay = inputAnchorState.toComposingOverlayOrNull()
+    val showFloatingInputAnchor = !readOnly && platformEditorBridge.useFloatingInputAnchor
+    val showTouchSelectionOverlays = !readOnly && platformEditorBridge.useTouchSelectionGestures
+
+    fun requestImeFocus() {
+        pendingAnchorFocusRequest = true
+    }
+
+    fun interruptInputAnchor() {
+        inputAnchorState.clear()
+    }
+
+    fun resetPreferredColumn() {
+        preferredColumn = null
+    }
+
+    fun updateSelection(nextSelection: TextRange) {
+        onFieldValueChange(
+            fieldValue.copy(
+                selection = nextSelection,
+                composition = null,
+            )
+        )
+    }
+
+    fun handleTouchSelectionInteractionStart() {
+        requestImeFocus()
+        resetPreferredColumn()
+        interruptInputAnchor()
+    }
 
     LaunchedEffect(
         pendingAnchorFocusRequest,
@@ -81,8 +114,12 @@ internal fun CodeEditorContent(
         pendingAnchorFocusRequest = false
     }
 
-    Box(modifier = modifier) {
-        if (!readOnly && !platformEditorBridge.useFloatingInputAnchor) {
+    Box(
+        modifier = modifier.onGloballyPositioned { coordinates ->
+            contentBoundsInWindow = coordinates.boundsInWindow()
+        },
+    ) {
+        if (!showFloatingInputAnchor && !readOnly) {
             platformEditorBridge.InputHost(
                 modifier = Modifier.fillMaxSize(),
                 inputAnchorState = inputAnchorState,
@@ -92,7 +129,7 @@ internal fun CodeEditorContent(
                 scope = scope,
                 preferredColumn = preferredColumn,
                 onPreferredColumnChange = { preferredColumn = it },
-                onInterruptInputAnchor = { inputAnchorState.clear() },
+                onInterruptInputAnchor = ::interruptInputAnchor,
                 textStyle = textStyle,
                 focusRequester = imeFocusRequester,
                 onFieldValueChange = onFieldValueChange,
@@ -125,39 +162,33 @@ internal fun CodeEditorContent(
                 null
             } else {
                 { baseModifier, canvasMetrics, lineLayoutCache ->
-                    baseModifier
-                        .codeEditorPointerInput(
-                            layoutSnapshot = layoutSnapshot,
-                            lineLayoutCache = lineLayoutCache,
-                            lineHeightPx = canvasMetrics.lineHeightPx,
-                            onFieldValueChange = onFieldValueChange,
-                            requestContentFocus = {},
-                            requestImeFocus = {
-                                pendingAnchorFocusRequest = true
-                            },
-                            onInterruptInputAnchor = { inputAnchorState.clear() },
-                            onAnyPointerEditing = { preferredColumn = null },
-                        )
-                        .bindPlatformEditorInput(
-                            bridge = platformEditorBridge,
-                            fieldValue = fieldValue,
-                            layoutSnapshot = layoutSnapshot,
-                            clipboard = clipboard,
-                            scope = scope,
-                            preferredColumn = preferredColumn,
-                            onPreferredColumnChange = { preferredColumn = it },
-                            onInterruptInputAnchor = { inputAnchorState.clear() },
-                            onFieldValueChange = onFieldValueChange,
-                        )
+                    baseModifier.codeEditorInteractionModifier(
+                        platformEditorBridge = platformEditorBridge,
+                        useFallbackLongPressContextMenu = !selectionToolbarBridge.usePlatformSelectionToolbar,
+                        layoutSnapshot = layoutSnapshot,
+                        lineLayoutCache = lineLayoutCache,
+                        documentId = documentId,
+                        documentRevision = documentRevision,
+                        lineHeightPx = canvasMetrics.lineHeightPx,
+                        fieldValue = fieldValue,
+                        clipboard = clipboard,
+                        scope = scope,
+                        preferredColumn = preferredColumn,
+                        onPreferredColumnChange = { preferredColumn = it },
+                        onRequestImeFocus = ::requestImeFocus,
+                        onInterruptInputAnchor = ::interruptInputAnchor,
+                        onAnyPointerEditing = ::resetPreferredColumn,
+                        onContextMenu = onContextMenu,
+                        onFieldValueChange = onFieldValueChange,
+                    )
                 }
             },
-            floatingUnderlayContent = if (readOnly || !platformEditorBridge.useFloatingInputAnchor) {
+            floatingUnderlayContent = if (!showFloatingInputAnchor) {
                 null
             } else {
                 { canvasMetrics, lineLayoutCache, viewportSnapshot ->
-                    val density = LocalDensity.current
                     val anchorModifier = inputAnchorModifier(
-                        density = density,
+                        density = LocalDensity.current,
                         layoutSnapshot = layoutSnapshot,
                         canvasMetrics = canvasMetrics,
                         lineLayoutCache = lineLayoutCache,
@@ -174,22 +205,38 @@ internal fun CodeEditorContent(
                         scope = scope,
                         preferredColumn = preferredColumn,
                         onPreferredColumnChange = { preferredColumn = it },
-                        onInterruptInputAnchor = { inputAnchorState.clear() },
+                        onInterruptInputAnchor = ::interruptInputAnchor,
                         textStyle = textStyle,
                         focusRequester = imeFocusRequester,
                         onFieldValueChange = onFieldValueChange,
                     )
                 }
             },
-            floatingContent = if (readOnly || !platformEditorBridge.useFloatingInputAnchor) {
+            floatingContent = if (readOnly || (!showFloatingInputAnchor && !showTouchSelectionOverlays)) {
                 null
             } else {
                 { canvasMetrics, lineLayoutCache, viewportSnapshot ->
-                    val density = LocalDensity.current
+                    if (showTouchSelectionOverlays) {
+                        CodeEditorTouchInteractionOverlays(
+                            selectionToolbarBridge = selectionToolbarBridge,
+                            layoutSnapshot = layoutSnapshot,
+                            lineLayoutCache = lineLayoutCache,
+                            canvasMetrics = canvasMetrics,
+                            viewportSnapshot = viewportSnapshot,
+                            contentBoundsInWindow = contentBoundsInWindow,
+                            fieldValue = fieldValue,
+                            clipboard = clipboard,
+                            onSelectAllRequested = {
+                                updateSelection(TextRange(0, fieldValue.text.length))
+                            },
+                            onSelectionChange = ::updateSelection,
+                            onHandleInteractionStart = ::handleTouchSelectionInteractionStart,
+                        )
+                    }
                     if (SHOW_INPUT_ANCHOR_DEBUG_OVERLAY) {
                         Box(
                             modifier = inputAnchorModifier(
-                                density = density,
+                                density = LocalDensity.current,
                                 layoutSnapshot = layoutSnapshot,
                                 canvasMetrics = canvasMetrics,
                                 lineLayoutCache = lineLayoutCache,
@@ -208,27 +255,4 @@ internal fun CodeEditorContent(
             overlayContent = null,
         )
     }
-}
-
-private fun Modifier.bindPlatformEditorInput(
-    bridge: PlatformEditorBridge,
-    fieldValue: TextFieldValue,
-    layoutSnapshot: CodeLayoutSnapshot,
-    clipboard: Clipboard,
-    scope: CoroutineScope,
-    preferredColumn: Int?,
-    onPreferredColumnChange: (Int?) -> Unit,
-    onInterruptInputAnchor: () -> Unit,
-    onFieldValueChange: (TextFieldValue) -> Unit,
-): Modifier = with(bridge) {
-    bindEditorInput(
-        fieldValue = fieldValue,
-        layoutSnapshot = layoutSnapshot,
-        clipboard = clipboard,
-        scope = scope,
-        preferredColumn = preferredColumn,
-        onPreferredColumnChange = onPreferredColumnChange,
-        onInterruptInputAnchor = onInterruptInputAnchor,
-        onFieldValueChange = onFieldValueChange,
-    )
 }

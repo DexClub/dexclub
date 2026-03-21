@@ -5,12 +5,14 @@
 - 主计划文档：`CANVAS_EDITOR_REFACTOR_PLAN.md`
 - 进度跟踪文档：`CANVAS_EDITOR_REFACTOR_PROGRESS.md`
 - 输入锚点规则：`INPUT_ANCHOR_STATE_RULES.md`
+- 选区交互规则：`SELECTION_INTERACTION_RULES.md`
 
 两份文档的分工如下：
 
 - 本文档负责记录目标、范围、设计方案、阶段拆分、风险和验收标准
 - 进度文档负责记录当前状态、阶段推进情况、已确认决议、最近变更和阻塞项
 - 输入锚点规则文档负责记录 IME / composing / commit / 焦点 / 锚点重定位的状态边界
+- 选区交互规则文档负责记录 Desktop / Android 在 caret、滚动、长按、手柄与菜单上的分层边界
 
 使用约定：
 
@@ -470,6 +472,34 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 - `CodeViewer` 可以响应 annotation 主点击与上下文命中
 - `CodeEditor` 的主点击优先保留给文本选择和 caret 定位
 - `CodeEditor` 如需暴露 annotation 交互，当前优先只开放上下文命中，不抢占主点击
+
+### 编辑态 Selection 分层
+
+`CodeEditor` 的 Selection 交互不应再尝试用一套手势同时覆盖 Desktop 和 Android。
+
+推荐约束如下：
+
+- Desktop 走 `mouse-first`：
+  - 主点击放置 caret
+  - 拖拽直接扩展选区
+  - 次键负责上下文菜单
+- Android 走 `touch-first`：
+  - 单击只放置 caret
+  - 普通拖动优先交给滚动
+  - 长按进入选区
+  - 长按后先按词选中，再打开菜单入口
+  - 后续扩选通过 `Selection Handle` 手柄完成
+
+这里的差异不应通过在公共编辑逻辑里直接判断“是否 Android / 是否 Desktop”实现，而应继续通过平台桥接层暴露能力开关收口。
+
+当前更合适的抽象是：
+
+- 是否使用浮动输入锚点
+- 是否启用 touch-first 的 Selection 手势
+
+而不是：
+
+- 业务层直接判断平台名
 
 ### 不建议作为基础架构的方案
 

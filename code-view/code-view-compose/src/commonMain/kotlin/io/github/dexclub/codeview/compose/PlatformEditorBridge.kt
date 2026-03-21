@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 
 internal interface PlatformEditorBridge {
     val useFloatingInputAnchor: Boolean
+    val useTouchSelectionGestures: Boolean
 
     fun Modifier.bindEditorInput(
         fieldValue: TextFieldValue,

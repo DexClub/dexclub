@@ -39,6 +39,7 @@ internal actual fun rememberPlatformEditorBridge(): PlatformEditorBridge {
 
 private object AndroidPlatformEditorBridge : PlatformEditorBridge {
     override val useFloatingInputAnchor: Boolean = false
+    override val useTouchSelectionGestures: Boolean = true
     private var latestRequestKeyboardFocus: (() -> Unit)? = null
 
     override fun Modifier.bindEditorInput(

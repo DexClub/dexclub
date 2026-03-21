@@ -12,15 +12,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.text.TextStyle
 import io.github.dexclub.app.model.OpenTabUiModel
 import io.github.dexclub.codeview.compose.CodeEditor
 import io.github.dexclub.codeview.compose.CodeViewerCursorTarget
 import io.github.dexclub.codeview.compose.CodeViewerInteractionOptions
 import io.github.dexclub.codeview.compose.rememberCodeAddons
+import io.github.dexclub.codeview.core.text.Cursor
+import io.github.dexclub.codeview.core.text.LineSelection
 import io.github.dexclub.codeview.core.document.CodeDocument
 import io.github.dexclub.codeview.core.language.CodeLanguageId
-import io.github.dexclub.codeview.core.text.Cursor
 import io.github.dexclub.codeview.treesitter.java.install.treeSitterJavaLanguage
 import io.github.dexclub.codeview.treesitter.smali.install.treeSitterSmaliLanguage
 import io.github.dexclub.core.editor.EDITOR_SESSION_KIND_JAVA
@@ -53,11 +53,9 @@ internal fun CodeViewPane(
     LaunchedEffect(paneState.text) {
         document.update(paneState.text)
     }
-
     var menuExpanded by remember { mutableStateOf(false) }
     var menuPos by remember { mutableStateOf(Offset.Zero) }
     var menuNavigateContext by remember { mutableStateOf<NavigateRequestContext?>(null) }
-    var selectedText by remember { mutableStateOf("") }
 
     val cursorTarget = remember(navigationRevealTarget) {
         if (navigationRevealTarget == null) return@remember null
@@ -80,6 +78,35 @@ internal fun CodeViewPane(
                 offset = editorState.cursorOffset,
             )
         }
+    }
+    var latestSelection by remember(tab.tabId, kind) { mutableStateOf(editorState.selection) }
+    var latestCursor by remember(tab.tabId, kind) { mutableStateOf(cursor) }
+    val selectedText = remember(paneState.text, latestSelection) {
+        extractSelectedText(
+            text = paneState.text,
+            selection = latestSelection,
+        )
+    }
+
+    LaunchedEffect(editorState.selection) {
+        latestSelection = editorState.selection
+    }
+
+    LaunchedEffect(cursor) {
+        latestCursor = cursor
+    }
+
+    fun updateCursorSelection(
+        selection: LineSelection?,
+        nextCursor: Cursor?,
+    ) {
+        callbacks.onUpdateCursorSelection(
+            tab.tabId,
+            kind,
+            nextCursor?.line ?: -1,
+            nextCursor?.offset ?: -1,
+            selection,
+        )
     }
 
     Box(modifier = modifier) {
@@ -107,6 +134,18 @@ internal fun CodeViewPane(
                 if (isSelectedTab) {
                     callbacks.onCodeViewportChanged(tab.tabId, kind, firstVisibleLine, lastVisibleLine)
                 }
+            },
+            onSelectionChange = { selection ->
+                if (!isSelectedTab) return@CodeEditor
+                latestSelection = selection
+            },
+            onCursorChange = { nextCursor ->
+                if (!isSelectedTab) return@CodeEditor
+                latestCursor = nextCursor
+                updateCursorSelection(
+                    selection = latestSelection,
+                    nextCursor = nextCursor,
+                )
             },
             onAnnotationHit = { hit ->
                 if (!isSelectedTab) return@CodeEditor
@@ -137,7 +176,21 @@ internal fun CodeViewPane(
         if (isSelectedTab) {
             CodeContextMenu(
                 selectedText = selectedText,
-                onSelectAll = {},
+                onSelectAll = {
+                    callbacks.onActivatePane(tab, paneIndex, kind)
+                    val selection = resolveSelectAllSelection(paneState.text)
+                    latestSelection = selection
+                    latestCursor = selection?.let {
+                        Cursor(
+                            line = it.endLine,
+                            offset = it.endOffset,
+                        )
+                    }
+                    updateCursorSelection(
+                        selection = latestSelection,
+                        nextCursor = latestCursor,
+                    )
+                },
                 expanded = menuExpanded,
                 position = menuPos,
                 navigateContext = menuNavigateContext,
