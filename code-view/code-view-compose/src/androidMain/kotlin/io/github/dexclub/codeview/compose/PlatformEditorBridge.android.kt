@@ -3,6 +3,7 @@ package io.github.dexclub.codeview.compose
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -11,6 +12,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
@@ -36,6 +39,7 @@ internal actual fun rememberPlatformEditorBridge(): PlatformEditorBridge {
 
 private object AndroidPlatformEditorBridge : PlatformEditorBridge {
     override val useFloatingInputAnchor: Boolean = false
+    private var latestRequestKeyboardFocus: (() -> Unit)? = null
 
     override fun Modifier.bindEditorInput(
         fieldValue: TextFieldValue,
@@ -49,6 +53,11 @@ private object AndroidPlatformEditorBridge : PlatformEditorBridge {
     ): Modifier = this
 
     override fun requestInputFocus(focusRequester: FocusRequester) {
+        val requestKeyboardFocus = latestRequestKeyboardFocus
+        if (requestKeyboardFocus != null) {
+            requestKeyboardFocus()
+            return
+        }
         try {
             focusRequester.requestFocus()
         } catch (_: Exception) {
@@ -70,7 +79,30 @@ private object AndroidPlatformEditorBridge : PlatformEditorBridge {
         focusRequester: FocusRequester,
         onFieldValueChange: (TextFieldValue) -> Unit,
     ) {
+        val keyboardController = LocalSoftwareKeyboardController.current
+        val view = LocalView.current
         val inputHostValue = resolveAndroidInputHostValue(inputAnchorState)
+
+        DisposableEffect(focusRequester, keyboardController, view) {
+            val requestKeyboardFocus = {
+                view.post {
+                    try {
+                        focusRequester.requestFocus()
+                    } catch (_: Exception) {
+                    }
+                    keyboardController?.show()
+                }
+                Unit
+            }
+            latestRequestKeyboardFocus = requestKeyboardFocus
+
+            onDispose {
+                if (latestRequestKeyboardFocus === requestKeyboardFocus) {
+                    latestRequestKeyboardFocus = null
+                }
+            }
+        }
+
         BasicTextField(
             value = inputHostValue,
             onValueChange = { newValue ->
@@ -181,7 +213,6 @@ private fun TextFieldValue.toAndroidImeFieldValue(): TextFieldValue {
     ) {
         return this
     }
-
     val actualText = text.substring(
         INPUT_HOST_IDLE_PREFIX.length,
         text.length - INPUT_HOST_IDLE_SUFFIX.length,
