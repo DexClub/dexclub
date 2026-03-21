@@ -10,6 +10,11 @@
 - 只负责 IME 会话、`composition` 与最终 `commit`
 - 不负责正文绘制、selection、caret、命令键或滚动
 
+当前平台形态：
+
+- Android：隐藏的 `0x0 BasicTextField`
+- Desktop：附着在 AWT 窗口上的透明 `JComponent` 输入宿主
+
 ## 核心原则
 
 ### 1. 画布是唯一可见编辑器
@@ -22,6 +27,7 @@
 - 它不绑定整份文档文本
 - 它只承载本次输入片段
 - commit 完成后必须立即清空
+- Desktop 下即使 `InputMethodEvent` 带有 `committedCharacterCount`，只要 composing 尚未结束，整段 preedit 仍继续保留在 `imeFieldValue`
 
 ### 3. 输入锚点永远跟随“当前画布光标”
 
@@ -213,9 +219,10 @@
 
 当前已确认：
 
-- Desktop 浮动输入锚点已可稳定承接输入
+- Desktop 输入锚点已切换为 AWT 窗口附属宿主，不再依赖隐藏 `BasicTextField`
 - 候选窗当前已能跟随输入锚点移动
 - `composing` 期间的可见光标、输入锚点与自动 reveal 已跟随 preedit 内部 caret
+- 输入宿主组件本体固定为透明 `1x1`，真实候选窗定位仅依赖 `getTextLocation()`
 
 因此 Desktop 侧后续重点不再是“候选窗能否跟随”，而是“命令键打断 / 点击打断 / 长行滚动”等边界一致性。
 
@@ -237,5 +244,4 @@
 ## 当前未决项
 
 - composing 被打断时，是否需要“尝试提交”而不是直接丢弃
-- Desktop 下透明输入锚点的最佳宿主形态
 - Desktop 下 composing 被打断时的最终策略是否需要进一步贴近 IDEA / 平台默认行为

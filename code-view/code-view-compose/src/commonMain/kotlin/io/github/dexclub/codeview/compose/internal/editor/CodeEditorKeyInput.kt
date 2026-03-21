@@ -265,7 +265,7 @@ internal fun Modifier.codeEditorCommandKeyInput(
     }
 }
 
-private fun moveCaretHorizontally(
+internal fun moveCaretHorizontally(
     fieldValue: TextFieldValue,
     delta: Int,
     extendSelection: Boolean,

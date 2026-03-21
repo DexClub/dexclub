@@ -9,6 +9,8 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 
 internal class CodeEditorInputAnchorState {
+    // imeFieldValue mirrors the platform preedit session only. The real document text stays in
+    // CodeEditor state and is updated separately when composition commits.
     var imeFieldValue by mutableStateOf(TextFieldValue(""))
         private set
     var anchorSelection by mutableStateOf<TextRange?>(null)
@@ -53,8 +55,33 @@ internal fun handleInputAnchorValueChange(
     onPreferredColumnChange: (Int?) -> Unit,
     onFieldValueChange: (TextFieldValue) -> Unit,
 ) {
+    val previousImeFieldValue = inputAnchorState.imeFieldValue
     val effectiveAnchorSelection = inputAnchorState.anchorSelection ?: fieldValue.selection
     when {
+        previousImeFieldValue.text.isNotEmpty() &&
+                inputAnchorState.anchorSelection != null &&
+                previousImeFieldValue.text == newValue.text &&
+                previousImeFieldValue.selection != newValue.selection -> {
+            val delta = newValue.selection.end.compareTo(previousImeFieldValue.selection.end)
+            if (delta != 0) {
+                onPreferredColumnChange(null)
+                inputAnchorState.clear()
+                onFieldValueChange(
+                    moveCaretHorizontally(
+                        fieldValue = fieldValue,
+                        delta = delta,
+                        extendSelection = false,
+                    )
+                )
+            } else {
+                inputAnchorState.update(
+                    newValue = newValue,
+                    anchorSelection = inputAnchorState.anchorSelection ?: effectiveAnchorSelection,
+                    consumedSelectionOnCompose = inputAnchorState.consumedSelectionOnCompose,
+                )
+            }
+        }
+
         newValue.text.isEmpty() -> {
             inputAnchorState.clear()
         }

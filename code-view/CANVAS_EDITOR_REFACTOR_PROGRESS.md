@@ -23,7 +23,7 @@
 - 最近更新时间：`2026-03-21`
 - 总体状态：`进行中`
 - 当前阶段：`阶段 7：回归与收尾`
-- 当前结论：`Cursor` 与 API 先行调整已完成；共享布局快照与 viewport 已接入 `CodeViewer` / `CodeEditor`；`CodeViewer` 已切到 Canvas 自绘并支持 annotation 点击、长按上下文与 desktop 次键上下文；`CodeEditor` 已切到“共享 CodeViewerCanvas + 隐藏 0x0 IME host + Canvas 自管编辑”的输入模型，编辑态不再依赖全屏透明 `BasicTextField` 作为主控；几何链路已统一到按行缓存的真实 `TextLayoutResult`，caret、selection、annotation 命中和横向 reveal 共用同一套来源；`code-view-compose` 的 JVM / Android 编译与 JVM 测试已再次通过；当前进入 Desktop / Android 手动回归阶段`
+- 当前结论：`Cursor` 与 API 先行调整已完成；共享布局快照与 viewport 已接入 `CodeViewer` / `CodeEditor`；`CodeViewer` 已切到 Canvas 自绘并支持 annotation 点击、长按上下文与 desktop 次键上下文；`CodeEditor` 已切到“共享 CodeViewerCanvas + 平台专属 IME host + Canvas 自管编辑”的输入模型，编辑态不再依赖全屏透明 `BasicTextField` 作为主控；Android 侧继续使用隐藏 `0x0 BasicTextField` 作为 IME host，Desktop 侧已切换为附着在 AWT 窗口上的专用输入宿主组件；几何链路已统一到按行缓存的真实 `TextLayoutResult`，caret、selection、annotation 命中和横向 reveal 共用同一套来源；`code-view-compose` 的 JVM / Android 编译与 JVM 测试已再次通过；当前进入 Desktop / Android 手动回归阶段`
 
 ## 阶段总览
 
@@ -55,10 +55,11 @@
 - 不再将“固定覆盖式透明 `BasicTextField`”作为编辑态主方案
 - `CodeEditor` 的编辑主控正式切回 Canvas / `TextLayoutResult`
 - Android 输入桥接改为隐藏的 `0x0 BasicTextField`，仅承接 IME 连接、composing 和 commit
-- Desktop 输入桥接改为 `onKeyEvent` 键盘路径，不依赖隐藏输入框
+- Desktop 输入桥接不再依赖隐藏 `BasicTextField`，而是改为专用 AWT 输入宿主组件
 - 编辑态在 `composition != null` 时不立即写回 `CodeDocument`，避免中文输入抖动
 - `CodeViewerCanvas` 的光标、选区、annotation 命中与横向 reveal 统一复用按行 `TextLayoutResult`
 - 平台输入接入层已通过 `PlatformEditorBridge` 收口为 `expect/actual`，公共编辑器不再依赖 `isDesktopPlatform()` 做架构分流
+- Desktop `composing` 期间会保留整段 preedit overlay，直到平台输入法真正 commit
 
 ## 当前阶段详情
 
@@ -176,7 +177,7 @@
   - 编辑态 `TextFieldValue.selection` 与 `LineSelection` / `Cursor` 互转已接通
   - 编辑态主点击和拖拽选区已回收至 `CodeEditor` 自己处理
   - Android 侧已接入隐藏 `0x0 BasicTextField` 作为 IME host
-  - Desktop 侧已接入 `onKeyEvent` 键盘输入、删除、粘贴、全选与方向键导航
+  - Desktop 侧已接入专用 AWT 输入宿主，负责 `InputMethodListener`、候选窗定位与普通键盘命令
   - `composition != null` 时不再立即更新 `CodeDocument`
   - 编辑态已接入 desktop 次键 annotation 上下文命中
   - 编辑态主点击当前明确保留给文本选择 / caret 定位，不触发 annotation 主点击
@@ -228,7 +229,7 @@
 
 - `CodeEditor` 移除“共享 scroll 容器上的全屏透明 `BasicTextField`”主输入模式
 - Android 输入路径切换为隐藏 `0x0 BasicTextField` IME host
-- Desktop 输入路径切换为 `onKeyEvent`
+- Desktop 输入路径已切换为附着在 AWT 窗口上的专用输入宿主组件，不再通过隐藏 `BasicTextField` 承担 IME 会话
 - 平台输入接入层抽为 `expect/actual` `PlatformEditorBridge`
 - `CodeEditor` 的点击定位、拖拽选区、基础键盘编辑和剪贴板操作已收回自身处理
 - `composition != null` 时不再立即 `document.update(...)`
@@ -240,16 +241,17 @@
 - `CodeViewer` 恢复呼吸光标动画，caret 端点恢复圆角
 - `CodeViewer` 多行选区改为连续块状绘制，去掉行间缝隙，并让非结束行延伸到整行剩余宽度
 - 用户最新 Desktop 手测反馈：光标呼吸与圆角效果可验收；多行选区的行间隙与行尾延伸效果可验收
-- 已明确“输入锚点”方案：透明 `BasicTextField` 只承载 IME 会话、composing 与 commit，不再承担可见编辑层职责
+- 已明确“输入锚点”方案：Android 使用隐藏 `BasicTextField`，Desktop 使用专用 AWT 宿主；两者都只承载 IME 会话、composing 与 commit，不承担可见编辑层职责
 - 已确认桌面端“候选窗跟随光标”是后续独立问题，需要在不破坏当前可用输入链路的前提下单独推进
 - 已补充一条关键规则：输入锚点永远跟随“当前画布光标”，一旦回车、删除、点击跳转等命令改变真实光标位置，输入锚点必须重新定位，并在必要时重置当前 composing 状态
 - 已新增独立文档 `INPUT_ANCHOR_STATE_RULES.md`，收口输入锚点的状态规则、命令键打断规则与焦点变化规则
-- Desktop 浮动输入锚点已跑通：自动焦点、英文输入、中文输入、方向键与 selection 不再互相打架
+- Desktop 专用输入宿主已跑通：自动焦点、英文输入、中文输入、候选窗定位与普通键盘命令已接通
 - 画布已接入 `inline composing overlay`，Desktop 中文预输入的拼音与下划线已可见
 - 行中间输入时的 preedit 改为内联渲染，后缀文本会右移，不再被遮挡
 - `selection + composing` 已调整为更接近 IDEA：首次进入 composing 时先真实删除选区内容，再从选区起点显示 preedit
 - `composing` 期间的可见光标、输入锚点与自动 reveal 已接入 preedit 内部 caret，不再固定在首字母，也不会等 commit 后才滚回可视区
 - Desktop 候选词窗口当前已能跟随输入锚点移动，整体效果与预期基本一致
+- Desktop IME 事件在 `committedCharacterCount > 0` 但 `composition` 尚未结束时，不再把前缀文本提前写入正文，而是继续保留整段 preedit overlay 直到最终 commit
 - `CodeEditor` 重构后再次通过 `:code-view-compose:compileKotlinJvm`
 - `CodeEditor` 重构后再次通过 `:code-view-compose:compileAndroidMain`
 - `CodeEditor` 重构后再次通过 `:code-view-compose:jvmTest`

@@ -108,7 +108,7 @@
 - `Canvas` 负责完整显示，且成为编辑态唯一视觉真相源
 - `CodeEditor` 自己管理文本、选区、光标、点击定位、拖拽选区和 reveal
 - Android 使用一个隐藏的 `0x0 BasicTextField` 仅承接 IME 连接、composing 和 commit
-- Desktop 继续通过 `onKeyEvent` 处理键盘输入与导航
+- Desktop 使用一个附着在 AWT 窗口上的专用输入宿主组件承接 IME 会话，并单独处理普通键盘命令
 - 后续如果需要更精确的 IME 锚点，再考虑在移动端为折叠 caret 追加平台锚点能力
 
 ## 核心设计
@@ -446,7 +446,7 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 - `Canvas` 负责真实视觉输出
 - `CodeEditor` 自己管理 `TextFieldValue`、selection、cursor、点击定位、拖拽与 reveal
 - Android 使用隐藏的 `0x0 BasicTextField` 负责 IME 连接、composing 和 commit
-- Desktop 使用 `onKeyEvent` 处理普通输入、删除、粘贴、导航与全选
+- Desktop 使用专用输入宿主组件处理 IME 会话、普通输入、删除、粘贴、导航与全选
 - 平台输入接入层通过 `expect/actual` bridge 收口，不在公共编辑器中继续堆平台条件分支
 - 不引入外部封装的 `TextField` 组件，避免 `code-view` 与其他 UI 模块形成反向依赖
 
@@ -456,7 +456,7 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 - `Canvas` 成为正文、selection、caret、命中和横向 reveal 的唯一视觉真相源
 - 编辑态仍使用内部 `TextFieldValue` 承接平台输入语义，但 `composition != null` 时不立即写回 `CodeDocument`
 - Android 的 IME host 固定为隐藏 `0x0 BasicTextField`
-- Desktop 的键盘路径不依赖隐藏输入框
+- Desktop 的 IME 与键盘路径不依赖隐藏输入框
 
 这样做的好处是：
 
@@ -588,12 +588,13 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 
 当前阶段已经确认：
 
-- Desktop 浮动输入锚点本身已经可以稳定承接输入
+- Desktop 专用输入宿主已经可以稳定承接输入
 - 输入锚点状态机、自动焦点与命令键打断规则已跑通
 - 画布侧 `inline composing overlay` 已落地
 - `selection + composing` 已按“首次进入 composing 时先真实删除选区”策略实现
 - `composing` 期间的可见光标、输入锚点与自动 reveal 已接入 preedit 内部 caret
 - Desktop 候选词窗口当前已能跟随输入锚点移动，整体效果达到当前阶段预期
+- Desktop `InputMethodEvent` 中的 preedit 前缀不再提前写入正文，整段 preedit 会保留到最终 commit
 
 因此后续不再需要围绕“桌面候选窗是否能跟随光标”继续试错，剩余工作应转向边界一致性验证和交互收尾。
 
@@ -791,7 +792,7 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 - 引入内部 `TextFieldValue` 状态
 - 将编辑态点击、拖拽、selection、caret 与 reveal 逻辑收回 `CodeEditor`
 - Android 接入隐藏 `0x0 BasicTextField` 作为 IME host
-- Desktop 接入 `onKeyEvent` 键盘输入与剪贴板路径
+- Desktop 接入专用输入宿主组件，统一处理 IME、键盘输入与剪贴板路径
 - 将 `TextFieldValue.selection` 与内部选区映射同步
 - `composition != null` 时不立即更新 `CodeDocument`
 - Canvas 绘制 caret 和选区，并统一使用 `TextLayoutResult`
