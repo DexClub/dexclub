@@ -17,6 +17,7 @@ actual fun WorkspaceScene(
     WorkspaceSceneContent(
         model = model,
         onRequestExportWorkspaceLogs = requestExportWorkspaceLogs,
+        onBackPressed = onBackPressed,
     )
 }
 

@@ -2,9 +2,13 @@ package io.github.dexclub.app.scene.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -61,117 +65,138 @@ fun NewWorkspaceDialog(
     var selectedTargetFile by remember { mutableStateOf<PlatformFile?>(null) }
 
     Dialog(
-        onDismissRequest = model::onCloseNewWorkspaceDialog
+        onDismissRequest = model::onCloseNewWorkspaceDialog,
     ) {
         val sonnerState = LocalSonner.current
-        Card(
-            contentPadding = androidx.compose.foundation.layout.PaddingValues.Zero,
-            modifier = Modifier.width(320.dp),
+
+        BoxWithConstraints(
+            contentAlignment = androidx.compose.ui.Alignment.Center,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
         ) {
-            Column {
-                Text(
-                    text = StringRes.current.createWorkspace,
-                    style = ShadcnTheme.textStyles.titleLarge,
-                    modifier = Modifier.padding(24.dp, 24.dp, 24.dp),
-                )
+            val dialogWidth = (maxWidth * 0.96f).coerceAtMost(420.dp)
 
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = StringRes.current.projectName,
-                    style = ShadcnTheme.textStyles.labelLarge,
-                    modifier = Modifier
-                        .padding(horizontal = 24.dp)
-                        .padding(bottom = 8.dp),
-                )
-                TextField(
-                    value = workspaceName,
-                    placeholder = StringRes.current.inputProjectNamePlaceholder,
-                    onValueChange = {
-                        isWorkspaceNameError = false
-                        workspaceName = it.copy(it.text.trim())
-                    },
-                    colors = if (isWorkspaceNameError) defaultTextFieldColors(TextFieldColor.Error) else defaultTextFieldColors(),
-                    maxLines = 1,
-                    modifier = Modifier
-                        .padding(horizontal = 24.dp)
-                        .fillMaxWidth()
-                        .focusRequester(workspaceNameFocusRequester),
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = StringRes.current.targetFile,
-                    style = ShadcnTheme.textStyles.labelLarge,
-                    modifier = Modifier
-                        .padding(horizontal = 24.dp)
-                        .padding(bottom = 8.dp),
-                )
-
-                SelectField(
-                    colors = if (isTargetFileError) defaultSelectFieldColors(SelectFieldColor.Error) else defaultSelectFieldColors(),
-                    onClick = {
-                        isTargetFileError = false
-                        PickerResultLauncher {
-                            scope.launch {
-                                val file = FileKit.openFilePicker(
-                                    type = FileKitType.File("apk", "dex"),
-                                    dialogSettings = FileKitDialogSettings.createDefault(),
-                                )
-                                if (file != null) {
-                                    selectedTargetFile = file
-                                }
-                            }
-                        }.launch()
-                    },
-                ) {
+            Card(
+                contentPadding = PaddingValues.Zero,
+                modifier = Modifier.width(dialogWidth),
+            ) {
+                Column {
                     Text(
-                        text = selectedTargetFile?.displayPath ?: StringRes.current.selectTargetFilePlaceholder,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        style = ShadcnTheme.textStyles.bodyMedium.copy(
-                            color = if (selectedTargetFile != null) ShadcnTheme.colors.primary
-                            else ShadcnTheme.textStyles.bodyMedium.color.copy(alpha = 0.6f)
-                        ),
+                        text = StringRes.current.createWorkspace,
+                        style = ShadcnTheme.textStyles.titleLarge,
+                        modifier = Modifier.padding(24.dp, 24.dp, 24.dp),
                     )
-                }
 
-                Spacer(modifier = Modifier.height(24.dp))
-                Row(
-                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, ShadcnTheme.colors.border)
-                        .background(ShadcnTheme.colors.muted.copy(0.5f))
-                        .padding(16.dp, 12.dp),
-                ) {
-                    OutlineButton(
-                        onClick = model::onCloseNewWorkspaceDialog,
-                    ) {
-                        Text(
-                            text = StringRes.current.cancel,
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = StringRes.current.projectName,
+                        style = ShadcnTheme.textStyles.labelLarge,
+                        modifier = Modifier
+                            .padding(horizontal = 24.dp)
+                            .padding(bottom = 8.dp),
+                    )
+                    TextField(
+                        value = workspaceName,
+                        placeholder = StringRes.current.inputProjectNamePlaceholder,
+                        onValueChange = {
+                            isWorkspaceNameError = false
+                            workspaceName = it.copy(it.text.trim())
+                        },
+                        colors = if (isWorkspaceNameError) {
+                            defaultTextFieldColors(TextFieldColor.Error)
+                        } else {
+                            defaultTextFieldColors()
+                        },
+                        maxLines = 1,
+                        modifier = Modifier
+                            .padding(horizontal = 24.dp)
+                            .fillMaxWidth()
+                            .focusRequester(workspaceNameFocusRequester),
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = StringRes.current.targetFile,
+                        style = ShadcnTheme.textStyles.labelLarge,
+                        modifier = Modifier
+                            .padding(horizontal = 24.dp)
+                            .padding(bottom = 8.dp),
+                    )
+
+                    SelectField(
+                        colors = if (isTargetFileError) {
+                            defaultSelectFieldColors(SelectFieldColor.Error)
+                        } else {
+                            defaultSelectFieldColors()
+                        },
                         onClick = {
-                            if (workspaceName.text.isEmpty()) {
-                                isWorkspaceNameError = true
-                                workspaceNameFocusRequester.requestFocus()
-                                sonnerState.sonner(StringRes.current.inputProjectNamePlaceholder)
-                                return@Button
-                            }
-
-                            if (selectedTargetFile == null) {
-                                isTargetFileError = true
-                                sonnerState.sonner(StringRes.current.selectTargetFilePlaceholder)
-                                return@Button
-                            }
-                            model.onNew(workspaceName.text, selectedTargetFile)
+                            isTargetFileError = false
+                            PickerResultLauncher {
+                                scope.launch {
+                                    val file = FileKit.openFilePicker(
+                                        type = FileKitType.File("apk", "dex"),
+                                        dialogSettings = FileKitDialogSettings.createDefault(),
+                                    )
+                                    if (file != null) {
+                                        selectedTargetFile = file
+                                    }
+                                }
+                            }.launch()
                         },
                     ) {
                         Text(
-                            text = StringRes.current.confirm,
+                            text = selectedTargetFile?.displayPath ?: StringRes.current.selectTargetFilePlaceholder,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            style = ShadcnTheme.textStyles.bodyMedium.copy(
+                                color = if (selectedTargetFile != null) {
+                                    ShadcnTheme.colors.primary
+                                } else {
+                                    ShadcnTheme.textStyles.bodyMedium.color.copy(alpha = 0.6f)
+                                },
+                            ),
                         )
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, ShadcnTheme.colors.border)
+                            .background(ShadcnTheme.colors.muted.copy(0.5f))
+                            .padding(16.dp, 12.dp),
+                    ) {
+                        OutlineButton(
+                            onClick = model::onCloseNewWorkspaceDialog,
+                        ) {
+                            Text(
+                                text = StringRes.current.cancel,
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                if (workspaceName.text.isEmpty()) {
+                                    isWorkspaceNameError = true
+                                    workspaceNameFocusRequester.requestFocus()
+                                    sonnerState.sonner(StringRes.current.inputProjectNamePlaceholder)
+                                    return@Button
+                                }
+
+                                if (selectedTargetFile == null) {
+                                    isTargetFileError = true
+                                    sonnerState.sonner(StringRes.current.selectTargetFilePlaceholder)
+                                    return@Button
+                                }
+                                model.onNew(workspaceName.text, selectedTargetFile)
+                            },
+                        ) {
+                            Text(
+                                text = StringRes.current.confirm,
+                            )
+                        }
                     }
                 }
             }

@@ -9,9 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -96,11 +93,11 @@ fun WorkspaceListPart(
     onDelete: (WorkspaceSummary) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier.width(350.dp),
+    Column(
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier,
     ) {
-        itemsIndexed(uiState.workspaceItems) { _, item ->
+        uiState.workspaceItems.forEach { item ->
             WorkspaceListItem(
                 item = item,
                 onSelect = { summary ->

@@ -1,5 +1,9 @@
 package io.github.dexclub.app
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -7,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import io.github.dexclub.app.navigation.Scenes
@@ -31,26 +36,39 @@ actual fun App(
         ) {
             SonnerBox {
                 val backStack = remember { mutableStateListOf<Scenes>(Scenes.Home) }
-                NavDisplay(
-                    backStack = backStack,
-                    onBack = { /* 不处理物理返回 */ },
-                    entryProvider = entryProvider {
-                        entry<Scenes.Home> { stack ->
-                            HomeScreen(
-                                onEnterWorkspace = { routeArgs ->
-                                    backStack.add(Scenes.Workspace(routeArgs))
-                                },
-                            )
-                        }
+                BackHandler(enabled = backStack.size > 1) {
+                    backStack.removeLastOrNull()
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .systemBarsPadding(),
+                ) {
+                    NavDisplay(
+                        backStack = backStack,
+                        onBack = {
+                            if (backStack.size > 1) {
+                                backStack.removeLastOrNull()
+                            }
+                        },
+                        entryProvider = entryProvider {
+                            entry<Scenes.Home> { stack ->
+                                HomeScreen(
+                                    onEnterWorkspace = { routeArgs ->
+                                        backStack.add(Scenes.Workspace(routeArgs))
+                                    },
+                                )
+                            }
 
-                        entry<Scenes.Workspace> { stack ->
-                            WorkspaceScene(
-                                onBackPressed = {},
-                                routeArgs = stack.args,
-                            )
+                            entry<Scenes.Workspace> { stack ->
+                                WorkspaceScene(
+                                    onBackPressed = { backStack.removeLastOrNull() },
+                                    routeArgs = stack.args,
+                                )
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
     }

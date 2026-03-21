@@ -1,10 +1,6 @@
 package io.github.dexclub.codeview.compose
 
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.selection.LocalTextSelectionColors
-import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -14,20 +10,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
-import io.github.dexclub.codeview.compose.internal.layout.CodeLayoutSnapshot
+import io.github.dexclub.codeview.compose.internal.editor.CodeEditorContent
+import io.github.dexclub.codeview.compose.internal.editor.clampTextRange
+import io.github.dexclub.codeview.compose.internal.editor.clampTextRangeOrNull
+import io.github.dexclub.codeview.compose.internal.editor.resolveExternalSelection
+import io.github.dexclub.codeview.compose.internal.editor.toCodeSelection
+import io.github.dexclub.codeview.compose.internal.editor.toTextRange
 import io.github.dexclub.codeview.compose.internal.layout.CodeLayoutSnapshotFactory
 import io.github.dexclub.codeview.core.annotation.CodeAnnotationHit
 import io.github.dexclub.codeview.core.api.CodeViewApi
 import io.github.dexclub.codeview.core.document.CodeDocument
-import io.github.dexclub.codeview.core.document.DocumentId
-import io.github.dexclub.codeview.core.document.DocumentRevision
 import io.github.dexclub.codeview.core.language.CodeLanguageId
-import io.github.dexclub.codeview.core.text.CodeSelection
 import io.github.dexclub.codeview.core.text.Cursor
 import io.github.dexclub.codeview.core.text.LineSelection
 import io.github.dexclub.codeview.language.addon.CodeAddons
@@ -246,8 +242,32 @@ public fun CodeEditor(
         }
     }
 
-    LaunchedEffect(snapshot.text, externalSelection?.anchorOffset, externalSelection?.caretOffset) {
+    LaunchedEffect(snapshot.text, externalSelection?.anchorOffset, externalSelection?.caretOffset, readOnly) {
+        val hasActiveComposition = fieldValue.composition != null && fieldValue.text != snapshot.text
         val nextValue = when {
+            readOnly -> TextFieldValue(
+                text = snapshot.text,
+                selection = externalSelection?.toTextRange() ?: TextRange(snapshot.text.length),
+            )
+
+            hasActiveComposition -> fieldValue.copy(
+                selection = when {
+                    externalSelection != null -> clampTextRange(
+                        range = externalSelection.toTextRange(),
+                        textLength = fieldValue.text.length,
+                    )
+
+                    else -> clampTextRange(
+                        range = fieldValue.selection,
+                        textLength = fieldValue.text.length,
+                    )
+                },
+                composition = clampTextRangeOrNull(
+                    range = fieldValue.composition,
+                    textLength = fieldValue.text.length,
+                ),
+            )
+
             externalSelection != null -> fieldValue.copy(
                 text = snapshot.text,
                 selection = externalSelection.toTextRange(),
@@ -309,13 +329,14 @@ public fun CodeEditor(
         followCursorToken = if (readOnly || followCursorToken == 0L) null else followCursorToken,
         fieldValue = fieldValue,
         onFieldValueChange = { newValue ->
+            if (fieldValue == newValue) return@CodeEditorContent
+
             fieldValue = newValue
             followCursorToken += 1L
-            val textChanged = snapshot.text != newValue.text
-            if (textChanged) {
+
+            val shouldCommitText = newValue.composition == null && snapshot.text != newValue.text
+            if (shouldCommitText) {
                 document.update(newValue.text)
-            }
-            if (textChanged) {
                 onTextChange?.invoke(newValue.text)
             }
 
@@ -327,160 +348,5 @@ public fun CodeEditor(
             onSelectionChange?.invoke(selectionLayoutSnapshot.codeSelectionToLineSelection(codeSelection))
             onCursorChange?.invoke(selectionLayoutSnapshot.cursorFromSelection(codeSelection))
         },
-    )
-}
-
-@Composable
-private fun CodeEditorContent(
-    documentId: DocumentId,
-    documentRevision: DocumentRevision,
-    layoutSnapshot: CodeLayoutSnapshot,
-    modifier: Modifier,
-    textStyle: TextStyle,
-    readOnly: Boolean,
-    searchHighlight: LineSelection?,
-    initialFirstVisibleLine: Int,
-    initialScrollOffsetX: Int,
-    selection: LineSelection?,
-    cursor: Cursor?,
-    cursorTarget: CodeViewerCursorTarget?,
-    interactionOptions: CodeViewerInteractionOptions,
-    onScrollChange: ((firstVisibleLine: Int, scrollOffsetX: Int) -> Unit)?,
-    onViewportChange: ((firstVisibleLine: Int, lastVisibleLine: Int) -> Unit)?,
-    onAnnotationHit: ((CodeAnnotationHit) -> Unit)?,
-    onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)?,
-    followCursorToken: Long?,
-    fieldValue: TextFieldValue,
-    onFieldValueChange: (TextFieldValue) -> Unit,
-) {
-    CodeViewerCanvas(
-        documentKey = documentId,
-        documentRevision = documentRevision,
-        layoutSnapshot = layoutSnapshot,
-        modifier = modifier,
-        textStyle = textStyle,
-        initialFirstVisibleLine = initialFirstVisibleLine,
-        initialScrollOffsetX = initialScrollOffsetX,
-        selection = selection,
-        cursor = cursor,
-        searchHighlight = searchHighlight,
-        cursorTarget = cursorTarget,
-        interactionOptions = interactionOptions,
-        onAnnotationHit = onAnnotationHit,
-        onContextMenu = onContextMenu,
-        onScrollChange = onScrollChange,
-        onViewportChange = onViewportChange,
-        followCursorToken = followCursorToken,
-        overlayContent = if (readOnly) {
-            null
-        } else {
-            { overlayModifier, canvasMetrics ->
-                val selectionColors = remember {
-                    TextSelectionColors(
-                        handleColor = Color(0xFF4096FF),
-                        backgroundColor = Color.Transparent,
-                    )
-                }
-                CompositionLocalProvider(LocalTextSelectionColors provides selectionColors) {
-                    BasicTextField(
-                        value = fieldValue,
-                        onValueChange = onFieldValueChange,
-                        modifier = overlayModifier.annotationInteractionModifier(
-                            layoutSnapshot = layoutSnapshot,
-                            documentKey = documentId,
-                            documentRevision = documentRevision,
-                            charWidthPx = canvasMetrics.charWidthPx,
-                            lineHeightPx = canvasMetrics.lineHeightPx,
-                            interactionOptions = interactionOptions,
-                            onAnnotationHit = onAnnotationHit,
-                            onContextMenu = onContextMenu,
-                            enablePrimaryClick = false,
-                            enableLongPressContextMenu = false,
-                            enableSecondaryClickContextMenu = true,
-                        ),
-                        readOnly = false,
-                        singleLine = false,
-                        minLines = layoutSnapshot.lineCount.coerceAtLeast(1),
-                        maxLines = Int.MAX_VALUE,
-                        textStyle = CodeViewDefaults.CodeTextStyle
-                            .merge(textStyle)
-                            .copy(color = Color.Transparent),
-                        cursorBrush = SolidColor(Color.Transparent),
-                    )
-                }
-            }
-        },
-    )
-}
-
-private fun resolveExternalSelection(
-    layoutSnapshot: CodeLayoutSnapshot,
-    selection: LineSelection?,
-    cursor: Cursor?,
-): CodeSelection? {
-    val safeSelection = layoutSnapshot.clampSelection(selection)
-    val safeCursor = layoutSnapshot.clampCursor(cursor)
-
-    if (safeSelection == null) {
-        return safeCursor?.let { safe -> CodeSelection.collapsed(layoutSnapshot.cursorToOffset(safe)) }
-    }
-
-    val normalizedSelection = safeSelection.normalized()
-    val startOffset = layoutSnapshot.positionToOffset(
-        normalizedSelection.startLine,
-        normalizedSelection.startOffset,
-    )
-    val endOffset = layoutSnapshot.positionToOffset(
-        normalizedSelection.endLine,
-        normalizedSelection.endOffset,
-    )
-    val cursorOffset = safeCursor?.let(layoutSnapshot::cursorToOffset)
-
-    return when {
-        cursorOffset == null -> CodeSelection(
-            anchorOffset = startOffset,
-            caretOffset = endOffset,
-        )
-
-        cursorOffset == startOffset && startOffset != endOffset -> CodeSelection(
-            anchorOffset = endOffset,
-            caretOffset = startOffset,
-        )
-
-        else -> CodeSelection(
-            anchorOffset = startOffset,
-            caretOffset = endOffset,
-        )
-    }
-}
-
-private fun TextRange.toCodeSelection(): CodeSelection =
-    CodeSelection(
-        anchorOffset = start,
-        caretOffset = end,
-    )
-
-private fun CodeSelection.toTextRange(): TextRange = TextRange(
-    start = anchorOffset,
-    end = caretOffset,
-)
-
-private fun clampTextRange(
-    range: TextRange,
-    textLength: Int,
-): TextRange {
-    return TextRange(
-        start = range.start.coerceIn(0, textLength),
-        end = range.end.coerceIn(0, textLength),
-    )
-}
-
-private fun clampTextRangeOrNull(
-    range: TextRange?,
-    textLength: Int,
-): TextRange? = range?.let {
-    clampTextRange(
-        range = it,
-        textLength = textLength,
     )
 }

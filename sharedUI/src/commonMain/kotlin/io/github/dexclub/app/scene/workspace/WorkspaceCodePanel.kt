@@ -17,6 +17,7 @@ internal fun WorkspaceCodePanel(
     uiState: WorkspaceCodePanelUiState,
     tabBarCallbacks: WorkspaceTabBarCallbacks,
     paneCallbacks: WorkspaceCodePaneCallbacks,
+    layoutMode: WorkspaceLayoutMode,
     modifier: Modifier = Modifier,
 ) {
     if (uiState.openTabs.isEmpty()) return
@@ -47,6 +48,7 @@ internal fun WorkspaceCodePanel(
             codePanelUiState = uiState,
             callbacks = paneCallbacks,
             state = pagerState,
+            layoutMode = layoutMode,
             modifier = Modifier.weight(1f),
         )
     }

@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.collectLatest
 internal fun SideLazyColumn(
     uiState: WorkspaceSidePanelUiState,
     callbacks: WorkspaceSidePanelCallbacks,
+    showScrollbars: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState(
@@ -143,21 +144,23 @@ internal fun SideLazyColumn(
             }
         }
 
-        VerticalScrollbar(
-            state = listState,
-            autoHide = false,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(vertical = 12.dp, horizontal = 2.dp),
-        )
+        if (showScrollbars) {
+            VerticalScrollbar(
+                state = listState,
+                autoHide = false,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(vertical = 12.dp, horizontal = 2.dp),
+            )
 
-        HorizontalScrollbar(
-            state = scrollState,
-            autoHide = false,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(vertical = 2.dp, horizontal = 12.dp),
-        )
+            HorizontalScrollbar(
+                state = scrollState,
+                autoHide = false,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(vertical = 2.dp, horizontal = 12.dp),
+            )
+        }
     }
 }
 

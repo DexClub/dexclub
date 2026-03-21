@@ -29,6 +29,7 @@ actual fun WorkspaceScene(
     WorkspaceSceneContent(
         model = model,
         onRequestExportWorkspaceLogs = requestExportWorkspaceLogs,
+        onBackPressed = onBackPressed,
         dragHandleModifier = Modifier.pointerHoverIcon(PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR))),
     )
 }

@@ -75,6 +75,7 @@ internal data class CodeViewportState(
         charWidthPx: Float,
         cursorHorizontalPx: Float? = null,
         cursorWidthPx: Float = 1f,
+        maxHorizontalScrollPx: Float? = null,
     ): CodeViewportState {
         val safeCursor = layout.clampCursor(cursor) ?: return clamp(layout)
         val safeViewport = clamp(layout)
@@ -99,7 +100,7 @@ internal data class CodeViewportState(
             firstVisibleLine = nextFirstVisibleLine,
             horizontalScrollPx = nextHorizontalScrollPx,
         ).clamp(layout).clampHorizontalScroll(
-            maxHorizontalScrollPx = safeViewport.maxHorizontalScrollPx(
+            maxHorizontalScrollPx = maxHorizontalScrollPx ?: safeViewport.maxHorizontalScrollPx(
                 layout = layout,
                 charWidthPx = charWidthPx,
             ),

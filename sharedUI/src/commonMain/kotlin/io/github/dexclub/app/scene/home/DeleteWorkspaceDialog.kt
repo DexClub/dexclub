@@ -2,9 +2,13 @@ package io.github.dexclub.app.scene.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -32,49 +36,57 @@ fun DeleteConfirmDialog(
     Dialog(
         onDismissRequest = model::onCloseDeleteConfirmDialog,
     ) {
-        Card(
-            contentPadding = androidx.compose.foundation.layout.PaddingValues.Zero,
-            modifier = Modifier.width(320.dp),
+        BoxWithConstraints(
+            contentAlignment = androidx.compose.ui.Alignment.Center,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
         ) {
-            Column {
-                Text(
-                    text = buildAnnotatedString {
-                        val split = StringRes.current.deleteWorkspaceMessage.split(" ")
-                        append(split[0])
-                        append(" ")
-                        withStyle(SpanStyle(background = ShadcnTheme.colors.sidebarBorder)) {
-                            append(split[1].format(uiState.selectedWorkspaceItem!!.name))
-                        }
-                        append(" ")
-                        append(split[2])
-                    },
-                    style = ShadcnTheme.textStyles.bodyMedium,
-                    modifier = Modifier
-                        .padding(horizontal = 24.dp, vertical = 32.dp)
-                )
+            val dialogWidth = (maxWidth * 0.92f).coerceAtMost(420.dp)
 
-                Row(
-                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, ShadcnTheme.colors.border)
-                        .background(ShadcnTheme.colors.muted.copy(0.5f))
-                        .padding(16.dp, 12.dp),
-                ) {
-                    OutlineButton(
-                        onClick = model::onCloseDeleteConfirmDialog,
+            Card(
+                contentPadding = PaddingValues.Zero,
+                modifier = Modifier.width(dialogWidth),
+            ) {
+                Column {
+                    Text(
+                        text = buildAnnotatedString {
+                            val split = StringRes.current.deleteWorkspaceMessage.split(" ")
+                            append(split[0])
+                            append(" ")
+                            withStyle(SpanStyle(background = ShadcnTheme.colors.sidebarBorder)) {
+                                append(split[1].format(uiState.selectedWorkspaceItem!!.name))
+                            }
+                            append(" ")
+                            append(split[2])
+                        },
+                        style = ShadcnTheme.textStyles.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 32.dp),
+                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.End,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, ShadcnTheme.colors.border)
+                            .background(ShadcnTheme.colors.muted.copy(0.5f))
+                            .padding(16.dp, 12.dp),
                     ) {
-                        Text(
-                            text = StringRes.current.cancel,
-                        )
-                    }
-                    Spacer(modifier = Modifier.padding(horizontal = 8.dp))
-                    Button(
-                        onClick = model::onDeleteConfirm,
-                    ) {
-                        Text(
-                            text = StringRes.current.delete,
-                        )
+                        OutlineButton(
+                            onClick = model::onCloseDeleteConfirmDialog,
+                        ) {
+                            Text(
+                                text = StringRes.current.cancel,
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = model::onDeleteConfirm,
+                        ) {
+                            Text(
+                                text = StringRes.current.delete,
+                            )
+                        }
                     }
                 }
             }

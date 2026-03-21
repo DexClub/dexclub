@@ -66,6 +66,7 @@ kotlin {
         }
 
         androidMain.dependencies {
+            implementation(libs.androidx.activityCompose)
             implementation(libs.kstore.file)
             implementation(libs.androidx.documentfile)
         }

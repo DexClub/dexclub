@@ -4,11 +4,13 @@
 
 - 主计划文档：`CANVAS_EDITOR_REFACTOR_PLAN.md`
 - 进度跟踪文档：`CANVAS_EDITOR_REFACTOR_PROGRESS.md`
+- 输入锚点规则：`INPUT_ANCHOR_STATE_RULES.md`
 
 两份文档的分工如下：
 
 - 本文档负责记录目标、范围、设计方案、阶段拆分、风险和验收标准
 - 进度文档负责记录当前状态、阶段推进情况、已确认决议、最近变更和阻塞项
+- 输入锚点规则文档负责记录 IME / composing / commit / 焦点 / 锚点重定位的状态边界
 
 使用约定：
 
@@ -40,10 +42,11 @@
 ### 主要目标
 
 1. 将 `CodeViewer` 改为基于 `Canvas` 的自绘渲染
-2. 将 `CodeEditorContent` 改为“Canvas 显示 + 透明输入桥接层”的编辑模型
-3. 正式引入 viewport 概念，并让只读态与编辑态共享同一套滚动和可见区定义
-4. 将现有公开参数真正接入内部逻辑，保证外部调用方状态可恢复、可同步
-5. 建立后续可扩展的代码坐标系统，为折叠、行号栏、诊断波浪线、代码补全定位等能力打基础
+2. 将 `CodeEditorContent` 改为“Canvas 显示 + 隐藏 IME host / 平台输入桥接”的编辑模型
+3. 让编辑态的 caret、selection、命中与 reveal 全部回到 Canvas / `TextLayoutResult` 主导
+4. 正式引入 viewport 概念，并让只读态与编辑态共享同一套滚动和可见区定义
+5. 将现有公开参数真正接入内部逻辑，保证外部调用方状态可恢复、可同步
+6. 建立后续可扩展的代码坐标系统，为折叠、行号栏、诊断波浪线、代码补全定位等能力打基础
 
 ### 次要目标
 
@@ -86,22 +89,27 @@
 
 那么后面会出现双份命中测试、双份滚动逻辑、双份选区映射，维护成本高，而且行为容易不一致。
 
-### 3. “透明 BasicTextField 跟随选区”存在较高风险
+### 3. “透明 BasicTextField 作为编辑主控”存在较高风险
 
-这个思路不是完全不可行，但不适合作为第一阶段主方案，主要风险包括：
+最新实现与手测已经证明，这条路线会把编辑态拆成两套系统：
 
-- IME 候选框、焦点和输入连接与组件真实位置强耦合
-- 多行选区时不存在单一“输入层位置”
-- Android / Desktop 行为差异较大
-- 拖拽选区与输入层位置同步复杂
-- 透明输入层频繁重定位会增加组合、测量与焦点抖动风险
+- `BasicTextField` 内部维护一套文本布局、选区和 composing 语义
+- `Canvas` 再维护一套视觉绘制、光标、命中和 reveal 逻辑
 
-因此第一阶段更推荐：
+主要风险包括：
 
-- `Canvas` 负责完整显示
-- 一个透明的 `BasicTextField` 固定覆盖在编辑区域内
-- 文本、选区、光标、滚动都由我们自己的状态驱动
-- 后续如果需要更精确的 IME 锚点，再考虑“仅在折叠 caret 状态下按光标定位输入锚点”的增强方案
+- composing 文本直接落入正文时，会触发 `TextFieldValue`、`CodeDocument`、Canvas 三条链路的高频同步
+- 输入控件内部布局与 Canvas 自绘布局来源不同，容易出现 caret 横向错位
+- 点击、拖拽、选区、自动滚动被拆成两套系统，平台差异更难收敛
+- Android / Desktop 下的焦点、IME 候选框和删除语义更容易出现抖动或回归
+
+因此当前主方案调整为：
+
+- `Canvas` 负责完整显示，且成为编辑态唯一视觉真相源
+- `CodeEditor` 自己管理文本、选区、光标、点击定位、拖拽选区和 reveal
+- Android 使用一个隐藏的 `0x0 BasicTextField` 仅承接 IME 连接、composing 和 commit
+- Desktop 继续通过 `onKeyEvent` 处理键盘输入与导航
+- 后续如果需要更精确的 IME 锚点，再考虑在移动端为折叠 caret 追加平台锚点能力
 
 ## 核心设计
 
@@ -414,73 +422,190 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 
 ### 文本渲染策略
 
-第一阶段优先采用“按可见行逐行绘制”的策略：
+第一阶段优先采用“按可见行逐行绘制 + 每行缓存真实 `TextLayoutResult`”的策略：
 
 - 每一帧只处理 viewport 内可见行
-- 每行按 token 分段绘制
-- 横向位置基于固定字符宽度计算
-
-这要求字体使用等宽字体，且列宽按测量结果统一确定。否则命中测试和横向滚动会非常不稳定。
+- 每行先构造带 token 颜色的 `AnnotatedString`
+- 每行绘制、selection、caret、annotation 命中统一复用同一份 `TextLayoutResult`
+- 仅将 `charWidthPx` 保留为行尾 cursor 宽度和少量 fallback 场景的辅助值
 
 ### 文本测量建议
 
-需要在组件初始化时测出：
+需要区分“行高估算”和“横向几何真值”：
 
-- `lineHeightPx`
-- `charWidthPx`
-- `baselinePx`
+- `lineHeightPx` 仍可通过样本测量估算
+- `charWidthPx` 只作为少量 fallback 场景的辅助值
+- 每个可见逻辑行都需要可复用的 `TextLayoutResult`
 
-后续所有坐标都基于这三个值推导，而不是依赖每次点击时重新做全文布局。
+后续点击定位、selection、caret、annotation 命中和横向 reveal 都应优先基于每行真实 `TextLayoutResult`，而不是只依赖固定列宽推导。
 
 ### 四、输入桥接层
 
-编辑态采用“显示层”和“输入层”分离：
+编辑态采用“显示层”和“输入桥接层”分离，但编辑主控不再交给可见输入控件：
 
 - `Canvas` 负责真实视觉输出
-- 透明 `BasicTextField` 负责接收键盘输入、删除、粘贴、IME 事件、焦点
-- 不引入外部封装的 `TextField` 组件，避免 `code-view` 与其他 UI 模块形成反向依赖；后续如需真实布局信息，直接使用 `BasicTextField` 提供的 `onTextLayout`
+- `CodeEditor` 自己管理 `TextFieldValue`、selection、cursor、点击定位、拖拽与 reveal
+- Android 使用隐藏的 `0x0 BasicTextField` 负责 IME 连接、composing 和 commit
+- Desktop 使用 `onKeyEvent` 处理普通输入、删除、粘贴、导航与全选
+- 平台输入接入层通过 `expect/actual` bridge 收口，不在公共编辑器中继续堆平台条件分支
+- 不引入外部封装的 `TextField` 组件，避免 `code-view` 与其他 UI 模块形成反向依赖
 
-### 第一阶段输入方案
+### 当前主输入方案
 
-优先方案：
-
-- 透明 `BasicTextField` 固定覆盖整个编辑区域
 - `CodeEditor` 不再二次嵌套 `CodeViewer`，而是直接复用同一个 `CodeViewerCanvas` 和同一组滚动容器
-- 使用我们自己的文本状态作为单一真源
-- 将 `TextFieldValue.selection` 与内部全局 offset 选区保持同步
-- 由 Canvas 渲染自定义选区和 caret
+- `Canvas` 成为正文、selection、caret、命中和横向 reveal 的唯一视觉真相源
+- 编辑态仍使用内部 `TextFieldValue` 承接平台输入语义，但 `composition != null` 时不立即写回 `CodeDocument`
+- Android 的 IME host 固定为隐藏 `0x0 BasicTextField`
+- Desktop 的键盘路径不依赖隐藏输入框
 
 这样做的好处是：
 
-- IME 连接更稳定
+- composing 不再直接驱动正文和 Canvas 双重刷新
+- caret、selection、命中和 reveal 都能复用同一套几何来源
 - Viewer / Editor 共用同一套 scroll state，避免双层滚动不同步
-- 焦点行为更自然
-- 无需在每次选区变化时重建输入层位置
-- Android / Desktop 更容易统一
+- 行为更接近旧版，平台差异更容易收敛
 
-第一阶段交互约束：
+当前阶段交互约束：
 
 - `CodeViewer` 可以响应 annotation 主点击与上下文命中
 - `CodeEditor` 的主点击优先保留给文本选择和 caret 定位
-- `CodeEditor` 如需暴露 annotation 交互，第一阶段优先只开放上下文命中，不抢占主点击
+- `CodeEditor` 如需暴露 annotation 交互，当前优先只开放上下文命中，不抢占主点击
 
-### 不建议第一阶段采用的方案
+### 不建议作为基础架构的方案
 
-“透明 `BasicTextField` 跟随选区或 caret 位置移动”暂不作为主路线，理由：
+- 全屏透明 `BasicTextField` 作为编辑主控
+- 透明输入控件跟随选区或 caret 位置移动
+
+理由：
 
 - 选区是范围，不是点
 - 多行选区无法自然映射到一个输入框位置
-- 透明控件位置变化会影响输入法候选框锚点和焦点稳定性
-- 容易引入平台差异 bug
+- 可见输入控件的内部布局与 Canvas 几何容易打架
+- 容易引入 IME 候选框、焦点和平台差异问题
 
 ### 第二阶段可评估增强
 
-如果后续需要更精确的 IME 候选框定位，可在“折叠选区”下引入输入锚点：
+如果后续需要更精确的 IME 候选框定位，可在移动端的“折叠选区”下补平台锚点：
 
-- 透明输入层仍负责输入
-- 但额外维护一个 caret 锚点坐标，供平台输入法定位使用
+- 隐藏 IME host 仍负责输入
+- 但额外维护一个 caret 平台锚点坐标，供输入法候选框定位使用
 
-这应作为增强项，而不是第一阶段基础方案。
+这应作为增强项，而不是当前基础架构。
+
+### 输入锚点方案补充
+
+当前已确认一个更明确的方向：`BasicTextField` 不再承担“透明编辑层”，而只承担“输入锚点”角色。
+
+输入锚点的职责边界如下：
+
+- 它不是可见编辑器，画布仍然是唯一可见文本来源
+- 它不绑定整份文档文本，只维护独立的 `imeFieldValue`
+- 它只负责：
+  - 建立平台输入法 / 文本输入会话
+  - 承载 `composition != null` 的预输入片段
+  - 在 `composition == null` 时产出最终 commit 文本
+- 它不负责：
+  - 绘制正文
+  - 绘制 caret
+  - 绘制 selection
+  - 命中测试
+  - 方向键 / Home / End / 删除 / 粘贴等命令键逻辑
+
+也就是说，输入锚点只是“IME 锚点 + 输入会话宿主”，其余一切都交给画布与编辑状态机。
+
+#### 中文输入法语义
+
+输入锚点需要正确区分 composing 与 commit：
+
+- `composition != null`
+  - 说明当前仍处于预输入阶段
+  - 画布只显示临时 composing 片段
+  - 不将该片段正式写入文档
+- `composition == null && text.isNotEmpty()`
+  - 说明输入法已经完成一次最终提交
+  - 不论提交结果是汉字还是拼音原文，都统一作为 commit 文本写入文档
+  - 提交完成后立即清空 `imeFieldValue`
+
+因此：
+
+- 空格确认候选汉字，本质上是一种 commit
+- 回车确认拼音原文，本质上也是一种 commit
+- 编辑器不需要自行判断“空格”和“回车”的输入法语义差异，只需要根据 `composition` 是否存在来区分预输入和正式提交
+
+#### 命令键与跨行场景
+
+输入锚点方案还必须明确处理“编辑命令导致光标离开当前行”的情况，例如：
+
+- 直接按回车插入换行
+- Backspace / Delete 导致跨行合并
+- 方向键、Home / End、鼠标点击导致光标跳转
+- 选区替换后光标落到新的位置
+
+这里的核心规则是：
+
+- 输入锚点永远服务于“当前画布光标”
+- 它不能长期绑定在某次输入开始时的旧位置
+- 一旦编辑命令改变了真实文档或真实光标位置，输入锚点必须立即重新定位
+
+更具体地说：
+
+- 普通编辑命令（例如直接回车换行）由编辑状态机处理
+- 文档和画布光标更新后，输入锚点在下一帧跟随新的画布光标位置移动
+- 如果当前仍存在 composing 片段，而编辑命令会改变文档结构或光标位置，则应优先：
+  - 结束当前 composing
+  - 或清空 / 重置输入锚点的局部 `imeFieldValue`
+
+也就是说，输入锚点不是“当前这一轮输入的所有者”，而只是“当前光标位置的输入入口”。
+
+#### 输入锚点定位原则
+
+输入锚点如果需要跟随光标，应满足以下条件：
+
+- 跟随的是“画布光标在当前 viewport 中的坐标”，而不是滚动内容内部的普通控件位置
+- 它不能成为滚动内容的一部分，否则很容易在获取焦点时触发 `bringIntoView`
+- 它不能接管鼠标事件
+- 它不能直接接管整套命令键
+
+推荐定位模型：
+
+- 画布继续负责可见内容
+- 输入锚点作为独立浮层存在
+- 其位置由当前光标的 viewport 坐标驱动
+- 命令键仍由编辑状态机处理
+
+此外还需要保证：
+
+- 输入锚点的焦点获取不会触发滚动容器的 `bringIntoView` 抖动
+- 输入锚点位置更新不会吞掉鼠标事件
+- 输入锚点失焦、输入法取消、候选提交等状态变化都能及时同步回画布状态机
+
+#### 当前实现取舍
+
+桌面端当前已验证：
+
+- “全屏透明输入宿主”更容易维持文本输入可用性
+- “跟随光标的小宿主”更有希望解决候选窗锚点问题
+
+当前阶段已经确认：
+
+- Desktop 浮动输入锚点本身已经可以稳定承接输入
+- 输入锚点状态机、自动焦点与命令键打断规则已跑通
+- 画布侧 `inline composing overlay` 已落地
+- `selection + composing` 已按“首次进入 composing 时先真实删除选区”策略实现
+- `composing` 期间的可见光标、输入锚点与自动 reveal 已接入 preedit 内部 caret
+- Desktop 候选词窗口当前已能跟随输入锚点移动，整体效果达到当前阶段预期
+
+因此后续不再需要围绕“桌面候选窗是否能跟随光标”继续试错，剩余工作应转向边界一致性验证和交互收尾。
+
+#### 仍需重点校验的边界
+
+输入锚点方案在继续落地前，应至少验证以下边界：
+
+- composing 期间直接回车、Backspace、Delete、方向键移动是否会导致状态错乱
+- composing 期间鼠标点击其他位置后，旧 composing 是否会被正确结束或丢弃
+- 输入锚点重新定位后，候选窗是否仍能稳定跟随
+- 输入锚点失焦后，未提交 composing 是否会被平台输入法吞掉或异常保留
+- 长行横向滚动、纵向滚动后，输入锚点是否仍能落在正确 viewport 坐标
 
 ### 五、交互命中模型
 
@@ -664,12 +789,14 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 任务：
 
 - 引入内部 `TextFieldValue` 状态
-- 透明 `BasicTextField` 固定覆盖编辑区
+- 将编辑态点击、拖拽、selection、caret 与 reveal 逻辑收回 `CodeEditor`
+- Android 接入隐藏 `0x0 BasicTextField` 作为 IME host
+- Desktop 接入 `onKeyEvent` 键盘输入与剪贴板路径
 - 将 `TextFieldValue.selection` 与内部选区映射同步
-- 文本变化后更新 `CodeDocument`
-- Canvas 绘制 caret 和选区
+- `composition != null` 时不立即更新 `CodeDocument`
+- Canvas 绘制 caret 和选区，并统一使用 `TextLayoutResult`
 - 输入后自动 reveal caret
-- 接入基础键盘操作
+- 接入基础键盘操作与拖拽选区
 
 需要优先保证的输入路径：
 
@@ -682,7 +809,7 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 风险点：
 
 - `String` 与 `TextFieldValue` 双状态不同步
-- 输入法 composing 区域可能需要额外处理
+- IME composing、退格与 commit 语义需要继续做平台手测
 - 编辑后 token 刷新存在异步延迟
 
 验收：
@@ -746,18 +873,19 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 
 主张：
 
-- 第一阶段使用固定覆盖式透明 `BasicTextField`
+- 第一阶段使用“隐藏 IME host + Canvas 自管编辑”方案
 
 原因：
 
-- 工程复杂度可控
-- 焦点和 IME 稳定性更高
-- 更容易把问题收敛到“状态同步”而不是“输入控件定位”
+- 工程复杂度仍可控
+- 能避免可见输入控件内部布局与 Canvas 布局互相干扰
+- 更容易把问题收敛到“状态同步 + 单一几何来源”
 
 代价：
 
 - 需要自己绘制选区和 caret
 - 需要自己维护命中与自动滚动
+- 需要自己处理 Desktop 键盘输入与移动端 IME 桥接细节
 
 ### 2. 是否一次性做完整编辑器
 
@@ -817,6 +945,6 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 - 共享布局核心
 - 正式 viewport 状态
 - Canvas 自绘 Viewer
-- 固定覆盖式透明 `BasicTextField` 作为第一阶段输入桥接
+- 隐藏 IME host + Canvas 自管编辑作为第一阶段输入桥接
 
-而不是一开始就使用“透明输入框跟随选区移动”的方案。后者可以作为后续增强项，但不适合作为首版基础架构。
+而不是把透明输入控件继续作为编辑主控。输入框跟随选区移动也依然不建议作为首版基础架构，只能作为后续增强项评估。

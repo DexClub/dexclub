@@ -57,7 +57,8 @@ internal fun WorkspaceSearchDialog(
                 .padding(12.dp),
         ) {
             val dialogWidth = (maxWidth * 0.96f).coerceAtMost(580.dp)
-            val dialogHeight = maxHeight.coerceAtMost(540.dp)
+            val dialogHeight = (maxHeight * 0.92f).coerceAtMost(540.dp)
+            val compactLayout = dialogWidth < 460.dp
 
             Card(
                 contentPadding = PaddingValues(20.dp),
@@ -81,37 +82,72 @@ internal fun WorkspaceSearchDialog(
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        TextField(
-                            value = uiState.activeQuery,
-                            onValueChange = onQueryChange,
-                            placeholder = uiState.currentTab.placeholder,
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(
-                                imeAction = ImeAction.Search,
-                            ),
-                            keyboardActions = KeyboardActions(
-                                onSearch = { onSearchRequest() },
-                            ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = 40.dp),
-                        )
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        LoadingButton(
-                            onClick = onSearchRequest,
-                            isLoading = uiState.isCurrentTabSearching,
-                            enabled = uiState.activeQuery.trim().isNotEmpty() && uiState.searchingTab == null,
-                            modifier = Modifier.heightIn(min = 40.dp),
+                    if (compactLayout) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text(
-                                text = "搜索",
+                            TextField(
+                                value = uiState.activeQuery,
+                                onValueChange = onQueryChange,
+                                placeholder = uiState.currentTab.placeholder,
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    imeAction = ImeAction.Search,
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onSearch = { onSearchRequest() },
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 40.dp),
                             )
+                            LoadingButton(
+                                onClick = onSearchRequest,
+                                isLoading = uiState.isCurrentTabSearching,
+                                enabled = uiState.activeQuery.trim().isNotEmpty() && uiState.searchingTab == null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 40.dp),
+                            ) {
+                                Text(
+                                    text = "搜索",
+                                )
+                            }
+                        }
+                    } else {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            TextField(
+                                value = uiState.activeQuery,
+                                onValueChange = onQueryChange,
+                                placeholder = uiState.currentTab.placeholder,
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(
+                                    imeAction = ImeAction.Search,
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onSearch = { onSearchRequest() },
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 40.dp),
+                            )
+
+                            Spacer(modifier = Modifier.width(10.dp))
+
+                            LoadingButton(
+                                onClick = onSearchRequest,
+                                isLoading = uiState.isCurrentTabSearching,
+                                enabled = uiState.activeQuery.trim().isNotEmpty() && uiState.searchingTab == null,
+                                modifier = Modifier.heightIn(min = 40.dp),
+                            ) {
+                                Text(
+                                    text = "搜索",
+                                )
+                            }
                         }
                     }
 

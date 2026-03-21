@@ -32,6 +32,58 @@ internal fun SideHeaderBar(
     callbacks: WorkspaceHeaderCallbacks,
     modifier: Modifier = Modifier,
 ) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(HeaderBarHeight)
+            .padding(horizontal = ContentHorizontalPadding),
+    ) {
+        WorkspaceHeaderTitleBlock(
+            uiState = uiState,
+            modifier = Modifier.weight(1f),
+        )
+        WorkspaceHeaderActionMenu(
+            uiState = uiState,
+            callbacks = callbacks,
+        )
+    }
+}
+
+@Composable
+internal fun WorkspaceHeaderTitleBlock(
+    uiState: WorkspaceHeaderUiState,
+    modifier: Modifier = Modifier,
+    showDisplayPath: Boolean = true,
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = uiState.workspaceName,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = ShadcnTheme.textStyles.labelMedium,
+            modifier = Modifier.padding(start = 8.dp),
+        )
+        if (showDisplayPath) {
+            Text(
+                text = uiState.displayPath,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = ShadcnTheme.textStyles.labelSmall.copy(
+                    color = ShadcnTheme.colors.primary.copy(alpha = 0.6f),
+                ),
+                modifier = Modifier.padding(start = 8.dp),
+            )
+        }
+    }
+}
+
+@Composable
+internal fun WorkspaceHeaderActionMenu(
+    uiState: WorkspaceHeaderUiState,
+    callbacks: WorkspaceHeaderCallbacks,
+    modifier: Modifier = Modifier,
+) {
     var actionMenuExpanded by remember { mutableStateOf(false) }
     var searchDialogVisible by remember { mutableStateOf(false) }
     var settingsDialogVisible by remember { mutableStateOf(false) }
@@ -41,77 +93,53 @@ internal fun SideHeaderBar(
         searchDialogVisible = false
     }
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .fillMaxWidth()
-            .height(HeaderBarHeight)
-            .padding(horizontal = ContentHorizontalPadding),
+    DropdownMenu(
+        expanded = actionMenuExpanded,
+        onDismissRequest = { actionMenuExpanded = false },
+        trigger = {
+            EIconButton(
+                shape = CircleShape,
+                contentPadding = PaddingValues(4.dp),
+                indicationColor = ShadcnTheme.colors.accent,
+                onClick = {
+                    actionMenuExpanded = true
+                },
+                modifier = modifier,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Filled.MoreVert,
+                    contentDescription = null,
+                    tint = ShadcnTheme.colors.primary.copy(alpha = 0.6f),
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        },
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = uiState.workspaceName,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = ShadcnTheme.textStyles.labelMedium,
-                modifier = Modifier.padding(start = 8.dp),
-            )
-            Text(
-                text = uiState.displayPath,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = ShadcnTheme.textStyles.labelSmall.copy(color = ShadcnTheme.colors.primary.copy(alpha = 0.6f)),
-                modifier = Modifier.padding(start = 8.dp),
-            )
-        }
-
-        DropdownMenu(
-            expanded = actionMenuExpanded,
-            onDismissRequest = { actionMenuExpanded = false },
-            trigger = {
-                EIconButton(
-                    shape = CircleShape,
-                    contentPadding = PaddingValues(4.dp),
-                    indicationColor = ShadcnTheme.colors.accent,
-                    onClick = {
-                        actionMenuExpanded = true
-                    }
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Filled.MoreVert,
-                        contentDescription = null,
-                        tint = ShadcnTheme.colors.primary.copy(alpha = 0.6f),
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
+        DropdownMenuItem(
+            text = "搜索",
+            textStyle = ShadcnTheme.textStyles.bodySmall,
+            onClick = {
+                callbacks.onResetSearchDialogState()
+                searchDialogVisible = true
+                actionMenuExpanded = false
             },
-        ) {
-            DropdownMenuItem(
-                text = "搜索",
-                textStyle = ShadcnTheme.textStyles.bodySmall,
-                onClick = {
-                    callbacks.onResetSearchDialogState()
-                    searchDialogVisible = true
-                    actionMenuExpanded = false
-                },
-            )
-            DropdownMenuItem(
-                text = "导出日志（最近7天）",
-                textStyle = ShadcnTheme.textStyles.bodySmall,
-                onClick = {
-                    callbacks.onRequestExportWorkspaceLogs()
-                    actionMenuExpanded = false
-                },
-            )
-            DropdownMenuItem(
-                text = "设置",
-                textStyle = ShadcnTheme.textStyles.bodySmall,
-                onClick = {
-                    settingsDialogVisible = true
-                    actionMenuExpanded = false
-                },
-            )
-        }
+        )
+        DropdownMenuItem(
+            text = "导出日志（最近7天）",
+            textStyle = ShadcnTheme.textStyles.bodySmall,
+            onClick = {
+                callbacks.onRequestExportWorkspaceLogs()
+                actionMenuExpanded = false
+            },
+        )
+        DropdownMenuItem(
+            text = "设置",
+            textStyle = ShadcnTheme.textStyles.bodySmall,
+            onClick = {
+                settingsDialogVisible = true
+                actionMenuExpanded = false
+            },
+        )
     }
 
     WorkspaceSearchDialog(

@@ -1,11 +1,14 @@
 package io.github.dexclub.app.scene.workspace
 
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,50 +32,59 @@ internal fun WorkspaceSettingsDialog(
     Dialog(
         onDismissRequest = onDismissRequest,
     ) {
-        Card(
-            contentPadding = PaddingValues(24.dp),
-            modifier = Modifier.width(320.dp),
+        BoxWithConstraints(
+            contentAlignment = androidx.compose.ui.Alignment.Center,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
         ) {
-            Column {
-                Text(
-                    text = "设置",
-                    style = ShadcnTheme.textStyles.titleLarge,
-                )
+            val dialogWidth = (maxWidth * 0.92f).coerceAtMost(360.dp)
 
-                Spacer(modifier = Modifier.height(20.dp))
+            Card(
+                contentPadding = PaddingValues(24.dp),
+                modifier = Modifier.width(dialogWidth),
+            ) {
+                Column {
+                    Text(
+                        text = "设置",
+                        style = ShadcnTheme.textStyles.titleLarge,
+                    )
 
-                Checkbox(
-                    checked = uiState.autoUnicodeDecodeEnabled,
-                    onCheckedChange = onAutoUnicodeDecodeChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = {
-                        Column {
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Checkbox(
+                        checked = uiState.autoUnicodeDecodeEnabled,
+                        onCheckedChange = onAutoUnicodeDecodeChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = {
+                            Column {
+                                Text(
+                                    text = "自动Unicode解码",
+                                    style = ShadcnTheme.textStyles.bodySmall,
+                                )
+                                Text(
+                                    text = "导出 Smali 时将 \\uXXXX 转为实际字符",
+                                    style = ShadcnTheme.textStyles.labelMedium.copy(
+                                        color = ShadcnTheme.colors.primary.copy(alpha = 0.6f),
+                                    ),
+                                )
+                            }
+                        },
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Spacer(modifier = Modifier.weight(1f))
+                        OutlineButton(
+                            onClick = onDismissRequest,
+                        ) {
                             Text(
-                                text = "自动Unicode解码",
-                                style = ShadcnTheme.textStyles.bodySmall,
-                            )
-                            Text(
-                                text = "导出 Smali 时将 \\uXXXX 转为实际字符",
-                                style = ShadcnTheme.textStyles.labelMedium.copy(
-                                    color = ShadcnTheme.colors.primary.copy(alpha = 0.6f),
-                                ),
+                                text = "关闭",
                             )
                         }
-                    },
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Spacer(modifier = Modifier.weight(1f))
-                    OutlineButton(
-                        onClick = onDismissRequest,
-                    ) {
-                        Text(
-                            text = "关闭",
-                        )
                     }
                 }
             }

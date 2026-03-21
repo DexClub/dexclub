@@ -24,6 +24,7 @@ private fun CodeViewPage(
     callbacks: WorkspaceCodePaneCallbacks,
     isSelected: Boolean,
     isContentVisible: Boolean,
+    layoutMode: WorkspaceLayoutMode,
 ) {
     if (!isContentVisible && !isSelected) {
         Box(Modifier.fillMaxSize())
@@ -41,6 +42,32 @@ private fun CodeViewPage(
                 .map { it.kind }
                 .ifEmpty { tab.requiredKinds }
                 .distinct()
+
+            if (layoutMode.isCompact) {
+                val activePane = tab.panes.firstOrNull { pane -> pane.paneIndex == tab.activePaneIndex }
+                val compactKind = activePane?.kind
+                    ?: paneKinds.firstOrNull { kind -> kind == tab.activeKind }
+                    ?: paneKinds.firstOrNull()
+                    ?: tab.activeKind
+                val compactPaneIndex = activePane?.paneIndex
+                    ?: tab.panes.firstOrNull { pane -> pane.kind == compactKind }?.paneIndex
+                    ?: 0
+
+                key("${tab.tabId}#$compactKind") {
+                    CodeViewPane(
+                        tab = tab,
+                        paneState = paneStateOf(compactKind),
+                        callbacks = callbacks,
+                        paneIndex = compactPaneIndex,
+                        kind = compactKind,
+                        isSelectedTab = isSelected,
+                        navigationRevealTarget = codePanelUiState.navigationRevealTarget,
+                        modifier = Modifier.fillMaxSize(),
+                        paddingValues = PaddingValues(end = 4.dp),
+                    )
+                }
+                return
+            }
 
             val leftKind = paneKinds.firstOrNull() ?: OPEN_TAB_KIND_SMALI
             val rightKind = paneKinds.getOrNull(1)
@@ -102,6 +129,7 @@ internal fun CodeViewPager(
     codePanelUiState: WorkspaceCodePanelUiState,
     callbacks: WorkspaceCodePaneCallbacks,
     state: PagerState,
+    layoutMode: WorkspaceLayoutMode,
     modifier: Modifier = Modifier,
 ) {
     val openTabs = codePanelUiState.openTabs
@@ -124,6 +152,7 @@ internal fun CodeViewPager(
                 callbacks = callbacks,
                 isSelected = isSelected,
                 isContentVisible = isContentVisible,
+                layoutMode = layoutMode,
             )
         }
     }

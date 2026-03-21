@@ -4,6 +4,7 @@
 
 - 主计划文档：`CANVAS_EDITOR_REFACTOR_PLAN.md`
 - 当前文档：`CANVAS_EDITOR_REFACTOR_PROGRESS.md`
+- 输入锚点规则：`INPUT_ANCHOR_STATE_RULES.md`
 
 使用方式：
 
@@ -19,10 +20,10 @@
 
 ## 当前总状态
 
-- 最近更新时间：`2026-03-20`
+- 最近更新时间：`2026-03-21`
 - 总体状态：`进行中`
-- 当前阶段：`阶段 6：性能与稳定性`
-- 当前结论：`Cursor` 与 API 先行调整已完成；共享布局快照与 viewport 已接入 `CodeViewer` / `CodeEditor`；`CodeViewer` 已切到 Canvas 自绘并支持 annotation 点击、长按上下文与 desktop 次键上下文；`CodeEditor` 已切到“共享 CodeViewerCanvas + 透明 BasicTextField”输入桥接，并已接通编辑态 caret 自动 reveal；布局快照、坐标解析与 viewport reveal 已有 `commonTest` 覆盖，`sharedUI` 主路径也已开始实际传入 `cursor`；`textStyle` 已确认不是根因；当前已补“平均度量、按行真实宽度测量、编辑态优先绘制 `fieldValue.text`、CJK 行高采样”等修正，但用户最新手测表明 Desktop 下输入汉字时仍存在 caret 横向错位和编辑行抖动，下一步应直接基于 `BasicTextField.onTextLayout` 的真实 `TextLayoutResult` 对齐编辑态绘制与 reveal
+- 当前阶段：`阶段 7：回归与收尾`
+- 当前结论：`Cursor` 与 API 先行调整已完成；共享布局快照与 viewport 已接入 `CodeViewer` / `CodeEditor`；`CodeViewer` 已切到 Canvas 自绘并支持 annotation 点击、长按上下文与 desktop 次键上下文；`CodeEditor` 已切到“共享 CodeViewerCanvas + 隐藏 0x0 IME host + Canvas 自管编辑”的输入模型，编辑态不再依赖全屏透明 `BasicTextField` 作为主控；几何链路已统一到按行缓存的真实 `TextLayoutResult`，caret、selection、annotation 命中和横向 reveal 共用同一套来源；`code-view-compose` 的 JVM / Android 编译与 JVM 测试已再次通过；当前进入 Desktop / Android 手动回归阶段`
 
 ## 阶段总览
 
@@ -33,8 +34,8 @@
 | 2 | viewport 状态层 | 已完成 | viewport 状态、滚动范围、visible range、cursor reveal 已接入 `CodeViewer` |
 | 3 | CodeViewer Canvas 化 | 已完成 | `CodeViewer` 已切 Canvas，自绘、高亮、caret、annotation 命中基础链路已完成 |
 | 4 | Viewer 交互与命中细化 | 进行中 | annotation 点击 / 长按上下文已接入，点击定位、横向滚动下命中细化仍待补 |
-| 5 | CodeEditor 输入桥接 | 进行中 | 已切换到共享 `CodeViewerCanvas`，编辑态仍待补更细回归与交互验证 |
-| 6 | 性能与稳定性 | 进行中 | 已开始拆分文本布局与装饰层，避免 token/annotation 刷新时重复分行 |
+| 5 | CodeEditor 输入桥接 | 已完成 | 已切换到隐藏 IME host + Canvas 自管编辑，基础键盘、点击和拖拽链路已接通 |
+| 6 | 性能与稳定性 | 进行中 | 已统一到按行 `TextLayoutResult` 几何缓存，仍需继续做大文件与长行场景回归 |
 | 7 | 回归与收尾 | 进行中 | `code-view-compose` 测试和 `sharedUI` 双端编译已通过，UI 手动回归仍待补 |
 
 ## 已确认决议
@@ -46,8 +47,18 @@
 - `CodeEditor` 需要补 `readOnly` 参数
 - `CodeEditor(readOnly = false)` 时 caret 强制显示，即使 `cursor == null` 也不允许隐藏
 - `CodeEditor(readOnly = true)` 时才允许通过 `cursor: Cursor?` 控制 caret 显示或隐藏
-- 第一阶段输入桥接优先采用“固定覆盖式透明 `BasicTextField` + Canvas 自绘”，不采用“输入层跟随选区移动”作为主方案
+- 第一阶段输入桥接曾优先采用“固定覆盖式透明 `BasicTextField` + Canvas 自绘”，该决议已在 `2026-03-21` 被替换
 - `CodeEditor` 参数面需要向 `CodeViewer` 对齐，至少补齐滚动、viewport、selection、cursor、annotation 交互相关参数
+
+### 2026-03-21
+
+- 不再将“固定覆盖式透明 `BasicTextField`”作为编辑态主方案
+- `CodeEditor` 的编辑主控正式切回 Canvas / `TextLayoutResult`
+- Android 输入桥接改为隐藏的 `0x0 BasicTextField`，仅承接 IME 连接、composing 和 commit
+- Desktop 输入桥接改为 `onKeyEvent` 键盘路径，不依赖隐藏输入框
+- 编辑态在 `composition != null` 时不立即写回 `CodeDocument`，避免中文输入抖动
+- `CodeViewerCanvas` 的光标、选区、annotation 命中与横向 reveal 统一复用按行 `TextLayoutResult`
+- 平台输入接入层已通过 `PlatformEditorBridge` 收口为 `expect/actual`，公共编辑器不再依赖 `isDesktopPlatform()` 做架构分流
 
 ## 当前阶段详情
 
@@ -156,29 +167,25 @@
 
 ### 阶段 5：CodeEditor 输入桥接
 
-- 状态：`进行中`
+- 状态：`已完成`
 - 已完成：
   - `CodeEditor` 接入 runtime `surface controller`
   - `CodeEditor` 接入 tokens / annotations collect 与 revision 刷新
   - `CodeEditor` 布局快照与 `CodeViewer` 改为同源
   - `CodeEditor` 不再嵌套 `CodeViewer`，改为直接复用 `CodeViewerCanvas`
-  - 编辑态透明 `BasicTextField` 已接入共享 scroll 容器
   - 编辑态 `TextFieldValue.selection` 与 `LineSelection` / `Cursor` 互转已接通
-  - 输入桥接层已隐藏原生选区背景，避免与 Canvas 选区叠绘
-  - `TextFieldValue` 同步时已保留 composing 区域，降低 IME 抖动风险
+  - 编辑态主点击和拖拽选区已回收至 `CodeEditor` 自己处理
+  - Android 侧已接入隐藏 `0x0 BasicTextField` 作为 IME host
+  - Desktop 侧已接入 `onKeyEvent` 键盘输入、删除、粘贴、全选与方向键导航
+  - `composition != null` 时不再立即更新 `CodeDocument`
   - 编辑态已接入 desktop 次键 annotation 上下文命中
   - 编辑态主点击当前明确保留给文本选择 / caret 定位，不触发 annotation 主点击
-  - 编辑态 `TextFieldValue` 变化后已通过内部 token 驱动 caret 自动 reveal
-  - 为布局快照、点击坐标解析、viewport reveal 补入 `commonTest`
-  - 完成 `:code-view-compose:jvmTest`
-  - 再次完成 `:code-view-compose:compileKotlinJvm`
-  - 再次完成 `:code-view-compose:compileAndroidMain`
+  - `code-view-compose` 再次通过 `:compileKotlinJvm`、`:compileAndroidMain` 与 `:jvmTest`
 - 未完成：
-  - 尚未验证 Android / Desktop 的输入法、拖拽选区与长文本编辑体验
-  - caret 自动 reveal 逻辑已接通，但尚未做 Android / Desktop 的专项手动回归
   - 若后续需要“编辑态主点击 annotation”，还需要额外设计与文本选择的优先级
+  - 双击选词、三击选行、长按选词等更细粒度编辑交互仍可继续补强
 - 下一步：
-  - 继续补编辑态交互验证，并开始性能与稳定性检查
+  - 进入阶段 6 / 7，继续做性能与回归验证
 
 ### 阶段 6：性能与稳定性
 
@@ -188,10 +195,13 @@
   - `CodeViewer` / `CodeEditor` 现在会先缓存按文本分行的基础布局，再按 tokens / annotations 做装饰
   - token / annotation 刷新时不再重复重建整份逻辑行布局
   - 每行 token 排序已前移到布局快照构建阶段，移除了绘制阶段的逐帧 `sortedBy`
+  - 新增按行缓存的 `CodeLineTextLayoutCache`
+  - `CodeViewerCanvas` 的正文绘制、caret、selection、annotation 命中和横向 reveal 已统一复用真实 `TextLayoutResult`
   - 为该路径补入 `commonTest`
 - 未完成：
   - 尚未对超长行和大文本滚动做专项性能基准
   - 尚未评估编辑态高频输入下 `selectionLayoutSnapshot` 临时重建成本
+  - 尚未验证 Desktop / Android 长文本输入下的真实体感
 - 下一步：
   - 继续看长文本 / 长行场景下是否需要再拆更细的缓存层
   - 结合主路径回归判断是否需要补专项性能日志或基准
@@ -201,16 +211,48 @@
 - 已完成：
   - 完成 `:code-view-compose:jvmTest`
   - 完成 `:code-view-compose:compileAndroidMain`
+  - 完成 `:code-view-compose:compileKotlinJvm`
   - 完成 `:sharedUI:compileKotlinJvm`
   - 完成 `:sharedUI:compileAndroidMain`
   - `sharedUI` 的 `CodeViewPane` 已开始向 `CodeViewer` 传入 `cursor`
 - 未完成：
-  - 尚未做 Android / Desktop 的手动交互回归
+  - 尚未做 Android / Desktop 的完整手动交互回归
   - 尚未验证工作区主路径下的实际滚动恢复、搜索高亮恢复与上下文菜单体验
+  - 尚未确认 Desktop 中文输入、长行输入和拖拽选区在真实页面中的体感
 - 下一步：
   - 进入 UI 级手动回归或继续补自动回归
 
 ## 最近变更
+
+### 2026-03-21
+
+- `CodeEditor` 移除“共享 scroll 容器上的全屏透明 `BasicTextField`”主输入模式
+- Android 输入路径切换为隐藏 `0x0 BasicTextField` IME host
+- Desktop 输入路径切换为 `onKeyEvent`
+- 平台输入接入层抽为 `expect/actual` `PlatformEditorBridge`
+- `CodeEditor` 的点击定位、拖拽选区、基础键盘编辑和剪贴板操作已收回自身处理
+- `composition != null` 时不再立即 `document.update(...)`
+- 新增 `CodeLineTextLayoutCache`
+- `CodeViewerCanvas` 的正文绘制、caret、selection、annotation 命中和横向 reveal 已统一走真实 `TextLayoutResult`
+- 新增 `code-view-compose` 平台 `Clipboard` / 修饰键 actual
+- `CodeEditor.kt` / `CodeViewer.kt` 已做结构瘦身，输入、状态映射、渲染与 annotation 交互拆入独立文件
+- `code-view-compose` 内部文件已进一步整理为 `internal/editor` 与 `internal/viewer` 两组子包，根包仅保留对外入口与少量平台桥接
+- `CodeViewer` 恢复呼吸光标动画，caret 端点恢复圆角
+- `CodeViewer` 多行选区改为连续块状绘制，去掉行间缝隙，并让非结束行延伸到整行剩余宽度
+- 用户最新 Desktop 手测反馈：光标呼吸与圆角效果可验收；多行选区的行间隙与行尾延伸效果可验收
+- 已明确“输入锚点”方案：透明 `BasicTextField` 只承载 IME 会话、composing 与 commit，不再承担可见编辑层职责
+- 已确认桌面端“候选窗跟随光标”是后续独立问题，需要在不破坏当前可用输入链路的前提下单独推进
+- 已补充一条关键规则：输入锚点永远跟随“当前画布光标”，一旦回车、删除、点击跳转等命令改变真实光标位置，输入锚点必须重新定位，并在必要时重置当前 composing 状态
+- 已新增独立文档 `INPUT_ANCHOR_STATE_RULES.md`，收口输入锚点的状态规则、命令键打断规则与焦点变化规则
+- Desktop 浮动输入锚点已跑通：自动焦点、英文输入、中文输入、方向键与 selection 不再互相打架
+- 画布已接入 `inline composing overlay`，Desktop 中文预输入的拼音与下划线已可见
+- 行中间输入时的 preedit 改为内联渲染，后缀文本会右移，不再被遮挡
+- `selection + composing` 已调整为更接近 IDEA：首次进入 composing 时先真实删除选区内容，再从选区起点显示 preedit
+- `composing` 期间的可见光标、输入锚点与自动 reveal 已接入 preedit 内部 caret，不再固定在首字母，也不会等 commit 后才滚回可视区
+- Desktop 候选词窗口当前已能跟随输入锚点移动，整体效果与预期基本一致
+- `CodeEditor` 重构后再次通过 `:code-view-compose:compileKotlinJvm`
+- `CodeEditor` 重构后再次通过 `:code-view-compose:compileAndroidMain`
+- `CodeEditor` 重构后再次通过 `:code-view-compose:jvmTest`
 
 ### 2026-03-20
 
@@ -249,7 +291,7 @@
 - `CodeViewerCanvas` 的行高测量改为同时采样拉丁字符和 CJK 字符，并取两者较大值，降低汉字输入时的行高抖动
 - 明确不引入外部封装 `TextField`，继续直接使用 `BasicTextField`
 - 用户最新 Desktop 手测确认：普通点击场景并未彻底结束问题，输入汉字时仍出现 caret 横向错位与编辑行抖动
-- 下次会话的首个实现方向已固定为：在 `CodeEditor` 中接入 `BasicTextField.onTextLayout`，基于真实 `TextLayoutResult` 驱动 caret、selection 和横向 reveal
+- 下次会话的首个实现方向已固定为：将编辑主控从透明 `BasicTextField` 收回 `CodeEditor`，并让几何链路统一回到真实 `TextLayoutResult`
 - `:sharedUI:compileKotlinJvm` 通过
 - `:sharedUI:compileAndroidMain` 通过
 - `CodeEditor` 输入桥接后再次通过 `code-view-compose` JVM / Android 编译
@@ -267,15 +309,12 @@
 - Desktop 下对可跳转符号执行右键时，上下文菜单位置、命中对象和行为是否正确
 - 编辑态下连续输入、删除、方向键移动后，caret 自动 reveal 的体感是否正常，是否出现“跑出视口”或抖动
 - Android / Desktop 的 IME composing 是否稳定，是否出现选区错乱、输入抖动或文本覆盖异常
-- 编辑态拖拽选区时，Canvas 自绘选区与透明 `BasicTextField` 的系统选区 handle 是否一致
+- 编辑态拖拽选区时，Canvas 自绘选区范围是否与实际文本替换结果一致
 - 工作区真实页面中的横向滚动、长行显示和 annotation 上下文菜单体验是否符合预期
-- Desktop 下已经观察到光标定位不准确和编辑行抖动，需要在显式传入目标 `textStyle` 后复测是否仍然存在
-- Desktop 下已经确认问题不由 `textStyle` 本身引起，需要继续复测“平均度量 + 显式多行输入层”后是否仍存在 caret 偏移和编辑行抖动
-- Desktop 下的 caret 定位问题已通过“平均度量 + 显式多行输入层”修正，当前剩余重点是确认编辑行抖动是否还存在
-- Desktop 下普通点击后的 caret 已经对齐，但汉字输入与 IME composing 下是否仍存在 caret 偏移和抖动还需继续确认
-- 当前已针对“汉字输入下 Canvas 画旧文本”和“拉丁样本行高低估 CJK 字形高度”两条路径补修，待继续手测验证
-- 用户最终确认：Desktop 下输入汉字时，caret 仍然对不上，而且编辑行仍会抖动
-- 下次不再尝试引入其他模块的 `TextField` 封装，直接基于 `BasicTextField.onTextLayout` 处理真实布局
+- Desktop 下中文输入、长行输入和横向滚动后的 caret / selection / reveal 是否仍然稳定
+- Desktop 下 composing 期间直接回车、删除、方向键或鼠标点击其他位置时，输入锚点是否会正确重定位并清理旧状态
+- Android 下隐藏 IME host 的退格、候选提交和焦点切换是否稳定
+- Desktop 下调试开关关闭后的最终体感是否仍与当前一致
 
 ## 手测清单
 
@@ -302,7 +341,7 @@
 - [ ] 使用退格、Delete、方向键移动 caret，确认自动 reveal 行为正常，没有明显抖动
 - [ ] 选中一段文本后直接输入，确认选区替换正确
 - [ ] 粘贴多行文本，确认文本内容、选区和 caret 最终位置正确
-- [ ] 拖拽选区时，确认 Canvas 自绘选区与系统 selection handle 位置一致
+- [ ] 拖拽选区时，确认 Canvas 自绘选区范围与最终替换结果一致
 - [ ] 编辑态右键可跳转符号，确认仍可弹出上下文菜单
 - [ ] 编辑态主点击普通文本区域，确认优先表现为文本选择 / caret 定位，而不是 annotation 主点击
 
@@ -310,8 +349,13 @@
 
 - [ ] Desktop 下使用中文输入法连续输入，确认 composing 不抖动、不丢字、不覆盖异常
 - [x] Desktop 下点击不同列位置后，caret 已能准确对齐目标列
-- [ ] Desktop 下输入汉字时，caret 是否仍然准确跟随 composing / 已提交文本
-- [ ] Desktop 下输入汉字时，编辑行是否仍然发生抖动
+- [x] Desktop 下光标呼吸节奏、透明度和圆角效果符合预期
+- [x] Desktop 下多行选区已经没有行间缝隙，且到行尾的延伸符合预期
+- [x] Desktop 下输入汉字时，caret 与 `inline composing overlay` 基本符合预期
+- [x] Desktop 下输入汉字时，编辑行不再出现明显抖动
+- [x] Desktop 下输入法候选词列表能跟随画布光标位置显示
+- [x] Desktop 下 composing 期间当前输入行会及时滚回可视区
+- [ ] Desktop 下 composing 过程中直接回车、删除、方向键跳转或鼠标点击其他位置后，输入状态是否仍然正确
 - [ ] Android 下使用输入法连续输入，确认 composing 和选区行为正常
 - [ ] Desktop 下对长行进行横向滚动后继续输入，确认 caret reveal 和文本显示正常
 - [ ] Android 下对长文本上下滚动后继续输入，确认 caret reveal 和滚动状态正常
@@ -324,19 +368,19 @@
 ## 下一步建议
 
 1. 继续验证 `CodeEditor` 编辑态下 selection、caret reveal、IME composing 和 desktop 次键上下文行为
-2. 在 `CodeEditor` 中接入 `BasicTextField.onTextLayout`，让 caret、selection、横向 reveal 直接使用真实 `TextLayoutResult`
-3. 补 UI 级主路径回归，确认工作区中的滚动恢复、搜索高亮和上下文菜单体验
+2. 优先补 composing 期间命令键/点击打断后的最终一致性回归
+3. 根据手测结果决定是否继续补双击选词、三击选行、长按选词等交互细节
 
 ## 下次会话起点
 
 - 先打开本文档，优先查看“待确认项”和“手测清单”
-- 本次会话结束时的未解决重点只有两个：`Desktop 中文输入时 caret 横向错位`、`Desktop 中文输入时编辑行抖动`
-- 下次会话不要再从 `textStyle`、平均字符宽度或外部 `TextField` 封装重新开始
+- 当前代码层面的主架构已经切到“隐藏 IME host + Canvas 自管编辑 + 真实 TextLayoutResult 几何”
+- 输入锚点、`inline composing overlay`、`selection + composing`、虚拟 caret 与 reveal 已经全部落地，不需要再回到主架构讨论
+- 下次会话不要再从 `textStyle`、平均字符宽度或“恢复透明 `BasicTextField` 主控”重新开始
 - 下次实现优先级：
-  1. 继续保持 `BasicTextField`，不引入其他模块封装
-  2. 在 `CodeEditor` 中接入 `onTextLayout: (TextLayoutResult) -> Unit`
-  3. 用真实 `TextLayoutResult` 驱动编辑态 caret、selection 高亮和横向 reveal
-  4. 再根据真实行高与 composing 区域表现决定是否还需要额外的 CJK 行高固定策略
+  1. 先验证 Desktop 下 composing 被回车 / 删除 / 方向键 / 鼠标点击打断时的最终一致性
+  2. 再验证长行横向滚动与输入时的 reveal 体感
+  3. 若主问题均已消失，再补双击选词、三击选行、长按选词等交互细节
 - 若本次已经完成手测，下一次会话请直接同步“哪些条目通过、哪些条目失败、失败现象是什么”
 - 若还未手测，下一次会话优先从工作区真实页面开始做 UI 级回归，不必再回到底层 API 或 Canvas 架构讨论
 - 如果手测发现问题，下一次会话建议直接附上：
