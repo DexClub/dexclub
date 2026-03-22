@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun CodeEditorSelectionToolbar(
     bridge: PlatformSelectionToolbarBridge,
+    showRequestToken: Long,
     layoutSnapshot: CodeLayoutSnapshot,
     lineLayoutCache: CodeLineTextLayoutCache,
     canvasMetrics: CodeViewerCanvasMetrics,
@@ -53,7 +54,7 @@ internal fun CodeEditorSelectionToolbar(
     }
     val visible = !selection.collapsed && selectedText.isNotEmpty() && !contentBoundsInWindow.isEmpty
 
-    LaunchedEffect(bridge, visible, selectionRect, selectedText) {
+    LaunchedEffect(bridge, visible, selectionRect, selectedText, showRequestToken) {
         if (!visible) {
             bridge.hideSelectionToolbar()
             return@LaunchedEffect

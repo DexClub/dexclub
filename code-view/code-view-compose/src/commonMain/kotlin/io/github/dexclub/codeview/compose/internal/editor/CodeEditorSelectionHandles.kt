@@ -6,11 +6,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.Density
@@ -20,7 +23,6 @@ import io.github.dexclub.codeview.compose.internal.layout.CodeLayoutSnapshot
 import io.github.dexclub.codeview.compose.internal.layout.CodeLineTextLayoutCache
 import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerCanvasMetrics
 import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerViewportSnapshot
-import androidx.compose.ui.graphics.drawscope.scale
 import kotlin.math.roundToInt
 
 @Composable
@@ -33,64 +35,116 @@ internal fun CodeEditorTouchSelectionHandles(
     selection: TextRange,
     onSelectionChange: (TextRange) -> Unit,
     onHandleInteractionStart: () -> Unit,
+    onHandleInteractionEnd: () -> Unit,
 ) {
-    if (selection.collapsed) return
+    var activeRangeHandleSession by remember {
+        mutableStateOf<ActiveRangeHandleSession?>(null)
+    }
+
+    if (!shouldShowSelectionHandles(selection, activeRangeHandleSession != null)) return
 
     val normalizedStart = selection.normalizedStart
     val normalizedEnd = selection.normalizedEnd
-    val startPlacement = resolveSelectionHandlePlacement(
-        kind = SelectionHandleKind.Start,
-        density = density,
-        layoutSnapshot = layoutSnapshot,
-        lineLayoutCache = lineLayoutCache,
-        canvasMetrics = canvasMetrics,
-        viewportSnapshot = viewportSnapshot,
-        textOffset = normalizedStart,
-    )
-    val endPlacement = resolveSelectionHandlePlacement(
-        kind = SelectionHandleKind.End,
-        density = density,
-        layoutSnapshot = layoutSnapshot,
-        lineLayoutCache = lineLayoutCache,
-        canvasMetrics = canvasMetrics,
-        viewportSnapshot = viewportSnapshot,
-        textOffset = normalizedEnd,
-    )
+    val rangeHandleConfigs = remember(normalizedStart, normalizedEnd) {
+        listOf(
+            RangeSelectionHandleConfig(
+                kind = SelectionHandleKind.Start,
+                textOffset = normalizedStart,
+                fixedOffset = normalizedEnd,
+            ),
+            RangeSelectionHandleConfig(
+                kind = SelectionHandleKind.End,
+                textOffset = normalizedEnd,
+                fixedOffset = normalizedStart,
+            ),
+        )
+    }
 
-    SelectionHandle(
-        density = density,
-        kind = SelectionHandleKind.Start,
-        placement = startPlacement,
-        onHandleInteractionStart = onHandleInteractionStart,
-        onDragViewportPosition = { viewportPosition ->
-            val textOffset = resolveEditorTextOffset(
+    rangeHandleConfigs.forEach { config ->
+        SelectionHandle(
+            kind = config.kind,
+            placement = resolveSelectionHandlePlacement(
+                kind = config.kind,
+                density = density,
                 layoutSnapshot = layoutSnapshot,
                 lineLayoutCache = lineLayoutCache,
-                lineHeightPx = canvasMetrics.lineHeightPx,
-                position = viewportPosition.toContentPosition(viewportSnapshot),
-            )
-            val nextStart = textOffset.coerceIn(0, normalizedEnd)
-            val nextSelection = TextRange(normalizedEnd, nextStart)
-            if (selection != nextSelection) {
-                onSelectionChange(nextSelection)
-            }
-        },
-    )
+                canvasMetrics = canvasMetrics,
+                viewportSnapshot = viewportSnapshot,
+                textOffset = config.textOffset,
+            ),
+            onHandleInteractionStart = {
+                activeRangeHandleSession = ActiveRangeHandleSession(
+                    kind = config.kind,
+                    fixedOffset = config.fixedOffset,
+                )
+                onHandleInteractionStart()
+            },
+            onHandleInteractionEnd = {
+                activeRangeHandleSession = null
+                onHandleInteractionEnd()
+            },
+            onDragViewportPosition = { viewportPosition ->
+                val draggedTextOffset = resolveTextOffsetFromViewportPosition(
+                    layoutSnapshot = layoutSnapshot,
+                    lineLayoutCache = lineLayoutCache,
+                    lineHeightPx = canvasMetrics.lineHeightPx,
+                    viewportSnapshot = viewportSnapshot,
+                    viewportPosition = viewportPosition,
+                )
+                val fixedOffset = activeRangeHandleSession
+                    ?.takeIf { it.kind == config.kind }
+                    ?.fixedOffset
+                    ?: config.fixedOffset
+                val nextSelection = resolveHandleDragSelection(
+                    kind = config.kind,
+                    draggedTextOffset = draggedTextOffset,
+                    fixedTextOffset = fixedOffset,
+                )
+                if (selection != nextSelection) {
+                    onSelectionChange(nextSelection)
+                }
+            },
+        )
+    }
+}
+
+@Composable
+internal fun CodeEditorTouchCursorHandle(
+    density: Density,
+    layoutSnapshot: CodeLayoutSnapshot,
+    lineLayoutCache: CodeLineTextLayoutCache,
+    canvasMetrics: CodeViewerCanvasMetrics,
+    viewportSnapshot: CodeViewerViewportSnapshot,
+    selection: TextRange,
+    onSelectionChange: (TextRange) -> Unit,
+    onHandleInteractionStart: () -> Unit,
+    onHandleInteractionEnd: () -> Unit,
+) {
+    if (!shouldShowCursorHandle(selection)) return
 
     SelectionHandle(
-        density = density,
-        kind = SelectionHandleKind.End,
-        placement = endPlacement,
+        kind = SelectionHandleKind.Cursor,
+        placement = resolveSelectionHandlePlacement(
+            kind = SelectionHandleKind.Cursor,
+            density = density,
+            layoutSnapshot = layoutSnapshot,
+            lineLayoutCache = lineLayoutCache,
+            canvasMetrics = canvasMetrics,
+            viewportSnapshot = viewportSnapshot,
+            textOffset = selection.end,
+        ),
         onHandleInteractionStart = onHandleInteractionStart,
+        onHandleInteractionEnd = onHandleInteractionEnd,
         onDragViewportPosition = { viewportPosition ->
-            val textOffset = resolveEditorTextOffset(
-                layoutSnapshot = layoutSnapshot,
-                lineLayoutCache = lineLayoutCache,
-                lineHeightPx = canvasMetrics.lineHeightPx,
-                position = viewportPosition.toContentPosition(viewportSnapshot),
+            val nextSelection = resolveCursorHandleSelection(
+                draggedTextOffset = resolveTextOffsetFromViewportPosition(
+                    layoutSnapshot = layoutSnapshot,
+                    lineLayoutCache = lineLayoutCache,
+                    lineHeightPx = canvasMetrics.lineHeightPx,
+                    viewportSnapshot = viewportSnapshot,
+                    viewportPosition = viewportPosition,
+                )
             )
-            val nextEnd = textOffset.coerceAtLeast(normalizedStart)
-            val nextSelection = TextRange(normalizedStart, nextEnd)
             if (selection != nextSelection) {
                 onSelectionChange(nextSelection)
             }
@@ -100,12 +154,17 @@ internal fun CodeEditorTouchSelectionHandles(
 
 @Composable
 private fun SelectionHandle(
-    density: Density,
     kind: SelectionHandleKind,
     placement: SelectionHandlePlacement,
     onHandleInteractionStart: () -> Unit,
+    onHandleInteractionEnd: () -> Unit,
     onDragViewportPosition: (Offset) -> Unit,
 ) {
+    val latestPlacement = rememberUpdatedState(placement)
+    val latestOnHandleInteractionStart = rememberUpdatedState(onHandleInteractionStart)
+    val latestOnHandleInteractionEnd = rememberUpdatedState(onHandleInteractionEnd)
+    val latestOnDragViewportPosition = rememberUpdatedState(onDragViewportPosition)
+
     Box(
         contentAlignment = Alignment.TopStart,
         modifier = Modifier
@@ -119,18 +178,33 @@ private fun SelectionHandle(
                 width = SELECTION_HANDLE_TOUCH_WIDTH_DP.dp,
                 height = SELECTION_HANDLE_TOUCH_HEIGHT_DP.dp,
             )
-            .pointerInput(placement.touchLeftPx, placement.touchTopPx) {
+            .pointerInput(kind) {
+                var dragViewportPosition: Offset? = null
                 detectDragGestures(
-                    onDragStart = {
-                        onHandleInteractionStart()
-                    },
-                    onDrag = { change, _ ->
-                        onDragViewportPosition(
-                            Offset(
-                                x = placement.touchLeftPx + change.position.x,
-                                y = placement.touchTopPx + change.position.y,
-                            )
+                    onDragStart = { startPosition ->
+                        latestOnHandleInteractionStart.value()
+                        val currentPlacement = latestPlacement.value
+                        dragViewportPosition = Offset(
+                            x = currentPlacement.touchLeftPx + startPosition.x,
+                            y = currentPlacement.touchTopPx + startPosition.y,
                         )
+                    },
+                    onDragEnd = {
+                        dragViewportPosition = null
+                        latestOnHandleInteractionEnd.value()
+                    },
+                    onDragCancel = {
+                        dragViewportPosition = null
+                        latestOnHandleInteractionEnd.value()
+                    },
+                    onDrag = { change, dragAmount ->
+                        val currentPosition = dragViewportPosition ?: Offset(
+                            x = latestPlacement.value.touchLeftPx + change.position.x,
+                            y = latestPlacement.value.touchTopPx + change.position.y,
+                        )
+                        val nextPosition = currentPosition + dragAmount
+                        dragViewportPosition = nextPosition
+                        latestOnDragViewportPosition.value(nextPosition)
                         change.consume()
                     },
                 )
@@ -145,79 +219,71 @@ private fun SelectionHandle(
                     )
                 }
                 .requiredSize(
-                    width = SELECTION_HANDLE_VISUAL_SIZE_DP.dp,
-                    height = SELECTION_HANDLE_VISUAL_SIZE_DP.dp,
+                    width = placement.visualWidthDp,
+                    height = placement.visualHeightDp,
                 ),
         ) {
-            val radius = size.width / 2f
-            if (kind == SelectionHandleKind.Start) {
-                scale(
-                    scaleX = -1f,
-                    scaleY = 1f,
-                    pivot = center,
-                ) {
-                    drawSelectionHandleBase(radius)
-                }
-            } else {
-                drawSelectionHandleBase(radius)
-            }
+            drawHandleIcon(kind)
         }
     }
 }
 
-private enum class SelectionHandleKind {
-    Start,
-    End,
+internal fun resolveHandleDragSelection(
+    kind: SelectionHandleKind,
+    draggedTextOffset: Int,
+    fixedTextOffset: Int,
+): TextRange {
+    val safeDraggedTextOffset = draggedTextOffset.coerceAtLeast(0)
+    val safeFixedTextOffset = fixedTextOffset.coerceAtLeast(0)
+    return when (kind) {
+        SelectionHandleKind.Start -> TextRange(safeDraggedTextOffset, safeFixedTextOffset)
+        SelectionHandleKind.End -> TextRange(safeFixedTextOffset, safeDraggedTextOffset)
+        SelectionHandleKind.Cursor -> error("Cursor 手柄不应走范围选区拖拽逻辑")
+    }
 }
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSelectionHandleBase(
-    radius: Float,
-) {
-    drawRect(
-        color = SELECTION_HANDLE_COLOR,
-        topLeft = Offset.Zero,
-        size = Size(radius, radius),
-    )
-    drawCircle(
-        color = SELECTION_HANDLE_COLOR,
-        radius = radius,
-        center = Offset(radius, radius),
-    )
+internal fun shouldShowSelectionHandles(
+    selection: TextRange,
+    hasActiveRangeHandleSession: Boolean,
+): Boolean {
+    return !selection.collapsed || hasActiveRangeHandleSession
 }
 
-private data class SelectionHandlePlacement(
-    val touchLeftPx: Float,
-    val touchTopPx: Float,
-    val visualLeftPx: Float,
-    val visualTopPx: Float,
+internal fun resolveCursorHandleSelection(
+    draggedTextOffset: Int,
+): TextRange {
+    return TextRange(draggedTextOffset.coerceAtLeast(0))
+}
+
+internal fun shouldShowCursorHandle(
+    selection: TextRange,
+): Boolean {
+    return selection.collapsed
+}
+
+private data class ActiveRangeHandleSession(
+    val kind: SelectionHandleKind,
+    val fixedOffset: Int,
 )
 
-private fun resolveSelectionHandlePlacement(
-    kind: SelectionHandleKind,
-    density: Density,
+private data class RangeSelectionHandleConfig(
+    val kind: SelectionHandleKind,
+    val textOffset: Int,
+    val fixedOffset: Int,
+)
+
+private fun resolveTextOffsetFromViewportPosition(
     layoutSnapshot: CodeLayoutSnapshot,
     lineLayoutCache: CodeLineTextLayoutCache,
-    canvasMetrics: CodeViewerCanvasMetrics,
+    lineHeightPx: Float,
     viewportSnapshot: CodeViewerViewportSnapshot,
-    textOffset: Int,
-): SelectionHandlePlacement {
-    val cursor = layoutSnapshot.offsetToCursor(textOffset)
-    val touchWidthPx = with(density) { SELECTION_HANDLE_TOUCH_WIDTH_DP.dp.toPx() }
-    val visualSizePx = with(density) { SELECTION_HANDLE_VISUAL_SIZE_DP.dp.toPx() }
-    val touchTopInsetPx = with(density) { SELECTION_HANDLE_TOUCH_TOP_INSET_DP.dp.toPx() }
-    val horizontalPaddingPx = (touchWidthPx - visualSizePx) / 2f
-    val xPx = lineLayoutCache.columnX(cursor.line, cursor.offset) - viewportSnapshot.horizontalScrollPx
-    val yPx = (cursor.line + 1) * canvasMetrics.lineHeightPx - viewportSnapshot.verticalScrollPx
-    val visualAnchorOffsetPx = when (kind) {
-        SelectionHandleKind.Start -> visualSizePx
-        SelectionHandleKind.End -> 0f
-    }
-    val visualLeftPx = xPx - visualAnchorOffsetPx
-    return SelectionHandlePlacement(
-        touchLeftPx = visualLeftPx - horizontalPaddingPx,
-        touchTopPx = yPx - touchTopInsetPx,
-        visualLeftPx = horizontalPaddingPx,
-        visualTopPx = touchTopInsetPx,
+    viewportPosition: Offset,
+): Int {
+    return resolveEditorTextOffset(
+        layoutSnapshot = layoutSnapshot,
+        lineLayoutCache = lineLayoutCache,
+        lineHeightPx = lineHeightPx,
+        position = viewportPosition.toContentPosition(viewportSnapshot),
     )
 }
 
@@ -229,9 +295,3 @@ private fun Offset.toContentPosition(
         y = y + viewportSnapshot.verticalScrollPx,
     )
 }
-
-private val SELECTION_HANDLE_COLOR: Color = Color(0xFF1A73E8)
-private const val SELECTION_HANDLE_TOUCH_WIDTH_DP: Int = 36
-private const val SELECTION_HANDLE_TOUCH_HEIGHT_DP: Int = 44
-private const val SELECTION_HANDLE_TOUCH_TOP_INSET_DP: Int = 4
-private const val SELECTION_HANDLE_VISUAL_SIZE_DP: Int = 22

@@ -19,6 +19,7 @@ internal fun WorkspaceSceneContent(
     onBackPressed: () -> Unit,
     modifier: Modifier = Modifier,
     dragHandleModifier: Modifier = Modifier,
+    drawerGesturesEnabled: Boolean = true,
 ) {
     val uiState by model.uiState.collectAsState()
     val sonnerState = LocalSonner.current
@@ -88,6 +89,7 @@ internal fun WorkspaceSceneContent(
                     tabBarCallbacks = tabBarCallbacks,
                     paneCallbacks = paneCallbacks,
                     onBackPressed = onBackPressed,
+                    drawerGesturesEnabled = drawerGesturesEnabled,
                 )
             }
 

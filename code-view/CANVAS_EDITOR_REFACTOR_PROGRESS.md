@@ -21,10 +21,10 @@
 
 ## 当前总状态
 
-- 最近更新时间：`2026-03-21`
+- 最近更新时间：`2026-03-22`
 - 总体状态：`进行中`
 - 当前阶段：`阶段 7：回归与收尾`
-- 当前结论：`Cursor` 与 API 先行调整已完成；共享布局快照与 viewport 已接入 `CodeViewer` / `CodeEditor`；`CodeViewer` 已切到 Canvas 自绘并支持 annotation 点击、长按上下文与 desktop 次键上下文；`CodeEditor` 已切到“共享 CodeViewerCanvas + 平台专属 IME host + Canvas 自管编辑”的输入模型，编辑态不再依赖全屏透明 `BasicTextField` 作为主控；Android 侧继续使用隐藏 `0x0 BasicTextField` 作为 IME host，Desktop 侧已切换为附着在 AWT 窗口上的专用输入宿主组件；几何链路已统一到按行缓存的真实 `TextLayoutResult`，caret、selection、annotation 命中和横向 reveal 共用同一套来源；Android 触摸优先 Selection、平台 `SelectionToolbar`、基础双手柄与对齐修正已接通；`code-view-compose` 与 `sharedUI` 的 JVM / Android 编译已再次通过；当前进入 Android 手动回归与交互细节收尾阶段`
+- 当前结论：`Cursor` 与 API 先行调整已完成；共享布局快照与 viewport 已接入 `CodeViewer` / `CodeEditor`；`CodeViewer` 已切到 Canvas 自绘并支持 annotation 点击、长按上下文与 desktop 次键上下文；`CodeEditor` 已切到“共享 CodeViewerCanvas + 平台专属 IME host + Canvas 自管编辑”的输入模型，编辑态不再依赖全屏透明 `BasicTextField` 作为主控；Android 侧继续使用隐藏 `0x0 BasicTextField` 作为 IME host，Desktop 侧已切换为附着在 AWT 窗口上的专用输入宿主组件；几何链路已统一到按行缓存的真实 `TextLayoutResult`，caret、selection、annotation 命中和横向 reveal 共用同一套来源；Android 触摸优先 Selection、平台 `SelectionToolbar`、单光标手柄、基础双手柄与对齐修正已接通，并已修正“长按选区 / 手柄拖拽在软键盘收起时误唤起 IME”的回归；`code-view-compose` 与 `sharedUI` 的 JVM / Android 编译已再次通过；当前进入 Android 手动回归与交互细节收尾阶段`
 
 ## 阶段总览
 
@@ -229,6 +229,17 @@
 
 ## 最近变更
 
+### 2026-03-22
+
+- Android 编辑态触摸交互已拆分为“单击请求 IME、长按选区不主动唤起软键盘”
+- Android 长按选词后若软键盘原本收起，当前会继续保持收起
+- Android 双手柄拖拽开始时不再额外触发软键盘弹出
+- Android 双手柄拖拽已改为稳定手势会话，不再因手柄位置实时刷新而频繁中断
+- Android 平台 `SelectionToolbar` 在手柄拖拽期间会临时收起，结束后再恢复，减少拖拽卡顿与生硬感
+- Android 双手柄在交汇后已允许继续反向拖拽，选区不会在交汇点直接丢失
+- Android 点击已有选区内部时，当前选区会保留；若平台 `SelectionToolbar` 已被收起，当前会重新触发显示
+- Android 编辑态已补单个光标手柄，拖拽时 caret 会跟随移动
+
 ### 2026-03-21
 
 - `CodeEditor` 移除“共享 scroll 容器上的全屏透明 `BasicTextField`”主输入模式
@@ -377,6 +388,7 @@
 - [ ] Android 下使用输入法连续输入，确认 composing 和选区行为正常
 - [ ] Android 下普通滑动代码页时，确认优先表现为纵向 / 横向滚动，而不是直接进入选区
 - [ ] Android 下长按单词后，确认会出现菜单入口且首个选区范围合理
+- [ ] Android 下单击放置 caret 后，确认会出现单个光标手柄，拖拽后 caret 能稳定跟随
 - [ ] Android 下拖拽左右手柄时，确认选区范围更新稳定，没有明显跳动
 - [ ] Desktop 下对长行进行横向滚动后继续输入，确认 caret reveal 和文本显示正常
 - [ ] Android 下对长文本上下滚动后继续输入，确认 caret reveal 和滚动状态正常

@@ -30,6 +30,7 @@ internal fun Modifier.codeEditorInteractionModifier(
     onRequestImeFocus: () -> Unit,
     onInterruptInputAnchor: () -> Unit,
     onAnyPointerEditing: () -> Unit,
+    onTapInsideSelection: () -> Unit,
     onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)?,
     onFieldValueChange: (TextFieldValue) -> Unit,
 ): Modifier {
@@ -38,11 +39,13 @@ internal fun Modifier.codeEditorInteractionModifier(
             layoutSnapshot = layoutSnapshot,
             lineLayoutCache = lineLayoutCache,
             lineHeightPx = lineHeightPx,
+            selection = fieldValue.selection,
             onFieldValueChange = onFieldValueChange,
             requestContentFocus = {},
-            requestImeFocus = onRequestImeFocus,
+            requestImeFocusOnTap = onRequestImeFocus,
             onInterruptInputAnchor = onInterruptInputAnchor,
             onAnyPointerEditing = onAnyPointerEditing,
+            onTapInsideSelection = onTapInsideSelection,
             onLongPressSelection = if (useFallbackLongPressContextMenu) {
                 { textOffset: Int, _: TextRange, position: Offset ->
                     onContextMenu?.invoke(

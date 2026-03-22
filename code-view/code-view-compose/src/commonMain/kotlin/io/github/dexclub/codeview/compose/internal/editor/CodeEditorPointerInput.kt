@@ -66,18 +66,20 @@ internal fun Modifier.codeEditorTouchPointerInput(
     layoutSnapshot: CodeLayoutSnapshot,
     lineLayoutCache: CodeLineTextLayoutCache,
     lineHeightPx: Float,
+    selection: TextRange,
     onFieldValueChange: (TextFieldValue) -> Unit,
     requestContentFocus: () -> Unit,
-    requestImeFocus: () -> Unit,
+    requestImeFocusOnTap: () -> Unit,
     onInterruptInputAnchor: () -> Unit,
     onAnyPointerEditing: () -> Unit,
+    onTapInsideSelection: (() -> Unit)? = null,
     onLongPressSelection: ((textOffset: Int, selection: TextRange, position: Offset) -> Unit)? = null,
 ): Modifier {
-    return pointerInput(layoutSnapshot.text, lineHeightPx) {
+    return pointerInput(layoutSnapshot.text, lineHeightPx, selection.start, selection.end) {
         detectTapGestures(
             onTap = { position ->
                 requestContentFocus()
-                requestImeFocus()
+                requestImeFocusOnTap()
                 onInterruptInputAnchor()
                 onAnyPointerEditing()
 
@@ -87,16 +89,19 @@ internal fun Modifier.codeEditorTouchPointerInput(
                     lineHeightPx = lineHeightPx,
                     position = position,
                 )
-                onFieldValueChange(
-                    TextFieldValue(
-                        text = layoutSnapshot.text,
-                        selection = TextRange(offset),
+                if (shouldKeepSelectionOnTap(selection, offset)) {
+                    onTapInsideSelection?.invoke()
+                } else {
+                    onFieldValueChange(
+                        TextFieldValue(
+                            text = layoutSnapshot.text,
+                            selection = TextRange(offset),
+                        )
                     )
-                )
+                }
             },
             onLongPress = { position ->
                 requestContentFocus()
-                requestImeFocus()
                 onInterruptInputAnchor()
                 onAnyPointerEditing()
 
@@ -188,4 +193,14 @@ private fun resolveLongPressSelectionRange(
 
 private fun Char.isSelectionWordChar(): Boolean {
     return isLetterOrDigit() || this == '_' || this == '$'
+}
+
+internal fun shouldKeepSelectionOnTap(
+    selection: TextRange,
+    tappedOffset: Int,
+): Boolean {
+    if (selection.collapsed) return false
+    val normalizedStart = selection.normalizedStart
+    val normalizedEnd = selection.normalizedEnd
+    return tappedOffset in normalizedStart..normalizedEnd
 }

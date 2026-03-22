@@ -40,6 +40,7 @@ internal fun WorkspaceSceneCompact(
     tabBarCallbacks: WorkspaceTabBarCallbacks,
     paneCallbacks: WorkspaceCodePaneCallbacks,
     onBackPressed: () -> Unit,
+    drawerGesturesEnabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -58,6 +59,7 @@ internal fun WorkspaceSceneCompact(
 
     ModalNavigationDrawer(
         drawerState = drawerState,
+        gesturesEnabled = drawerGesturesEnabled,
         drawerContent = {
             ModalDrawerSheet(
                 modifier = Modifier.fillMaxHeight(),

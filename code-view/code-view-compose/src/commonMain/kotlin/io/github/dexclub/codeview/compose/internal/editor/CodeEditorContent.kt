@@ -70,6 +70,8 @@ internal fun CodeEditorContent(
     val imeFocusRequester = remember(documentId) { FocusRequester() }
     var preferredColumn by remember(documentId) { mutableStateOf<Int?>(null) }
     var pendingAnchorFocusRequest by remember(documentId) { mutableStateOf(false) }
+    var suppressTouchSelectionToolbar by remember(documentId) { mutableStateOf(false) }
+    var selectionToolbarRequestToken by remember(documentId) { mutableStateOf(0L) }
     var contentBoundsInWindow by remember(documentId) { mutableStateOf(Rect.Zero) }
     val composingOverlay = inputAnchorState.toComposingOverlayOrNull()
     val showFloatingInputAnchor = !readOnly && platformEditorBridge.useFloatingInputAnchor
@@ -97,9 +99,18 @@ internal fun CodeEditorContent(
     }
 
     fun handleTouchSelectionInteractionStart() {
-        requestImeFocus()
+        suppressTouchSelectionToolbar = true
         resetPreferredColumn()
         interruptInputAnchor()
+    }
+
+    fun handleTouchSelectionInteractionEnd() {
+        suppressTouchSelectionToolbar = false
+    }
+
+    fun requestSelectionToolbar() {
+        suppressTouchSelectionToolbar = false
+        selectionToolbarRequestToken += 1L
     }
 
     LaunchedEffect(
@@ -178,6 +189,7 @@ internal fun CodeEditorContent(
                         onRequestImeFocus = ::requestImeFocus,
                         onInterruptInputAnchor = ::interruptInputAnchor,
                         onAnyPointerEditing = ::resetPreferredColumn,
+                        onTapInsideSelection = ::requestSelectionToolbar,
                         onContextMenu = onContextMenu,
                         onFieldValueChange = onFieldValueChange,
                     )
@@ -219,6 +231,8 @@ internal fun CodeEditorContent(
                     if (showTouchSelectionOverlays) {
                         CodeEditorTouchInteractionOverlays(
                             selectionToolbarBridge = selectionToolbarBridge,
+                            showSelectionToolbar = !suppressTouchSelectionToolbar,
+                            showSelectionToolbarRequestToken = selectionToolbarRequestToken,
                             layoutSnapshot = layoutSnapshot,
                             lineLayoutCache = lineLayoutCache,
                             canvasMetrics = canvasMetrics,
@@ -231,6 +245,7 @@ internal fun CodeEditorContent(
                             },
                             onSelectionChange = ::updateSelection,
                             onHandleInteractionStart = ::handleTouchSelectionInteractionStart,
+                            onHandleInteractionEnd = ::handleTouchSelectionInteractionEnd,
                         )
                     }
                     if (SHOW_INPUT_ANCHOR_DEBUG_OVERLAY) {

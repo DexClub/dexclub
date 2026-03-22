@@ -18,6 +18,7 @@ actual fun WorkspaceScene(
         model = model,
         onRequestExportWorkspaceLogs = requestExportWorkspaceLogs,
         onBackPressed = onBackPressed,
+        drawerGesturesEnabled = false,
     )
 }
 
