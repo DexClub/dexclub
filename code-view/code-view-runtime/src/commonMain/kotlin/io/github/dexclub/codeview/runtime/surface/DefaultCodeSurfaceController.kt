@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @InternalCodeViewApi
 internal class DefaultCodeSurfaceController(
@@ -50,14 +51,16 @@ internal class DefaultCodeSurfaceController(
     }
 
     override suspend fun refresh() {
-        val snapshot = document.snapshots.value
-        val degradeDecision = degradePolicy.evaluate(snapshot)
+        withContext(Dispatchers.Default) {
+            val snapshot = document.snapshots.value
+            val degradeDecision = degradePolicy.evaluate(snapshot)
 
-        when (degradeDecision) {
-            is DegradeDecision.None -> processNormal()
-            is DegradeDecision.LargeFile -> processWithWarning(degradeDecision)
-            is DegradeDecision.OversizedFile -> processFallback(degradeDecision)
-            is DegradeDecision.LongLines -> processWithWarning(degradeDecision)
+            when (degradeDecision) {
+                is DegradeDecision.None -> processNormal()
+                is DegradeDecision.LargeFile -> processWithWarning(degradeDecision)
+                is DegradeDecision.OversizedFile -> processFallback(degradeDecision)
+                is DegradeDecision.LongLines -> processWithWarning(degradeDecision)
+            }
         }
     }
 

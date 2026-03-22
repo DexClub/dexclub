@@ -9,6 +9,8 @@ import io.github.dexclub.codeview.compose.internal.layout.CodeLayoutSnapshot
 import io.github.dexclub.codeview.compose.internal.layout.CodeLineTextLayoutCache
 import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerCanvasMetrics
 import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerViewportSnapshot
+import io.github.dexclub.codeview.compose.internal.viewer.contentXToViewportX
+import io.github.dexclub.codeview.compose.internal.viewer.contentYToViewportY
 import io.github.dexclub.codeview.core.text.Cursor
 import kotlin.math.roundToInt
 
@@ -32,12 +34,11 @@ internal fun inputAnchorModifier(
         fieldSelection = fieldSelection,
         composingOverlay = composingOverlay,
     )
-    val lineLayout = lineLayoutCache.layout(anchorPlacement.lineIndex)
-    val lineTopPx = anchorPlacement.lineIndex * canvasMetrics.lineHeightPx - viewportSnapshot.verticalScrollPx
-    val contentTopPx = lineTopPx + (
-        (canvasMetrics.lineHeightPx - lineLayout.size.height.toFloat()) / 2f
-    ).coerceAtLeast(0f)
-    val rawXPx = anchorPlacement.xPx - viewportSnapshot.horizontalScrollPx
+    val lineTopPx = viewportSnapshot.contentYToViewportY(
+        anchorPlacement.lineIndex * canvasMetrics.lineHeightPx,
+    )
+    val contentTopPx = lineTopPx + canvasMetrics.contentTopPaddingPx
+    val rawXPx = viewportSnapshot.contentXToViewportX(anchorPlacement.xPx)
     val rawYPx = contentTopPx
     val xPx = rawXPx.coerceIn(0f, (viewportSnapshot.viewportWidthPx - widthPx).coerceAtLeast(0f))
     val yPx = rawYPx.coerceIn(0f, (viewportSnapshot.viewportHeightPx - heightPx).coerceAtLeast(0f))

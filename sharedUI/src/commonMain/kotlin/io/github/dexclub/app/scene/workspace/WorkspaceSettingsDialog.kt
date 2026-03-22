@@ -19,6 +19,7 @@ import io.github.shadcn.ui.compose.Checkbox
 import io.github.shadcn.ui.compose.Dialog
 import io.github.shadcn.ui.compose.OutlineButton
 import io.github.shadcn.ui.compose.ShadcnTheme
+import io.github.shadcn.ui.compose.Slider
 
 @Composable
 internal fun WorkspaceSettingsDialog(
@@ -26,6 +27,7 @@ internal fun WorkspaceSettingsDialog(
     visible: Boolean,
     onDismissRequest: () -> Unit,
     onAutoUnicodeDecodeChange: (Boolean) -> Unit,
+    onCodeScrollPastEndChange: (Int) -> Unit,
 ) {
     if (!visible) return
 
@@ -72,6 +74,36 @@ internal fun WorkspaceSettingsDialog(
                         },
                     )
 
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = "Scroll Past End",
+                            style = ShadcnTheme.textStyles.bodySmall,
+                        )
+                        Text(
+                            text = "底部额外预留 ${uiState.codeScrollPastEnd} 行空白，0 表示关闭",
+                            style = ShadcnTheme.textStyles.labelMedium.copy(
+                                color = ShadcnTheme.colors.primary.copy(alpha = 0.6f),
+                            ),
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Slider(
+                            value = uiState.codeScrollPastEnd.coerceIn(0, MAX_SCROLL_PAST_END_LINES).toFloat() /
+                                MAX_SCROLL_PAST_END_LINES.toFloat(),
+                            onValueChange = { fraction ->
+                                onCodeScrollPastEndChange(
+                                    (fraction * MAX_SCROLL_PAST_END_LINES)
+                                        .toInt()
+                                        .coerceIn(0, MAX_SCROLL_PAST_END_LINES),
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Row(
@@ -91,3 +123,5 @@ internal fun WorkspaceSettingsDialog(
         }
     }
 }
+
+private const val MAX_SCROLL_PAST_END_LINES: Int = 20

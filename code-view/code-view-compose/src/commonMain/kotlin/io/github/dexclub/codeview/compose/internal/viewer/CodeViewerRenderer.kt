@@ -6,7 +6,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.dp
@@ -22,6 +21,9 @@ internal fun DrawScope.drawCodeViewerContent(
     layoutSnapshot: CodeLayoutSnapshot,
     lineLayoutCache: CodeLineTextLayoutCache,
     lineHeightPx: Float,
+    contentHeightPx: Float,
+    contentTopPaddingPx: Float,
+    baselinePx: Float,
     selection: LineSelection?,
     searchHighlight: LineSelection?,
     cursor: Cursor?,
@@ -45,6 +47,8 @@ internal fun DrawScope.drawCodeViewerContent(
             lineLayoutCache = lineLayoutCache,
             lineTop = lineTop,
             lineHeightPx = lineHeightPx,
+            contentHeightPx = contentHeightPx,
+            contentTopPaddingPx = contentTopPaddingPx,
             extendMultilineToContentRight = false,
             verticalInsetPx = 1.dp.toPx(),
             cornerRadiusPx = 4.dp.toPx(),
@@ -57,6 +61,8 @@ internal fun DrawScope.drawCodeViewerContent(
             lineLayoutCache = lineLayoutCache,
             lineTop = lineTop,
             lineHeightPx = lineHeightPx,
+            contentHeightPx = contentHeightPx,
+            contentTopPaddingPx = contentTopPaddingPx,
             extendMultilineToContentRight = true,
             verticalInsetPx = 0f,
             cornerRadiusPx = 0f,
@@ -67,7 +73,7 @@ internal fun DrawScope.drawCodeViewerContent(
             lineIndex = lineIndex,
             lineLayoutCache = lineLayoutCache,
             lineTop = lineTop,
-            lineHeightPx = lineHeightPx,
+            baselinePx = baselinePx,
             composingOverlay = composingOverlay,
             overlayColor = cursorColor,
         )
@@ -77,19 +83,17 @@ internal fun DrawScope.drawCodeViewerContent(
             lineIndex = lineIndex,
             composingOverlay = composingOverlay,
         )
+        val contentTop = lineContentTopPx(
+            lineTop = lineTop,
+            contentTopPaddingPx = contentTopPaddingPx,
+        )
+        val contentBottom = lineContentBottomPx(
+            lineTop = lineTop,
+            contentTopPaddingPx = contentTopPaddingPx,
+            contentHeightPx = contentHeightPx,
+        )
         if (inlineComposing != null) {
-            val lineLayout = lineLayoutCache.layout(lineIndex)
             val overlayLayout = lineLayoutCache.plainTextLayout(inlineComposing.overlayText)
-            val contentTop = lineContentTopPx(
-                lineTop = lineTop,
-                lineHeightPx = lineHeightPx,
-                layout = lineLayout,
-            )
-            val contentBottom = lineContentBottomPx(
-                lineTop = lineTop,
-                lineHeightPx = lineHeightPx,
-                layout = lineLayout,
-            )
             val anchorStartX = lineLayoutCache.columnX(lineIndex, inlineComposing.startColumn)
             val caretX = anchorStartX + overlayLayout.getCursorRect(inlineComposing.caretOffset).left
             val roundedCaretX = kotlin.math.round(caretX * density) / density
@@ -101,17 +105,6 @@ internal fun DrawScope.drawCodeViewerContent(
                 cap = StrokeCap.Round,
             )
         } else if (cursor != null && cursor.line == lineIndex) {
-            val layout = lineLayoutCache.layout(lineIndex)
-            val contentTop = lineContentTopPx(
-                lineTop = lineTop,
-                lineHeightPx = lineHeightPx,
-                layout = layout,
-            )
-            val contentBottom = lineContentBottomPx(
-                lineTop = lineTop,
-                lineHeightPx = lineHeightPx,
-                layout = layout,
-            )
             val rawCursorX = lineLayoutCache.columnX(lineIndex, cursor.offset)
             val cursorX = kotlin.math.round(rawCursorX * density) / density
             drawLine(
@@ -133,6 +126,8 @@ private fun DrawScope.drawSelectionRange(
     lineLayoutCache: CodeLineTextLayoutCache,
     lineTop: Float,
     lineHeightPx: Float,
+    contentHeightPx: Float,
+    contentTopPaddingPx: Float,
     extendMultilineToContentRight: Boolean,
     verticalInsetPx: Float,
     cornerRadiusPx: Float,
@@ -157,18 +152,17 @@ private fun DrawScope.drawSelectionRange(
     }
     val width = (right - left).coerceAtLeast(0f)
     if (width <= 0f) return
-    val layout = lineLayoutCache.layout(lineIndex)
+
+    val lineBottom = lineTop + lineHeightPx
     val contentTop = lineContentTopPx(
         lineTop = lineTop,
-        lineHeightPx = lineHeightPx,
-        layout = layout,
+        contentTopPaddingPx = contentTopPaddingPx,
     )
     val contentBottom = lineContentBottomPx(
         lineTop = lineTop,
-        lineHeightPx = lineHeightPx,
-        layout = layout,
+        contentTopPaddingPx = contentTopPaddingPx,
+        contentHeightPx = contentHeightPx,
     )
-    val lineBottom = lineTop + lineHeightPx
     val isMultilineSelection = selection.startLine != selection.endLine
     val shouldFillWholeLineHeight = extendMultilineToContentRight && isMultilineSelection
     val paddingPx = when {
@@ -197,16 +191,13 @@ private fun DrawScope.drawCodeLineText(
     lineIndex: Int,
     lineLayoutCache: CodeLineTextLayoutCache,
     lineTop: Float,
-    lineHeightPx: Float,
+    baselinePx: Float,
     composingOverlay: CodeEditorComposingOverlay?,
     overlayColor: Color,
 ) {
-    val layout = lineLayoutCache.layout(lineIndex)
-    val textTop = lineContentTopPx(
-        lineTop = lineTop,
-        lineHeightPx = lineHeightPx,
-        layout = layout,
-    )
+    val lineSegments = lineLayoutCache.renderSegments(lineIndex)
+    if (lineSegments.isEmpty()) return
+
     val inlineComposing = resolveInlineComposingOverlay(
         layoutSnapshot = layoutSnapshot,
         lineIndex = lineIndex,
@@ -214,57 +205,70 @@ private fun DrawScope.drawCodeLineText(
     )
 
     if (inlineComposing == null) {
-        drawText(
-            textLayoutResult = layout,
-            topLeft = Offset(
-                x = 0f,
-                y = textTop,
-            ),
+        drawTextSegments(
+            segments = lineSegments,
+            lineLayoutCache = lineLayoutCache,
+            lineTop = lineTop,
+            baselinePx = baselinePx,
+            xResolver = { segment ->
+                lineLayoutCache.columnX(lineIndex, segment.startColumn)
+            },
         )
         return
     }
 
     val anchorStartX = lineLayoutCache.columnX(lineIndex, inlineComposing.startColumn)
     val anchorEndX = lineLayoutCache.columnX(lineIndex, inlineComposing.endColumn)
-    val replacedWidthPx = (anchorEndX - anchorStartX).coerceAtLeast(0f)
     val overlayLayout = lineLayoutCache.plainTextLayout(inlineComposing.overlayText)
+    val overlaySegments = lineLayoutCache.plainTextRenderSegments(
+        text = inlineComposing.overlayText,
+        color = overlayColor,
+    )
+    val replacedWidthPx = (anchorEndX - anchorStartX).coerceAtLeast(0f)
     val overlayWidthPx = overlayLayout.size.width.toFloat()
     val suffixShiftPx = overlayWidthPx - replacedWidthPx
 
-    clipRect(
-        left = 0f,
-        right = anchorStartX,
-        top = lineTop,
-        bottom = lineTop + lineHeightPx,
-    ) {
-        drawText(
-            textLayoutResult = layout,
-            topLeft = Offset(0f, textTop),
-        )
-    }
-
-    drawText(
-        textLayoutResult = overlayLayout,
-        topLeft = Offset(anchorStartX, textTop),
+    drawTextSegments(
+        segments = sliceCodeLineRenderSegments(
+            segments = lineSegments,
+            startColumn = 0,
+            endColumn = inlineComposing.startColumn,
+        ),
+        lineLayoutCache = lineLayoutCache,
+        lineTop = lineTop,
+        baselinePx = baselinePx,
+        xResolver = { segment ->
+            lineLayoutCache.columnX(lineIndex, segment.startColumn)
+        },
     )
-
-    clipRect(
-        left = anchorStartX + overlayWidthPx,
-        right = size.width,
-        top = lineTop,
-        bottom = lineTop + lineHeightPx,
-    ) {
-        drawText(
-            textLayoutResult = layout,
-            topLeft = Offset(suffixShiftPx, textTop),
-        )
-    }
+    drawTextSegments(
+        segments = overlaySegments,
+        lineLayoutCache = lineLayoutCache,
+        lineTop = lineTop,
+        baselinePx = baselinePx,
+        xResolver = { segment ->
+            anchorStartX + overlayLayout.getCursorRect(segment.startColumn).left
+        },
+    )
+    drawTextSegments(
+        segments = sliceCodeLineRenderSegments(
+            segments = lineSegments,
+            startColumn = inlineComposing.endColumn,
+            endColumn = layoutSnapshot.lineLength(lineIndex),
+        ),
+        lineLayoutCache = lineLayoutCache,
+        lineTop = lineTop,
+        baselinePx = baselinePx,
+        xResolver = { segment ->
+            lineLayoutCache.columnX(lineIndex, segment.startColumn) + suffixShiftPx
+        },
+    )
 
     val underlineStart = inlineComposing.compositionStart
     val underlineEnd = inlineComposing.compositionEnd
     if (underlineStart == underlineEnd) return
 
-    val underlineY = textTop + overlayLayout.getLineBaseline(0) + 2.dp.toPx()
+    val underlineY = lineTop + baselinePx + 2.dp.toPx()
     val underlineStartX = anchorStartX + overlayLayout.getCursorRect(underlineStart).left
     val underlineEndX = anchorStartX + overlayLayout.getCursorRect(underlineEnd).left
     drawDashedUnderline(
@@ -274,6 +278,35 @@ private fun DrawScope.drawCodeLineText(
         y = underlineY,
         strokeWidth = 1.5f.dp.toPx(),
     )
+}
+
+private fun DrawScope.drawTextSegments(
+    segments: List<CodeLineRenderSegment>,
+    lineLayoutCache: CodeLineTextLayoutCache,
+    lineTop: Float,
+    baselinePx: Float,
+    xResolver: (CodeLineRenderSegment) -> Float,
+) {
+    segments.forEach { segment ->
+        if (segment.text.isEmpty()) return@forEach
+        if (segment.text.all(Char::isWhitespace)) return@forEach
+
+        val layout = lineLayoutCache.segmentLayout(
+            text = segment.text,
+            color = segment.color,
+        )
+        drawText(
+            textLayoutResult = layout,
+            topLeft = Offset(
+                x = xResolver(segment),
+                y = resolveSegmentTextTopPx(
+                    lineTop = lineTop,
+                    baselinePx = baselinePx,
+                    layout = layout,
+                ),
+            ),
+        )
+    }
 }
 
 private data class InlineComposingOverlay(
@@ -314,22 +347,24 @@ private fun resolveInlineComposingOverlay(
 
 private fun lineContentTopPx(
     lineTop: Float,
-    lineHeightPx: Float,
-    layout: TextLayoutResult,
+    contentTopPaddingPx: Float,
 ): Float {
-    return lineTop + ((lineHeightPx - layout.size.height.toFloat()) / 2f).coerceAtLeast(0f)
+    return resolveLineContentTopPx(
+        lineTop = lineTop,
+        contentTopPaddingPx = contentTopPaddingPx,
+    )
 }
 
 private fun lineContentBottomPx(
     lineTop: Float,
-    lineHeightPx: Float,
-    layout: TextLayoutResult,
+    contentTopPaddingPx: Float,
+    contentHeightPx: Float,
 ): Float {
-    return lineContentTopPx(
+    return resolveLineContentBottomPx(
         lineTop = lineTop,
-        lineHeightPx = lineHeightPx,
-        layout = layout,
-    ) + layout.size.height.toFloat()
+        contentTopPaddingPx = contentTopPaddingPx,
+        contentHeightPx = contentHeightPx,
+    )
 }
 
 private fun DrawScope.drawDashedUnderline(

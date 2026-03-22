@@ -1,6 +1,7 @@
 package io.github.dexclub.codeview.compose.internal.editor
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalDensity
@@ -16,6 +17,7 @@ import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerViewportSnap
 internal fun CodeEditorTouchInteractionOverlays(
     selectionToolbarBridge: PlatformSelectionToolbarBridge,
     showSelectionToolbar: Boolean,
+    showSelectionHandles: Boolean,
     showSelectionToolbarRequestToken: Long,
     layoutSnapshot: CodeLayoutSnapshot,
     lineLayoutCache: CodeLineTextLayoutCache,
@@ -28,6 +30,9 @@ internal fun CodeEditorTouchInteractionOverlays(
     onSelectionChange: (TextRange) -> Unit,
     onHandleInteractionStart: () -> Unit,
     onHandleInteractionEnd: () -> Unit,
+    onHandleAutoScrollStart: (TouchHandleAutoScrollTarget, Offset) -> Unit,
+    onHandleAutoScrollMove: (Offset) -> Unit,
+    onHandleAutoScrollEnd: () -> Unit,
 ) {
     val density = LocalDensity.current
     val selection = fieldValue.selection
@@ -47,6 +52,10 @@ internal fun CodeEditorTouchInteractionOverlays(
         )
     }
 
+    if (!showSelectionHandles) {
+        return
+    }
+
     if (selection.collapsed) {
         CodeEditorTouchCursorHandle(
             density = density,
@@ -58,6 +67,9 @@ internal fun CodeEditorTouchInteractionOverlays(
             onSelectionChange = onSelectionChange,
             onHandleInteractionStart = onHandleInteractionStart,
             onHandleInteractionEnd = onHandleInteractionEnd,
+            onHandleAutoScrollStart = onHandleAutoScrollStart,
+            onHandleAutoScrollMove = onHandleAutoScrollMove,
+            onHandleAutoScrollEnd = onHandleAutoScrollEnd,
         )
     } else {
         CodeEditorTouchSelectionHandles(
@@ -70,6 +82,9 @@ internal fun CodeEditorTouchInteractionOverlays(
             onSelectionChange = onSelectionChange,
             onHandleInteractionStart = onHandleInteractionStart,
             onHandleInteractionEnd = onHandleInteractionEnd,
+            onHandleAutoScrollStart = onHandleAutoScrollStart,
+            onHandleAutoScrollMove = onHandleAutoScrollMove,
+            onHandleAutoScrollEnd = onHandleAutoScrollEnd,
         )
     }
 }

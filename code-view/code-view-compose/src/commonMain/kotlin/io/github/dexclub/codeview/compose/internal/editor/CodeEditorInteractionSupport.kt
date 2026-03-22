@@ -8,6 +8,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import io.github.dexclub.codeview.compose.PlatformEditorBridge
 import io.github.dexclub.codeview.compose.internal.layout.CodeLayoutSnapshot
 import io.github.dexclub.codeview.compose.internal.layout.CodeLineTextLayoutCache
+import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerScrollController
 import io.github.dexclub.codeview.core.annotation.CodeAnnotationHit
 import io.github.dexclub.codeview.core.annotation.CodeInteractionTrigger
 import io.github.dexclub.codeview.core.document.DocumentId
@@ -28,9 +29,14 @@ internal fun Modifier.codeEditorInteractionModifier(
     preferredColumn: Int?,
     onPreferredColumnChange: (Int?) -> Unit,
     onRequestImeFocus: () -> Unit,
+    isSoftwareKeyboardVisible: () -> Boolean,
     onInterruptInputAnchor: () -> Unit,
     onAnyPointerEditing: () -> Unit,
+    scrollController: CodeViewerScrollController,
     onTapInsideSelection: () -> Unit,
+    onLongPressSelectionGestureStart: (selection: TextRange, viewportPosition: Offset) -> Unit,
+    onLongPressSelectionGestureMove: (viewportPosition: Offset) -> Unit,
+    onLongPressSelectionGestureEnd: () -> Unit,
     onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)?,
     onFieldValueChange: (TextFieldValue) -> Unit,
 ): Modifier {
@@ -43,10 +49,15 @@ internal fun Modifier.codeEditorInteractionModifier(
             onFieldValueChange = onFieldValueChange,
             requestContentFocus = {},
             requestImeFocusOnTap = onRequestImeFocus,
+            isSoftwareKeyboardVisibleOnTap = isSoftwareKeyboardVisible,
             onInterruptInputAnchor = onInterruptInputAnchor,
             onAnyPointerEditing = onAnyPointerEditing,
+            scrollController = scrollController,
             onTapInsideSelection = onTapInsideSelection,
-            onLongPressSelection = if (useFallbackLongPressContextMenu) {
+            onLongPressSelectionGestureStart = onLongPressSelectionGestureStart,
+            onLongPressSelectionGestureMove = onLongPressSelectionGestureMove,
+            onLongPressSelectionGestureEnd = onLongPressSelectionGestureEnd,
+            onLongPressSelectionComplete = if (useFallbackLongPressContextMenu) {
                 { textOffset: Int, _: TextRange, position: Offset ->
                     onContextMenu?.invoke(
                         buildCodeEditorContextMenuAnnotationHit(

@@ -14,9 +14,10 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
 import io.github.dexclub.codeview.compose.internal.editor.CodeEditorContent
-import io.github.dexclub.codeview.compose.internal.editor.clampTextRange
-import io.github.dexclub.codeview.compose.internal.editor.clampTextRangeOrNull
+import io.github.dexclub.codeview.compose.internal.editor.ExternalSelectionSyncInput
 import io.github.dexclub.codeview.compose.internal.editor.resolveExternalSelection
+import io.github.dexclub.codeview.compose.internal.editor.resolveSynchronizedFieldValue
+import io.github.dexclub.codeview.compose.internal.editor.shouldSyncExternalSelection
 import io.github.dexclub.codeview.compose.internal.editor.toCodeSelection
 import io.github.dexclub.codeview.compose.internal.editor.toTextRange
 import io.github.dexclub.codeview.compose.internal.layout.CodeLayoutSnapshotFactory
@@ -44,6 +45,7 @@ public fun CodeEditor(
     searchHighlight: LineSelection? = null,
     initialFirstVisibleLine: Int = 0,
     initialScrollOffsetX: Int = 0,
+    scrollPastEnd: Int = CodeViewDefaults.ScrollPastEnd,
     cursorTarget: CodeViewerCursorTarget? = null,
     interactionOptions: CodeViewerInteractionOptions = CodeViewerInteractionOptions(),
     onSelectionChange: ((LineSelection?) -> Unit)? = null,
@@ -78,6 +80,7 @@ public fun CodeEditor(
         searchHighlight = searchHighlight,
         initialFirstVisibleLine = initialFirstVisibleLine,
         initialScrollOffsetX = initialScrollOffsetX,
+        scrollPastEnd = scrollPastEnd,
         cursorTarget = cursorTarget,
         interactionOptions = interactionOptions,
         onTextChange = { newText ->
@@ -108,6 +111,7 @@ public fun CodeEditor(
     searchHighlight: LineSelection? = null,
     initialFirstVisibleLine: Int = 0,
     initialScrollOffsetX: Int = 0,
+    scrollPastEnd: Int = CodeViewDefaults.ScrollPastEnd,
     cursorTarget: CodeViewerCursorTarget? = null,
     interactionOptions: CodeViewerInteractionOptions = CodeViewerInteractionOptions(),
     onSelectionChange: ((LineSelection?) -> Unit)? = null,
@@ -140,6 +144,7 @@ public fun CodeEditor(
         searchHighlight = searchHighlight,
         initialFirstVisibleLine = initialFirstVisibleLine,
         initialScrollOffsetX = initialScrollOffsetX,
+        scrollPastEnd = scrollPastEnd,
         cursorTarget = cursorTarget,
         interactionOptions = interactionOptions,
         onTextChange = onTextChange,
@@ -165,6 +170,7 @@ public fun CodeEditor(
     searchHighlight: LineSelection? = null,
     initialFirstVisibleLine: Int = 0,
     initialScrollOffsetX: Int = 0,
+    scrollPastEnd: Int = CodeViewDefaults.ScrollPastEnd,
     cursorTarget: CodeViewerCursorTarget? = null,
     interactionOptions: CodeViewerInteractionOptions = CodeViewerInteractionOptions(),
     onTextChange: ((String) -> Unit)? = null,
@@ -209,6 +215,12 @@ public fun CodeEditor(
             cursor = cursor,
         )
     }
+    val externalSelectionInput = remember(selection, cursor) {
+        ExternalSelectionSyncInput(
+            selection = selection,
+            cursor = cursor,
+        )
+    }
     var fieldValue by remember(document.documentId) {
         mutableStateOf(
             TextFieldValue(
@@ -216,6 +228,9 @@ public fun CodeEditor(
                 selection = externalSelection?.toTextRange() ?: TextRange(snapshot.text.length),
             )
         )
+    }
+    var previousExternalSelectionInput by remember(document.documentId) {
+        mutableStateOf(externalSelectionInput)
     }
     var followCursorToken by remember(document.documentId) {
         mutableStateOf(0L)
@@ -242,60 +257,23 @@ public fun CodeEditor(
         }
     }
 
-    LaunchedEffect(snapshot.text, externalSelection?.anchorOffset, externalSelection?.caretOffset, readOnly) {
-        val hasActiveComposition = fieldValue.composition != null && fieldValue.text != snapshot.text
-        val nextValue = when {
-            readOnly -> TextFieldValue(
-                text = snapshot.text,
-                selection = externalSelection?.toTextRange() ?: TextRange(snapshot.text.length),
-            )
-
-            hasActiveComposition -> fieldValue.copy(
-                selection = when {
-                    externalSelection != null -> clampTextRange(
-                        range = externalSelection.toTextRange(),
-                        textLength = fieldValue.text.length,
-                    )
-
-                    else -> clampTextRange(
-                        range = fieldValue.selection,
-                        textLength = fieldValue.text.length,
-                    )
-                },
-                composition = clampTextRangeOrNull(
-                    range = fieldValue.composition,
-                    textLength = fieldValue.text.length,
-                ),
-            )
-
-            externalSelection != null -> fieldValue.copy(
-                text = snapshot.text,
-                selection = externalSelection.toTextRange(),
-                composition = clampTextRangeOrNull(
-                    range = fieldValue.composition,
-                    textLength = snapshot.text.length,
-                ),
-            )
-
-            fieldValue.text == snapshot.text -> fieldValue.copy(
-                selection = clampTextRange(
-                    range = fieldValue.selection,
-                    textLength = snapshot.text.length,
-                ),
-                composition = clampTextRangeOrNull(
-                    range = fieldValue.composition,
-                    textLength = snapshot.text.length,
-                ),
-            )
-
-            else -> TextFieldValue(
-                text = snapshot.text,
-                selection = TextRange(snapshot.text.length),
-            )
-        }
+    LaunchedEffect(snapshot.text, selection, cursor, readOnly) {
+        val shouldSyncExternalSelection = shouldSyncExternalSelection(
+            readOnly = readOnly,
+            currentInput = externalSelectionInput,
+            previousInput = previousExternalSelectionInput,
+        )
+        val nextValue = resolveSynchronizedFieldValue(
+            snapshotText = snapshot.text,
+            fieldValue = fieldValue,
+            externalSelection = externalSelection,
+            readOnly = readOnly,
+            syncExternalSelection = shouldSyncExternalSelection,
+        )
         if (fieldValue != nextValue) {
             fieldValue = nextValue
         }
+        previousExternalSelectionInput = externalSelectionInput
     }
 
     val effectiveSelection = remember(editorLayoutSnapshot, fieldValue.selection) {
@@ -318,6 +296,7 @@ public fun CodeEditor(
         searchHighlight = searchHighlight,
         initialFirstVisibleLine = initialFirstVisibleLine,
         initialScrollOffsetX = initialScrollOffsetX,
+        scrollPastEnd = scrollPastEnd,
         selection = if (readOnly) selection else effectiveSelection,
         cursor = if (readOnly) cursor else effectiveCursor,
         cursorTarget = cursorTarget,

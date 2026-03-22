@@ -5,4 +5,5 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class AppSettings(
     val autoUnicodeDecode: Boolean = true,
+    val codeScrollPastEnd: Int = 5,
 )

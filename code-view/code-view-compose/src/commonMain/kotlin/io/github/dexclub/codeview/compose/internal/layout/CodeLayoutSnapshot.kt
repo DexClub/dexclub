@@ -37,6 +37,12 @@ internal data class CodeLayoutSnapshot(
     fun lineLength(lineIndex: Int): Int = lineAt(lineIndex).length
 
 
+    fun lineText(lineIndex: Int): String {
+        val line = lineAt(lineIndex)
+        return text.substring(line.startOffset, line.endOffsetExclusive)
+    }
+
+
     fun tokensForLine(lineIndex: Int): List<CodeLineTokenSpan> = tokensByLine[lineAt(lineIndex).lineIndex]
 
 

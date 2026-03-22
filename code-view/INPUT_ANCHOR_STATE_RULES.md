@@ -1,5 +1,13 @@
 # Input Anchor 状态规则
 
+## 2026-03-22 决议
+
+- 文件名暂时保留为 `INPUT_ANCHOR_STATE_RULES.md`，但当前文档已经不再只服务于“输入锚点”这一种实现。
+- Desktop 侧继续使用专用输入宿主组件，当前规则仍然适用。
+- Android 侧早期的“隐藏 `0x0 BasicTextField` 作为输入锚点宿主”路线已结束。
+- Android 当前已切到 `AndroidInputHostView + InputConnection` 平台输入桥；该输入桥仍需遵守本文档中的 composing、commit、焦点切换与真实光标同步规则。
+- Android 键盘顶起相关的动态 `WindowInsets.ime.bottom` 当前已下沉到 `code-view-compose` 内部，不再通过 `sharedUI` 向公共编辑器 API 透传。
+
 ## 目的
 
 本文档用于明确 `code-view-compose` 中“输入锚点”方案的状态边界，避免后续在 Desktop / Android 的 IME 处理上继续边实现边试错。
@@ -12,7 +20,7 @@
 
 当前平台形态：
 
-- Android：隐藏的 `0x0 BasicTextField`
+- Android：自定义 `AndroidInputHostView + InputConnection` 输入宿主，负责 IME 会话、composing、commit 与平台编辑命令桥接
 - Desktop：附着在 AWT 窗口上的透明 `JComponent` 输入宿主
 
 ## 核心原则
@@ -189,7 +197,8 @@
 - 当前真实光标所在列
 - 当前 viewport 的横向滚动
 - 当前 viewport 的纵向滚动
-- 当前行的真实 `TextLayoutResult`
+- 当前字体配置对应的稳定行度量
+- 当前行的真实 `TextLayoutResult` 中可复用的横向定位信息
 
 ### 坐标系
 
@@ -207,6 +216,16 @@
 - 输入锚点不能成为滚动内容的一部分
 - 输入锚点不能吞掉鼠标事件
 - 输入锚点获取焦点不能触发滚动容器的 `bringIntoView` 抖动
+
+补充约束：
+
+- 当前行的真实 `TextLayoutResult` 可以用于横向 caret / 命中 / 候选窗定位
+- 当前行的真实 `TextLayoutResult` 不应直接决定整行可见文本的垂直行框位置
+- 中英混排时，垂直定位应优先依赖“字体配置级”的稳定行度量，而不是这一行当前内容的瞬时高度或瞬时 baseline
+- Android 键盘顶起期间，viewport 与 caret reveal 当前会同时参考：
+  - 实际 viewport 收缩量
+  - 平台逐帧变化的 `WindowInsets.ime.bottom`
+- 这套逻辑的目标不是“键盘弹完后再补滚”，而是让画布中的真实 caret 与输入宿主都能随着 IME 动画同步抬升
 
 ## 平台策略
 
@@ -228,20 +247,64 @@
 
 ### Android
 
-当前重点目标：
+已确认的旧路线问题：
 
-- 保证 IME 会话稳定
-- 保证 composing / commit 正常
-- 保证隐藏输入宿主不与画布编辑状态打架
+- 删除命令无法稳定映射回真实文档
+- 软键盘触发的选择 / 全选等编辑命令会被隐藏宿主自身吞掉
+- 继续在隐藏 `BasicTextField` 上打补丁，维护成本会持续上升
+
+当前决策：
+
+- 不再继续扩展“隐藏 `0x0 BasicTextField` 作为 Android 输入宿主”这条路线
+- Android 已切到更底层的平台文本输入桥，直接接入 IME 会话与编辑命令
+
+新桥至少需要覆盖：
+
+- `composition` / `commit`
+- 删除相关命令
+- 选区更新
+- 输入法异常 `setSelection(...)` 的归一化
+
+补充约束：
+
+- Android 输入桥不能机械地信任 IME 发送的每一次 collapsed `setSelection(...)`
+- 已在真机上确认两类异常：
+  - 选区结束时折叠回旧 anchor
+  - 在软键盘 `Shift` 选区结束后，发送与当前选区无关的随机 collapsed offset
+- 当前规则要求输入桥先判断该 collapsed 请求是否仍然与当前选区上下文一致，再决定是否接受
+- 若不一致，应归一化为“保留当前活动端 caret”的折叠选区
+- 这类兼容逻辑应集中收口在输入桥状态机中，而不是散落到页面层或 viewer 层
+- Android 软键盘“开始选择”模式下，若方向键扩选从正选继续跨过 anchor 进入逆选，输入桥状态机必须继续保持选择模式激活
+- 因此“collapsed 到 anchor”在开始选择模式中不能被机械地视为退出条件
+
+### Scroll Past End
+
+- `CodeViewer` / `CodeEditor` 已提供 `scrollPastEnd` 参数，默认预留 5 行
+- 当 `scrollPastEnd <= 0` 时，不额外预留底部空白
+- 底部预留不仅影响内容高度，也必须影响：
+  - viewport 裁剪上限
+  - caret reveal / cursorTarget reveal
+- reveal 逻辑不应在“光标已可见”时重置当前行内像素偏移，否则会导致底部预留区轻微抖动或被吃掉几 px
+- viewport 的可见范围当前会额外带底部 overscan，用于避免键盘遮挡区域附近的行在顶起过程中被过早裁掉
+- 软键盘侧的选择 / 全选 / 剪贴板类编辑动作
+
+无论具体实现落在 Compose 的平台文本输入 session 还是更下层的 Android 桥接，仍需满足本文档的状态边界：
+
+- 画布仍然是唯一可见编辑器
+- 平台输入桥不拥有整份真实文档
+- 平台输入桥不能长期绑定旧光标
+- 命令键与真实编辑状态必须回到 `CodeEditor` 状态机
 
 ## 当前建议实现顺序
 
-1. 先确保主输入链路稳定
+1. 先继续稳固 Android `AndroidInputHostView + InputConnection` 输入桥，覆盖更多输入法与设备差异
 2. 明确 composing 被命令键 / 点击 / 失焦打断时的统一清理规则
-3. 再处理输入锚点跟随画布光标定位
-4. 最后单独处理 Desktop 候选窗精确跟随
+3. 继续验证输入桥跟随画布光标定位与候选窗定位的一致性
+4. 最后单独处理 Desktop 候选窗与边界一致性
 
 ## 当前未决项
 
+- Android 低层输入桥优先落在 Compose 平台文本输入 session，还是进一步自定义 Android 平台桥
+- Android 新输入桥如何承接软键盘“选择 / 全选 / 剪贴板”类编辑动作并统一回放到 `CodeEditor` 状态机
 - composing 被打断时，是否需要“尝试提交”而不是直接丢弃
 - Desktop 下 composing 被打断时的最终策略是否需要进一步贴近 IDEA / 平台默认行为

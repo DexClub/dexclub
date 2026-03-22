@@ -184,12 +184,14 @@ class WorkspaceSceneViewModel internal constructor(
             selectedOpenTab,
             _navigationRevealTarget,
             paneContentState,
-        ) { openTabs, selectedOpenTab, navigationRevealTarget, codeTexts ->
+            _appSettings,
+        ) { openTabs, selectedOpenTab, navigationRevealTarget, codeTexts, appSettings ->
             buildWorkspaceCodePanelUiState(
                 openTabs = openTabs,
                 selectedOpenTab = selectedOpenTab,
                 navigationRevealTarget = navigationRevealTarget,
                 codeContents = codeTexts,
+                appSettings = appSettings,
                 resolveEditorState = { tab, kind ->
                     editorStateRepository.getContentStateSnapshot(
                         tabId = tab.tabId,
@@ -1328,6 +1330,36 @@ class WorkspaceSceneViewModel internal constructor(
         }
 
         val updatedSettings = previousSettings.copy(autoUnicodeDecode = enabled)
+        _appSettings.value = updatedSettings
+
+        _appSettingsRevision++
+        val revision = _appSettingsRevision
+        val sendResult = _appSettingsSaveRequests.trySend(
+            AppSettingsSaveRequest(
+                revision = revision,
+                settings = updatedSettings,
+            ),
+        )
+        if (sendResult.isFailure) {
+            _appSettings.value = previousSettings
+            logWarn(
+                text = "提交设置保存任务失败",
+                throwable = sendResult.exceptionOrNull(),
+            )
+            viewModelScope.launch {
+                emitMessageEffect("提交设置保存任务失败")
+            }
+        }
+    }
+
+    fun updateCodeScrollPastEnd(lines: Int) {
+        val normalizedLines = lines.coerceAtLeast(0)
+        val previousSettings = _appSettings.value
+        if (previousSettings.codeScrollPastEnd == normalizedLines) {
+            return
+        }
+
+        val updatedSettings = previousSettings.copy(codeScrollPastEnd = normalizedLines)
         _appSettings.value = updatedSettings
 
         _appSettingsRevision++

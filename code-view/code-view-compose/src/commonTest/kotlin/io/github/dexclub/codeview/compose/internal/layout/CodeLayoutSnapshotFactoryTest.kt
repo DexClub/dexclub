@@ -12,9 +12,9 @@ class CodeLayoutSnapshotFactoryTest {
         val snapshot = CodeLayoutSnapshotFactory.create("ab\r\nc\n")
 
         assertEquals(3, snapshot.lineCount)
-        assertEquals("ab", snapshot.lineAt(0).content)
-        assertEquals("c", snapshot.lineAt(1).content)
-        assertEquals("", snapshot.lineAt(2).content)
+        assertEquals("ab", snapshot.lineText(0))
+        assertEquals("c", snapshot.lineText(1))
+        assertEquals("", snapshot.lineText(2))
 
         assertEquals(0, snapshot.lineAt(0).startOffset)
         assertEquals(4, snapshot.lineAt(1).startOffset)

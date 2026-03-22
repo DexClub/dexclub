@@ -19,11 +19,12 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
+
 import io.github.dexclub.codeview.compose.internal.layout.CodeLayoutSnapshot
 import io.github.dexclub.codeview.compose.internal.layout.CodeLineTextLayoutCache
 import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerCanvasMetrics
 import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerViewportSnapshot
-import kotlin.math.roundToInt
 
 @Composable
 internal fun CodeEditorTouchSelectionHandles(
@@ -36,6 +37,9 @@ internal fun CodeEditorTouchSelectionHandles(
     onSelectionChange: (TextRange) -> Unit,
     onHandleInteractionStart: () -> Unit,
     onHandleInteractionEnd: () -> Unit,
+    onHandleAutoScrollStart: (TouchHandleAutoScrollTarget, Offset) -> Unit,
+    onHandleAutoScrollMove: (Offset) -> Unit,
+    onHandleAutoScrollEnd: () -> Unit,
 ) {
     var activeRangeHandleSession by remember {
         mutableStateOf<ActiveRangeHandleSession?>(null)
@@ -83,12 +87,20 @@ internal fun CodeEditorTouchSelectionHandles(
                 activeRangeHandleSession = null
                 onHandleInteractionEnd()
             },
+            onHandleAutoScrollTarget = RangeHandleAutoScrollTarget(
+                kind = config.kind,
+                fixedOffset = config.fixedOffset,
+            ),
+            onHandleAutoScrollStart = onHandleAutoScrollStart,
+            onHandleAutoScrollMove = onHandleAutoScrollMove,
+            onHandleAutoScrollEnd = onHandleAutoScrollEnd,
             onDragViewportPosition = { viewportPosition ->
                 val draggedTextOffset = resolveTextOffsetFromViewportPosition(
                     layoutSnapshot = layoutSnapshot,
                     lineLayoutCache = lineLayoutCache,
                     lineHeightPx = canvasMetrics.lineHeightPx,
-                    viewportSnapshot = viewportSnapshot,
+                    horizontalScrollPx = viewportSnapshot.horizontalScrollPx,
+                    verticalScrollPx = viewportSnapshot.verticalScrollPx,
                     viewportPosition = viewportPosition,
                 )
                 val fixedOffset = activeRangeHandleSession
@@ -119,6 +131,9 @@ internal fun CodeEditorTouchCursorHandle(
     onSelectionChange: (TextRange) -> Unit,
     onHandleInteractionStart: () -> Unit,
     onHandleInteractionEnd: () -> Unit,
+    onHandleAutoScrollStart: (TouchHandleAutoScrollTarget, Offset) -> Unit,
+    onHandleAutoScrollMove: (Offset) -> Unit,
+    onHandleAutoScrollEnd: () -> Unit,
 ) {
     if (!shouldShowCursorHandle(selection)) return
 
@@ -133,6 +148,10 @@ internal fun CodeEditorTouchCursorHandle(
             viewportSnapshot = viewportSnapshot,
             textOffset = selection.end,
         ),
+        onHandleAutoScrollTarget = CursorHandleAutoScrollTarget,
+        onHandleAutoScrollStart = onHandleAutoScrollStart,
+        onHandleAutoScrollMove = onHandleAutoScrollMove,
+        onHandleAutoScrollEnd = onHandleAutoScrollEnd,
         onHandleInteractionStart = onHandleInteractionStart,
         onHandleInteractionEnd = onHandleInteractionEnd,
         onDragViewportPosition = { viewportPosition ->
@@ -141,7 +160,8 @@ internal fun CodeEditorTouchCursorHandle(
                     layoutSnapshot = layoutSnapshot,
                     lineLayoutCache = lineLayoutCache,
                     lineHeightPx = canvasMetrics.lineHeightPx,
-                    viewportSnapshot = viewportSnapshot,
+                    horizontalScrollPx = viewportSnapshot.horizontalScrollPx,
+                    verticalScrollPx = viewportSnapshot.verticalScrollPx,
                     viewportPosition = viewportPosition,
                 )
             )
@@ -156,11 +176,19 @@ internal fun CodeEditorTouchCursorHandle(
 private fun SelectionHandle(
     kind: SelectionHandleKind,
     placement: SelectionHandlePlacement,
+    onHandleAutoScrollTarget: TouchHandleAutoScrollTarget,
+    onHandleAutoScrollStart: (TouchHandleAutoScrollTarget, Offset) -> Unit,
+    onHandleAutoScrollMove: (Offset) -> Unit,
+    onHandleAutoScrollEnd: () -> Unit,
     onHandleInteractionStart: () -> Unit,
     onHandleInteractionEnd: () -> Unit,
     onDragViewportPosition: (Offset) -> Unit,
 ) {
     val latestPlacement = rememberUpdatedState(placement)
+    val latestOnHandleAutoScrollTarget = rememberUpdatedState(onHandleAutoScrollTarget)
+    val latestOnHandleAutoScrollStart = rememberUpdatedState(onHandleAutoScrollStart)
+    val latestOnHandleAutoScrollMove = rememberUpdatedState(onHandleAutoScrollMove)
+    val latestOnHandleAutoScrollEnd = rememberUpdatedState(onHandleAutoScrollEnd)
     val latestOnHandleInteractionStart = rememberUpdatedState(onHandleInteractionStart)
     val latestOnHandleInteractionEnd = rememberUpdatedState(onHandleInteractionEnd)
     val latestOnDragViewportPosition = rememberUpdatedState(onDragViewportPosition)
@@ -182,19 +210,26 @@ private fun SelectionHandle(
                 var dragViewportPosition: Offset? = null
                 detectDragGestures(
                     onDragStart = { startPosition ->
-                        latestOnHandleInteractionStart.value()
                         val currentPlacement = latestPlacement.value
-                        dragViewportPosition = Offset(
+                        val initialViewportPosition = Offset(
                             x = currentPlacement.touchLeftPx + startPosition.x,
                             y = currentPlacement.touchTopPx + startPosition.y,
+                        )
+                        dragViewportPosition = initialViewportPosition
+                        latestOnHandleInteractionStart.value()
+                        latestOnHandleAutoScrollStart.value(
+                            latestOnHandleAutoScrollTarget.value,
+                            initialViewportPosition,
                         )
                     },
                     onDragEnd = {
                         dragViewportPosition = null
+                        latestOnHandleAutoScrollEnd.value()
                         latestOnHandleInteractionEnd.value()
                     },
                     onDragCancel = {
                         dragViewportPosition = null
+                        latestOnHandleAutoScrollEnd.value()
                         latestOnHandleInteractionEnd.value()
                     },
                     onDrag = { change, dragAmount ->
@@ -204,6 +239,7 @@ private fun SelectionHandle(
                         )
                         val nextPosition = currentPosition + dragAmount
                         dragViewportPosition = nextPosition
+                        latestOnHandleAutoScrollMove.value(nextPosition)
                         latestOnDragViewportPosition.value(nextPosition)
                         change.consume()
                     },
@@ -261,6 +297,29 @@ internal fun shouldShowCursorHandle(
     return selection.collapsed
 }
 
+internal sealed interface TouchHandleAutoScrollTarget {
+    fun resolveSelection(draggedTextOffset: Int): TextRange
+}
+
+internal data class RangeHandleAutoScrollTarget(
+    val kind: SelectionHandleKind,
+    val fixedOffset: Int,
+) : TouchHandleAutoScrollTarget {
+    override fun resolveSelection(draggedTextOffset: Int): TextRange {
+        return resolveHandleDragSelection(
+            kind = kind,
+            draggedTextOffset = draggedTextOffset,
+            fixedTextOffset = fixedOffset,
+        )
+    }
+}
+
+internal object CursorHandleAutoScrollTarget : TouchHandleAutoScrollTarget {
+    override fun resolveSelection(draggedTextOffset: Int): TextRange {
+        return resolveCursorHandleSelection(draggedTextOffset)
+    }
+}
+
 private data class ActiveRangeHandleSession(
     val kind: SelectionHandleKind,
     val fixedOffset: Int,
@@ -272,26 +331,23 @@ private data class RangeSelectionHandleConfig(
     val fixedOffset: Int,
 )
 
-private fun resolveTextOffsetFromViewportPosition(
+internal fun resolveTextOffsetFromViewportPosition(
     layoutSnapshot: CodeLayoutSnapshot,
     lineLayoutCache: CodeLineTextLayoutCache,
     lineHeightPx: Float,
-    viewportSnapshot: CodeViewerViewportSnapshot,
+    horizontalScrollPx: Float,
+    verticalScrollPx: Float,
     viewportPosition: Offset,
 ): Int {
+    // Handle drag events are now emitted from the same overscrolled layer as the visual
+    // handles, so converting back to content space only needs the base scroll offsets.
     return resolveEditorTextOffset(
         layoutSnapshot = layoutSnapshot,
         lineLayoutCache = lineLayoutCache,
         lineHeightPx = lineHeightPx,
-        position = viewportPosition.toContentPosition(viewportSnapshot),
-    )
-}
-
-private fun Offset.toContentPosition(
-    viewportSnapshot: CodeViewerViewportSnapshot,
-): Offset {
-    return Offset(
-        x = x + viewportSnapshot.horizontalScrollPx,
-        y = y + viewportSnapshot.verticalScrollPx,
+        position = Offset(
+            x = viewportPosition.x + horizontalScrollPx,
+            y = viewportPosition.y + verticalScrollPx,
+        ),
     )
 }

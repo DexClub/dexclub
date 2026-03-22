@@ -43,11 +43,42 @@ internal data class CodeViewportState(
     }
 
 
-    fun clamp(layout: CodeLayoutSnapshot): CodeViewportState {
-        val maxFirstVisibleLine = (layout.lineCount - visibleLineCount.coerceAtLeast(1)).coerceAtLeast(0)
+    fun renderLineRange(
+        lineCount: Int,
+        extraLeadingLines: Int = 0,
+        extraTrailingLines: Int = 0,
+    ): IntRange {
+        require(lineCount > 0) { "lineCount 必须大于 0: $lineCount" }
+        val visibleRange = visibleLineRange(lineCount)
+        val safeExtraLeadingLines = extraLeadingLines.coerceAtLeast(0)
+        val safeExtraTrailingLines = extraTrailingLines.coerceAtLeast(0)
+        val firstLine = (visibleRange.first - safeExtraLeadingLines).coerceAtLeast(0)
+        val lastLine = (visibleRange.last + safeExtraTrailingLines).coerceAtMost(lineCount - 1)
+        return firstLine..lastLine
+    }
+
+
+    fun clamp(
+        layout: CodeLayoutSnapshot,
+        extraBottomLines: Int = 0,
+    ): CodeViewportState {
+        val maxFirstVisibleLine = maxFirstVisibleLine(
+            lineCount = layout.lineCount,
+            extraBottomLines = extraBottomLines,
+        )
         return copy(
             firstVisibleLine = firstVisibleLine.coerceIn(0, maxFirstVisibleLine),
         )
+    }
+
+
+    fun maxFirstVisibleLine(
+        lineCount: Int,
+        extraBottomLines: Int = 0,
+    ): Int {
+        require(lineCount > 0) { "lineCount 必须大于 0: $lineCount" }
+        val safeExtraBottomLines = extraBottomLines.coerceAtLeast(0)
+        return (lineCount + safeExtraBottomLines - visibleLineCount.coerceAtLeast(1)).coerceAtLeast(0)
     }
 
 
@@ -75,18 +106,22 @@ internal data class CodeViewportState(
         charWidthPx: Float,
         cursorHorizontalPx: Float? = null,
         cursorWidthPx: Float = 1f,
+        preferredBottomReserveLines: Int? = null,
         maxHorizontalScrollPx: Float? = null,
+        extraBottomLines: Int = 0,
     ): CodeViewportState {
-        val safeCursor = layout.clampCursor(cursor) ?: return clamp(layout)
-        val safeViewport = clamp(layout)
+        val safeCursor = layout.clampCursor(cursor) ?: return clamp(layout, extraBottomLines)
+        val safeViewport = clamp(layout, extraBottomLines)
 
         val safeVisibleLineCount = safeViewport.visibleLineCount.coerceAtLeast(1)
         val currentLastVisibleLine = safeViewport.lastVisibleLine(layout.lineCount)
-        val nextFirstVisibleLine = when {
-            safeCursor.line < safeViewport.firstVisibleLine -> safeCursor.line
-            safeCursor.line > currentLastVisibleLine -> safeCursor.line - safeVisibleLineCount + 1
-            else -> safeViewport.firstVisibleLine
-        }.coerceAtLeast(0)
+        val nextFirstVisibleLine = resolveRevealedFirstVisibleLine(
+            cursorLine = safeCursor.line,
+            firstVisibleLine = safeViewport.firstVisibleLine,
+            lastVisibleLine = currentLastVisibleLine,
+            visibleLineCount = safeVisibleLineCount,
+            preferredBottomReserveLines = preferredBottomReserveLines,
+        )
 
         val nextHorizontalScrollPx = revealHorizontalScroll(
             cursor = safeCursor,
@@ -99,12 +134,39 @@ internal data class CodeViewportState(
         return safeViewport.copy(
             firstVisibleLine = nextFirstVisibleLine,
             horizontalScrollPx = nextHorizontalScrollPx,
-        ).clamp(layout).clampHorizontalScroll(
+        ).clamp(layout, extraBottomLines).clampHorizontalScroll(
             maxHorizontalScrollPx = maxHorizontalScrollPx ?: safeViewport.maxHorizontalScrollPx(
                 layout = layout,
                 charWidthPx = charWidthPx,
             ),
         )
+    }
+
+    private fun resolveRevealedFirstVisibleLine(
+        cursorLine: Int,
+        firstVisibleLine: Int,
+        lastVisibleLine: Int,
+        visibleLineCount: Int,
+        preferredBottomReserveLines: Int?,
+    ): Int {
+        if (cursorLine < firstVisibleLine) {
+            return cursorLine
+        }
+        val safePreferredBottomReserveLines = preferredBottomReserveLines
+            ?.coerceAtLeast(0)
+        if (safePreferredBottomReserveLines != null) {
+            val preferredCursorLineInViewport = (visibleLineCount - 1 - safePreferredBottomReserveLines)
+                .coerceIn(0, visibleLineCount - 1)
+            val preferredCursorAbsoluteLine = firstVisibleLine + preferredCursorLineInViewport
+            if (cursorLine > preferredCursorAbsoluteLine) {
+                return (cursorLine - preferredCursorLineInViewport).coerceAtLeast(0)
+            }
+            return firstVisibleLine
+        }
+        if (cursorLine > lastVisibleLine) {
+            return (cursorLine - visibleLineCount + 1).coerceAtLeast(0)
+        }
+        return firstVisibleLine
     }
 
 

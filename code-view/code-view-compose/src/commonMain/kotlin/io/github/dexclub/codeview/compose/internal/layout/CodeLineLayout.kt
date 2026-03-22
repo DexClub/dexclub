@@ -4,7 +4,6 @@ internal data class CodeLineLayout(
     val lineIndex: Int,
     val startOffset: Int,
     val endOffsetExclusive: Int,
-    val content: String,
 ) {
     val length: Int
         get() = endOffsetExclusive - startOffset

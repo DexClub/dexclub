@@ -89,9 +89,9 @@ class StretchOverscrollEffect(private val scope: CoroutineScope) : OverscrollEff
         var consumedByStretchX = 0f
         var consumedByStretchY = 0f
 
-        if (source == NestedScrollSource.UserInput) {
-            val width = if (containerSize.width > 0) containerSize.width.toFloat() else 1000f
-            val height = if (containerSize.height > 0) containerSize.height.toFloat() else 1000f
+        if (source == NestedScrollSource.UserInput && containerSize.width > 0 && containerSize.height > 0) {
+            val width = containerSize.width.toFloat()
+            val height = containerSize.height.toFloat()
 
             val newX = if (abs(leftOverX) > 0.5f) {
                 val progress = (abs(visibleOffset.x) / width).coerceIn(0f, 1f)
@@ -147,6 +147,7 @@ class StretchOverscrollEffect(private val scope: CoroutineScope) : OverscrollEff
             ) {
                 visibleOffset = this.value
             }
+            animationJob?.join()
         }
     }
 
@@ -168,7 +169,11 @@ private class StretchOverscrollNode(
 
     override fun ContentDrawScope.draw() {
         val offset = effect.visibleOffset
-        if (offset == Offset.Zero || size.width == 0f || size.height == 0f) {
+        if (
+            (abs(offset.x) <= OVERSCROLL_VISUAL_EPSILON_PX && abs(offset.y) <= OVERSCROLL_VISUAL_EPSILON_PX) ||
+            size.width == 0f ||
+            size.height == 0f
+        ) {
             drawContent()
         } else {
             // 计算 X 轴拉伸 (最大拉伸 3%)
@@ -218,3 +223,5 @@ fun WithOverscroll(
         content()
     }
 }
+
+private const val OVERSCROLL_VISUAL_EPSILON_PX: Float = 0.5f

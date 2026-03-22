@@ -118,6 +118,7 @@ internal fun CodeViewPane(
                 .padding(paddingValues),
             initialFirstVisibleLine = editorState.scrollOffsetY,
             initialScrollOffsetX = editorState.scrollOffsetX,
+            scrollPastEnd = paneState.scrollPastEnd,
             selection = editorState.selection,
             cursor = cursor,
             searchHighlight = editorState.searchHighlight,

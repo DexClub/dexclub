@@ -270,6 +270,9 @@ internal fun moveCaretHorizontally(
     delta: Int,
     extendSelection: Boolean,
 ): TextFieldValue {
+    if (delta == 0) {
+        return fieldValue.copy(composition = null)
+    }
     if (!extendSelection && !fieldValue.selection.collapsed) {
         return when {
             delta < 0 -> fieldValue.moveCaretTo(fieldValue.selection.normalizedStart, false)
@@ -277,10 +280,8 @@ internal fun moveCaretHorizontally(
         }
     }
 
-    val targetOffset = when {
-        delta < 0 -> (fieldValue.normalizedCaretOffset() - 1).coerceAtLeast(0)
-        else -> (fieldValue.normalizedCaretOffset() + 1).coerceAtMost(fieldValue.text.length)
-    }
+    val targetOffset = (fieldValue.normalizedCaretOffset() + delta)
+        .coerceIn(0, fieldValue.text.length)
     return fieldValue.moveCaretTo(targetOffset, extendSelection)
 }
 

@@ -13,6 +13,8 @@ import io.github.dexclub.codeview.compose.internal.layout.CodeLayoutSnapshot
 import io.github.dexclub.codeview.compose.internal.layout.CodeLineTextLayoutCache
 import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerCanvasMetrics
 import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerViewportSnapshot
+import io.github.dexclub.codeview.compose.internal.viewer.contentXToHandleViewportX
+import io.github.dexclub.codeview.compose.internal.viewer.contentYToHandleViewportY
 
 internal enum class SelectionHandleKind {
     Start,
@@ -52,8 +54,12 @@ internal fun resolveSelectionHandlePlacement(
     val touchWidthPx = with(density) { SELECTION_HANDLE_TOUCH_WIDTH_DP.dp.toPx() }
     val visualWidthPx = with(density) { visualMetrics.widthDp.toPx() }
     val horizontalPaddingPx = (touchWidthPx - visualWidthPx) / 2f
-    val xPx = lineLayoutCache.columnX(cursor.line, cursor.offset) - viewportSnapshot.horizontalScrollPx
-    val yPx = (cursor.line + 1) * canvasMetrics.lineHeightPx - viewportSnapshot.verticalScrollPx
+    val xPx = viewportSnapshot.contentXToHandleViewportX(
+        lineLayoutCache.columnX(cursor.line, cursor.offset),
+    )
+    val yPx = viewportSnapshot.contentYToHandleViewportY(
+        (cursor.line + 1) * canvasMetrics.lineHeightPx,
+    )
     val visualLeftPx = xPx - visualMetrics.anchorOffsetPx
     return SelectionHandlePlacement(
         touchLeftPx = visualLeftPx - horizontalPaddingPx,

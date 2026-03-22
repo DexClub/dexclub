@@ -11,6 +11,7 @@ internal data class WorkspaceHeaderCallbacks(
     val onOpenClassResult: (WorkspaceClassSearchResult) -> Unit,
     val onOpenStringResult: (WorkspaceStringSearchResult) -> Unit,
     val onAutoUnicodeDecodeChange: (Boolean) -> Unit,
+    val onCodeScrollPastEndChange: (Int) -> Unit,
 )
 
 internal data class WorkspaceSidePanelCallbacks(

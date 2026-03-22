@@ -46,6 +46,7 @@ internal fun WorkspaceSceneContent(
             onOpenClassResult = { result -> model.onOpenClassByName(result.className) },
             onOpenStringResult = model::onOpenStringSearchResult,
             onAutoUnicodeDecodeChange = model::updateAutoUnicodeDecode,
+            onCodeScrollPastEndChange = model::updateCodeScrollPastEnd,
         )
     }
     val sidePanelCallbacks = remember(model) {

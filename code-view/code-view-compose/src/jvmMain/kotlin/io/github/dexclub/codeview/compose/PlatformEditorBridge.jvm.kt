@@ -30,6 +30,7 @@ internal actual fun rememberPlatformEditorBridge(): PlatformEditorBridge {
 private object JvmPlatformEditorBridge : PlatformEditorBridge {
     override val useFloatingInputAnchor: Boolean = true
     override val useTouchSelectionGestures: Boolean = false
+    override fun isSoftwareKeyboardVisible(): Boolean = false
 
     // Desktop IME is driven by a dedicated AWT component rather than a hidden Compose text field.
     // We keep a reference here so focus requests can target the real host directly.

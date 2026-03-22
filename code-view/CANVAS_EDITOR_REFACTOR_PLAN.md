@@ -23,13 +23,15 @@
 
 ## 背景
 
-当前 `code-view-compose` 中的 `CodeViewer` 与 `CodeEditorContent` 仍是占位实现：
+本计划文档保留了这轮重构从“占位实现”演进到当前架构的背景。下面这组“现状问题”描述的是改造起点，而不是 2026-03-22 的当前代码状态。
+
+改造起点中，`code-view-compose` 的 `CodeViewer` 与 `CodeEditorContent` 曾是占位实现：
 
 - `CodeViewer` 仅使用 `BasicText` 直接显示全文
 - `CodeEditorContent` 仅使用 `BasicTextField` 直接编辑全文
 - 对外已经暴露的 `initialFirstVisibleLine`、`initialScrollOffsetX`、`selection`、`searchHighlight`、`cursorTarget`、`onScrollChange`、`onViewportChange`、`onAnnotationHit`、`onContextMenu` 等参数，尚未真正接入内部布局和交互逻辑
 
-这意味着当前实现无法稳定承载以下能力：
+这意味着当时的实现无法稳定承载以下能力：
 
 - 基于行号的 viewport 恢复与同步
 - 行列坐标和全局文本偏移之间的准确映射
@@ -45,7 +47,7 @@
 
 1. 将 `CodeViewer` 改为基于 `Canvas` 的自绘渲染
 2. 将 `CodeEditorContent` 改为“Canvas 显示 + 隐藏 IME host / 平台输入桥接”的编辑模型
-3. 让编辑态的 caret、selection、命中与 reveal 全部回到 Canvas / `TextLayoutResult` 主导
+3. 让编辑态的 caret、selection、命中与 reveal 全部回到 Canvas 主导，其中横向几何以 `TextLayoutResult` 为准，垂直行框以稳定行度量为准
 4. 正式引入 viewport 概念，并让只读态与编辑态共享同一套滚动和可见区定义
 5. 将现有公开参数真正接入内部逻辑，保证外部调用方状态可恢复、可同步
 6. 建立后续可扩展的代码坐标系统，为折叠、行号栏、诊断波浪线、代码补全定位等能力打基础
@@ -109,8 +111,8 @@
 
 - `Canvas` 负责完整显示，且成为编辑态唯一视觉真相源
 - `CodeEditor` 自己管理文本、选区、光标、点击定位、拖拽选区和 reveal
-- Android 使用一个隐藏的 `0x0 BasicTextField` 仅承接 IME 连接、composing 和 commit
 - Desktop 使用一个附着在 AWT 窗口上的专用输入宿主组件承接 IME 会话，并单独处理普通键盘命令
+- Android 不再将隐藏的 `0x0 BasicTextField` 视为长期方案，后续改为更底层的平台文本输入桥
 - 后续如果需要更精确的 IME 锚点，再考虑在移动端为折叠 caret 追加平台锚点能力
 
 ## 核心设计
@@ -287,7 +289,7 @@ public fun CodeEditor(
 - Desktop 侧已经观察到“光标定位不准确”和“输入时编辑行抖动”，因此 `textStyle` 需要作为首个排查入口保留给上层显式控制
 - 若继续沿用“单字符整数宽度”测量，Desktop 侧会积累列宽误差，因此字符宽度和行高应优先使用长样本平均值测量
 - 对包含汉字的文本和 IME composing，单纯的固定列宽模型仍然不够，编辑态需要进一步使用按行真实宽度测量的 x 坐标来绘制分段文本、选区、caret 和 reveal
-- 当前实现仍基于“固定字符宽度”模型，因此自定义 `textStyle` 最好保持等宽字体并提供明确 `lineHeight`
+- 当前实现虽然已经不再依赖纯固定字符宽度绘制正文，但自定义 `textStyle` 仍最好保持等宽字体并提供明确 `lineHeight`
 - 若只覆盖部分样式属性，未指定部分应回退到 `CodeViewDefaults.CodeTextStyle`
 
 #### 6. `selection` 与 `cursor` 的配套语义
@@ -424,22 +426,24 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 
 ### 文本渲染策略
 
-第一阶段优先采用“按可见行逐行绘制 + 每行缓存真实 `TextLayoutResult`”的策略：
+当前实现采用“按可见行逐行绘制 + 稳定行度量 + 分段文本布局”的策略：
 
 - 每一帧只处理 viewport 内可见行
-- 每行先构造带 token 颜色的 `AnnotatedString`
-- 每行绘制、selection、caret、annotation 命中统一复用同一份 `TextLayoutResult`
-- 仅将 `charWidthPx` 保留为行尾 cursor 宽度和少量 fallback 场景的辅助值
+- 每行先基于 token 颜色与字符脚本分组生成可复用的渲染分段
+- 横向点击定位、caret、annotation 命中与横向 reveal 继续复用 `TextLayoutResult`
+- 垂直行框不再由当前行瞬时 mixed layout 决定，而是统一使用字体配置级的稳定行度量
+- `charWidthPx` 仅保留给行尾 cursor 宽度与少量 fallback 场景
 
 ### 文本测量建议
 
-需要区分“行高估算”和“横向几何真值”：
+需要明确区分“稳定行框”和“横向几何真值”：
 
-- `lineHeightPx` 仍可通过样本测量估算
+- `lineHeightPx`、`contentHeightPx`、`contentTopPaddingPx` 与共享 `baselinePx` 由字体配置级样本测量统一导出
 - `charWidthPx` 只作为少量 fallback 场景的辅助值
-- 每个可见逻辑行都需要可复用的 `TextLayoutResult`
+- 每个可见逻辑行仍需要可复用的 `TextLayoutResult`，但它主要服务于横向几何，不再直接决定整行垂直行框
+- 混排行中的可见文本按渲染分段单独测量与绘制，避免单个 mixed layout 的瞬时 baseline 把整行带偏
 
-后续点击定位、selection、caret、annotation 命中和横向 reveal 都应优先基于每行真实 `TextLayoutResult`，而不是只依赖固定列宽推导。
+后续点击定位、selection、caret、annotation 命中和横向 reveal 都应优先基于可复用的 `TextLayoutResult`，而不是只依赖固定列宽推导。
 
 ### 四、输入桥接层
 
@@ -447,25 +451,65 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 
 - `Canvas` 负责真实视觉输出
 - `CodeEditor` 自己管理 `TextFieldValue`、selection、cursor、点击定位、拖拽与 reveal
-- Android 使用隐藏的 `0x0 BasicTextField` 负责 IME 连接、composing 和 commit
+- Android 改用更底层的平台文本输入桥负责 IME 连接、composing、commit 与平台编辑命令
 - Desktop 使用专用输入宿主组件处理 IME 会话、普通输入、删除、粘贴、导航与全选
 - 平台输入接入层通过 `expect/actual` bridge 收口，不在公共编辑器中继续堆平台条件分支
 - 不引入外部封装的 `TextField` 组件，避免 `code-view` 与其他 UI 模块形成反向依赖
 
-### 当前主输入方案
+### 当前输入桥接方向
 
 - `CodeEditor` 不再二次嵌套 `CodeViewer`，而是直接复用同一个 `CodeViewerCanvas` 和同一组滚动容器
 - `Canvas` 成为正文、selection、caret、命中和横向 reveal 的唯一视觉真相源
 - 编辑态仍使用内部 `TextFieldValue` 承接平台输入语义，但 `composition != null` 时不立即写回 `CodeDocument`
-- Android 的 IME host 固定为隐藏 `0x0 BasicTextField`
 - Desktop 的 IME 与键盘路径不依赖隐藏输入框
+- Android 当前代码已切到 `AndroidInputHostView + InputConnection` 输入桥，不再依赖隐藏 `BasicTextField`
+- Android 后续目标是继续稳固这条低层输入桥，并在必要时再评估 Compose 平台文本输入 session API，而不是回到不可见文本框补丁路线
+- 混排渲染当前已切到“稳定行度量 + 分段绘制”路径，`TextLayoutResult` 主要保留给横向几何与命中计算
 
 这样做的好处是：
 
 - composing 不再直接驱动正文和 Canvas 双重刷新
 - caret、selection、命中和 reveal 都能复用同一套几何来源
 - Viewer / Editor 共用同一套 scroll state，避免双层滚动不同步
-- 行为更接近旧版，平台差异更容易收敛
+- Desktop 行为更接近旧版，平台差异更容易收敛
+
+Android 侧已确认隐藏 `BasicTextField` 方案的结构性问题：
+
+- 删除命令无法稳定映射回真实文档
+- 软键盘触发的选择 / 全选等编辑命令会落在宿主自身，而不是回放到真实编辑状态
+- 继续补丁化处理会让宿主越来越像“第二套编辑器”，违背当前分层目标
+
+因此 Android 新桥必须满足：
+
+- 只负责 IME 会话、composing、commit 与平台编辑命令接入
+- 不拥有整份真实文档，也不成为第二套可编辑文本源
+- 能直接承接删除、选区更新、软键盘侧选择 / 全选 / 剪贴板类动作
+- 所有真实编辑结果都统一回放到 `CodeEditor` 状态机
+
+### 四点五、Android Overscroll 探索
+
+Android overscroll 当前已确认最终落地方向：正文 stretch 使用平台 overscroll，光标手柄、选区手柄、工具栏与相关 overlay 放入同一 overscroll 视觉层统一变形。
+
+探索原因：
+
+- 代码编辑器的正文、caret、选择手柄、光标手柄、工具栏和输入锚点天然分层，若 overlay 留在系统 stretch 之外，就会出现对不齐或“冲出去再收回”的问题
+- AndroidX / AOSP 的平台 stretch 本质上是 `RenderNode + EdgeEffect` 的硬件层变形，不适合在公共 Canvas 层继续用 `scale` 或手工坐标映射去复刻
+- 只对手柄额外附加简单平移，或单独做 stretch / unStretch 估算，都会引入抖动、过冲和命中不一致
+
+当前探索目标：
+
+- 正文直接使用平台 overscroll stretch，而不是在编辑器内部再次自绘 stretch
+- 光标手柄、选区双手柄、工具栏与相关 overlay 跟正文进入同一 overscroll 视觉层
+- overlay 命中与拖拽优先回到基础 scroll 坐标模型，不再额外做一套手工 stretch / unStretch 反算
+- 若后续需要扩展，仅考虑在平台 stretch 之上补少量平台专用能力，不再回到 editor-local 自定义 stretch 主方案
+
+当前已知风险：
+
+- 若 overlay 没有进入同一 overscroll 视觉层，就仍然会出现正文和手柄不对齐
+- 若后续再次回到公共层的手工 stretch / unStretch 估算，容易重新引入字符抖动、手柄过冲和拖拽错位
+- 平台 overscroll 的视觉主导权必须保留在 Android 平台层，公共层只应维护必要的滚动与交互状态
+
+当前该方向已通过用户手测确认正文 stretch、光标手柄与选区双手柄对齐效果，可作为 Android 默认方案继续回归验证。
 
 当前阶段交互约束：
 
@@ -517,14 +561,14 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 
 如果后续需要更精确的 IME 候选框定位，可在移动端的“折叠选区”下补平台锚点：
 
-- 隐藏 IME host 仍负责输入
+- 平台输入桥仍负责输入
 - 但额外维护一个 caret 平台锚点坐标，供输入法候选框定位使用
 
 这应作为增强项，而不是当前基础架构。
 
 ### 输入锚点方案补充
 
-当前已确认一个更明确的方向：`BasicTextField` 不再承担“透明编辑层”，而只承担“输入锚点”角色。
+当前已确认一个更明确的方向：输入宿主不再承担“透明编辑层”角色，而只承担平台输入桥接角色。
 
 输入锚点的职责边界如下：
 
@@ -611,7 +655,7 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 
 #### 当前实现取舍
 
-桌面端当前已验证：
+桌面端早期探索中曾验证：
 
 - “全屏透明输入宿主”更容易维持文本输入可用性
 - “跟随光标的小宿主”更有希望解决候选窗锚点问题
@@ -619,12 +663,13 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 当前阶段已经确认：
 
 - Desktop 专用输入宿主已经可以稳定承接输入
-- 输入锚点状态机、自动焦点与命令键打断规则已跑通
+- Desktop 输入宿主的状态机、自动焦点与命令键打断规则已跑通
 - 画布侧 `inline composing overlay` 已落地
 - `selection + composing` 已按“首次进入 composing 时先真实删除选区”策略实现
 - `composing` 期间的可见光标、输入锚点与自动 reveal 已接入 preedit 内部 caret
 - Desktop 候选词窗口当前已能跟随输入锚点移动，整体效果达到当前阶段预期
 - Desktop `InputMethodEvent` 中的 preedit 前缀不再提前写入正文，整段 preedit 会保留到最终 commit
+- Android 隐藏 `BasicTextField` 路线已确认暴露结构性缺陷，不再继续作为长期实现推进
 
 因此后续不再需要围绕“桌面候选窗是否能跟随光标”继续试错，剩余工作应转向边界一致性验证和交互收尾。
 
@@ -821,11 +866,11 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 
 - 引入内部 `TextFieldValue` 状态
 - 将编辑态点击、拖拽、selection、caret 与 reveal 逻辑收回 `CodeEditor`
-- Android 接入隐藏 `0x0 BasicTextField` 作为 IME host
+- Android 接入更底层的平台文本输入桥，当前主链为 `AndroidInputHostView + InputConnection`，后续按需要评估 Compose 平台文本输入 session API
 - Desktop 接入专用输入宿主组件，统一处理 IME、键盘输入与剪贴板路径
 - 将 `TextFieldValue.selection` 与内部选区映射同步
 - `composition != null` 时不立即更新 `CodeDocument`
-- Canvas 绘制 caret 和选区，并统一使用 `TextLayoutResult`
+- Canvas 绘制 caret 和选区；横向几何统一使用 `TextLayoutResult`，垂直行框统一使用稳定行度量
 - 输入后自动 reveal caret
 - 接入基础键盘操作与拖拽选区
 
@@ -840,6 +885,7 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 风险点：
 
 - `String` 与 `TextFieldValue` 双状态不同步
+- Android 新输入桥需要覆盖删除、选区更新与软键盘编辑动作，平台语义梳理成本较高
 - IME composing、退格与 commit 语义需要继续做平台手测
 - 编辑后 token 刷新存在异步延迟
 
@@ -862,6 +908,7 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 - 限制每帧只绘制可见行
 - 对布局快照做必要缓存
 - 将“按文本分行的基础布局”和“按 token / annotation 装饰”拆层缓存
+- 将“稳定行度量采样”“渲染分段切分”“按段文本布局”继续保持为独立可缓存层
 - 避免高频滚动下重复解析整份文本
 - 评估长行场景下的横向滚动成本
 - 保持大文件降级路径兼容 runtime 当前策略
@@ -904,12 +951,14 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 
 主张：
 
-- 第一阶段使用“隐藏 IME host + Canvas 自管编辑”方案
+- Desktop 保持“专用输入宿主 + Canvas 自管编辑”
+- Android 改为“更底层的平台文本输入桥 + Canvas 自管编辑”
 
 原因：
 
 - 工程复杂度仍可控
 - 能避免可见输入控件内部布局与 Canvas 布局互相干扰
+- 能避免 Android 隐藏 `BasicTextField` 继续吞掉删除和软键盘编辑动作
 - 更容易把问题收敛到“状态同步 + 单一几何来源”
 
 代价：
@@ -976,6 +1025,6 @@ Viewer 与 Editor 都复用同一个渲染器，只是在编辑态额外绘制 c
 - 共享布局核心
 - 正式 viewport 状态
 - Canvas 自绘 Viewer
-- 隐藏 IME host + Canvas 自管编辑作为第一阶段输入桥接
+- Desktop 专用输入宿主 + Android 低层平台文本输入桥，统一接到 Canvas 自管编辑
 
 而不是把透明输入控件继续作为编辑主控。输入框跟随选区移动也依然不建议作为首版基础架构，只能作为后续增强项评估。

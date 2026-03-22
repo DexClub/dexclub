@@ -56,6 +56,21 @@ class CodeEditorSelectionHandlesTest {
     }
 
     @Test
+    fun rangeHandleAutoScrollTarget_usesSameSelectionRulesAsRangeHandleDrag() {
+        val target = RangeHandleAutoScrollTarget(
+            kind = SelectionHandleKind.Start,
+            fixedOffset = 10,
+        )
+
+        assertEquals(TextRange(12, 10), target.resolveSelection(draggedTextOffset = 12))
+    }
+
+    @Test
+    fun cursorHandleAutoScrollTarget_returnsCollapsedSelection() {
+        assertEquals(TextRange(9), CursorHandleAutoScrollTarget.resolveSelection(draggedTextOffset = 9))
+    }
+
+    @Test
     fun shouldShowCursorHandle_returnsTrueOnlyForCollapsedSelection() {
         assertTrue(shouldShowCursorHandle(TextRange(4)))
         assertFalse(shouldShowCursorHandle(TextRange(4, 6)))

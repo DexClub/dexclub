@@ -8,6 +8,8 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import io.github.dexclub.codeview.compose.internal.viewer.buildCodeLineRenderSegments
+import io.github.dexclub.codeview.compose.internal.viewer.CodeLineRenderSegment
 import io.github.dexclub.codeview.core.token.CodeTokenKind
 
 internal class CodeLineTextLayoutCache(
@@ -19,9 +21,12 @@ internal class CodeLineTextLayoutCache(
     private val lineLayoutCache: MutableMap<Int, TextLayoutResult> = mutableMapOf()
     private val lineWidthCache: MutableMap<Int, Float> = mutableMapOf()
     private val plainTextLayoutCache: MutableMap<String, TextLayoutResult> = mutableMapOf()
+    private val lineRenderSegmentsCache: MutableMap<Int, List<CodeLineRenderSegment>> = mutableMapOf()
+    private val plainTextRenderSegmentsCache: MutableMap<SegmentRenderKey, List<CodeLineRenderSegment>> = mutableMapOf()
+    private val segmentLayoutCache: MutableMap<SegmentRenderKey, TextLayoutResult> = mutableMapOf()
 
-    val maxLineWidthPx: Float by lazy(LazyThreadSafetyMode.NONE) {
-        layoutSnapshot.lines.indices.maxOfOrNull(::lineWidthPx) ?: 0f
+    fun estimatedMaxLineWidthPx(fallbackCharWidthPx: Float): Float {
+        return (layoutSnapshot.maxLineLength * fallbackCharWidthPx).coerceAtLeast(0f)
     }
 
     fun lineWidthPx(lineIndex: Int): Float {
@@ -102,16 +107,78 @@ internal class CodeLineTextLayoutCache(
         }
     }
 
+    fun renderSegments(lineIndex: Int): List<CodeLineRenderSegment> {
+        require(lineIndex in layoutSnapshot.lines.indices) { "lineIndex 超出范围: $lineIndex" }
+        return lineRenderSegmentsCache.getOrPut(lineIndex) {
+            val lineText = layoutSnapshot.lineText(lineIndex)
+            if (lineText.isEmpty()) {
+                return@getOrPut emptyList()
+            }
+            val tokens = layoutSnapshot.tokensForLine(lineIndex)
+            val defaultColor = tokenColor(CodeTokenKind.PlainText)
+            var tokenIndex = 0
+            buildCodeLineRenderSegments(
+                text = lineText,
+                colorAtIndex = { column ->
+                    while (tokenIndex < tokens.size && column >= tokens[tokenIndex].endColumn) {
+                        tokenIndex += 1
+                    }
+                    val token = tokens.getOrNull(tokenIndex)
+                    when {
+                        token != null && column in token.startColumn until token.endColumn -> tokenColor(token.kind)
+                        else -> defaultColor
+                    }
+                },
+            )
+        }
+    }
+
+    fun plainTextRenderSegments(
+        text: String,
+        color: Color,
+    ): List<CodeLineRenderSegment> {
+        val key = SegmentRenderKey(
+            text = text,
+            color = color,
+        )
+        return plainTextRenderSegmentsCache.getOrPut(key) {
+            if (text.isEmpty()) {
+                return@getOrPut emptyList()
+            }
+            buildCodeLineRenderSegments(
+                text = text,
+                colorAtIndex = { color },
+            )
+        }
+    }
+
+    fun segmentLayout(
+        text: String,
+        color: Color,
+    ): TextLayoutResult {
+        val key = SegmentRenderKey(
+            text = text,
+            color = color,
+        )
+        return segmentLayoutCache.getOrPut(key) {
+            textMeasurer.measure(
+                text = AnnotatedString(text),
+                style = textStyle.copy(color = color),
+                softWrap = false,
+            )
+        }
+    }
+
     private fun annotatedLine(lineIndex: Int): AnnotatedString {
         return lineTextCache.getOrPut(lineIndex) {
-            val line = layoutSnapshot.lineAt(lineIndex)
+            val lineText = layoutSnapshot.lineText(lineIndex)
             val tokens = layoutSnapshot.tokensForLine(lineIndex)
-            if (tokens.isEmpty() || line.content.isEmpty()) {
-                return@getOrPut AnnotatedString(line.content)
+            if (tokens.isEmpty() || lineText.isEmpty()) {
+                return@getOrPut AnnotatedString(lineText)
             }
 
             buildAnnotatedString {
-                append(line.content)
+                append(lineText)
                 tokens.forEach { token ->
                     if (token.startColumn >= token.endColumn) return@forEach
                     addStyle(
@@ -158,4 +225,9 @@ internal class CodeLineTextLayoutCache(
             CodeTokenKind.PlainText -> Color(0xFF1F2328)
         }
     }
+
+    private data class SegmentRenderKey(
+        val text: String,
+        val color: Color,
+    )
 }

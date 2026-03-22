@@ -4,6 +4,7 @@ import io.github.dexclub.settings.AppSettings
 
 data class WorkspaceSettingsUiState(
     val autoUnicodeDecodeEnabled: Boolean = AppSettings().autoUnicodeDecode,
+    val codeScrollPastEnd: Int = AppSettings().codeScrollPastEnd,
 )
 
 internal fun buildWorkspaceSettingsUiState(
@@ -11,5 +12,6 @@ internal fun buildWorkspaceSettingsUiState(
 ): WorkspaceSettingsUiState {
     return WorkspaceSettingsUiState(
         autoUnicodeDecodeEnabled = appSettings.autoUnicodeDecode,
+        codeScrollPastEnd = appSettings.codeScrollPastEnd,
     )
 }

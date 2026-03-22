@@ -14,6 +14,8 @@ import io.github.dexclub.codeview.compose.internal.layout.CodeLayoutSnapshot
 import io.github.dexclub.codeview.compose.internal.layout.CodeLineTextLayoutCache
 import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerCanvasMetrics
 import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerViewportSnapshot
+import io.github.dexclub.codeview.compose.internal.viewer.contentXToViewportX
+import io.github.dexclub.codeview.compose.internal.viewer.contentYToViewportY
 import kotlinx.coroutines.launch
 
 @Composable
@@ -108,11 +110,13 @@ private fun resolveSelectionToolbarRect(
     val topPx = startCursor.line * canvasMetrics.lineHeightPx
     val bottomPx = (endCursor.line + 1) * canvasMetrics.lineHeightPx
 
-    val viewportLeft = (leftPx - viewportSnapshot.horizontalScrollPx).coerceIn(0f, viewportSnapshot.viewportWidthPx)
-    val viewportRight = (rightPx - viewportSnapshot.horizontalScrollPx)
+    val viewportLeft = viewportSnapshot.contentXToViewportX(leftPx)
+        .coerceIn(0f, viewportSnapshot.viewportWidthPx)
+    val viewportRight = viewportSnapshot.contentXToViewportX(rightPx)
         .coerceIn(viewportLeft + 1f, viewportSnapshot.viewportWidthPx.coerceAtLeast(viewportLeft + 1f))
-    val viewportTop = (topPx - viewportSnapshot.verticalScrollPx).coerceIn(0f, viewportSnapshot.viewportHeightPx)
-    val viewportBottom = (bottomPx - viewportSnapshot.verticalScrollPx)
+    val viewportTop = viewportSnapshot.contentYToViewportY(topPx)
+        .coerceIn(0f, viewportSnapshot.viewportHeightPx)
+    val viewportBottom = viewportSnapshot.contentYToViewportY(bottomPx)
         .coerceIn(viewportTop + 1f, viewportSnapshot.viewportHeightPx.coerceAtLeast(viewportTop + 1f))
 
     return Rect(

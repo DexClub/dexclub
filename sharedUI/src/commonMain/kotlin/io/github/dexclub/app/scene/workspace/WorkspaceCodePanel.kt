@@ -49,7 +49,9 @@ internal fun WorkspaceCodePanel(
             callbacks = paneCallbacks,
             state = pagerState,
             layoutMode = layoutMode,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .workspaceCodePanelImePadding(),
         )
     }
 }

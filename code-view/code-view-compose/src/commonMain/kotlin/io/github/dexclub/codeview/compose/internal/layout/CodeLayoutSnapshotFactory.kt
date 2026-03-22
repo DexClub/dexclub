@@ -44,7 +44,6 @@ internal object CodeLayoutSnapshotFactory {
             when (text[index]) {
                 '\r' -> {
                     lines += buildLine(
-                        text = text,
                         lineIndex = lineIndex,
                         lineStart = lineStart,
                         lineEndExclusive = index,
@@ -58,7 +57,6 @@ internal object CodeLayoutSnapshotFactory {
 
                 '\n' -> {
                     lines += buildLine(
-                        text = text,
                         lineIndex = lineIndex,
                         lineStart = lineStart,
                         lineEndExclusive = index,
@@ -71,7 +69,6 @@ internal object CodeLayoutSnapshotFactory {
         }
 
         lines += buildLine(
-            text = text,
             lineIndex = lineIndex,
             lineStart = lineStart,
             lineEndExclusive = text.length,
@@ -82,7 +79,6 @@ internal object CodeLayoutSnapshotFactory {
 
 
     private fun buildLine(
-        text: String,
         lineIndex: Int,
         lineStart: Int,
         lineEndExclusive: Int,
@@ -91,7 +87,6 @@ internal object CodeLayoutSnapshotFactory {
             lineIndex = lineIndex,
             startOffset = lineStart,
             endOffsetExclusive = lineEndExclusive,
-            content = text.substring(lineStart, lineEndExclusive),
         )
     }
 

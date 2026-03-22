@@ -3,11 +3,13 @@ package io.github.dexclub.app.scene.workspace
 import io.github.dexclub.app.model.OpenTabUiModel
 import io.github.dexclub.core.editor.EditorContentStateSnapshot
 import io.github.dexclub.core.editor.buildEditorContentKey
+import io.github.dexclub.settings.AppSettings
 
 data class WorkspaceCodePaneUiState(
     val contentKey: String,
     val text: String = "",
     val editorState: EditorContentStateSnapshot = EditorContentStateSnapshot(),
+    val scrollPastEnd: Int = AppSettings().codeScrollPastEnd,
 )
 
 data class WorkspaceCodePanelUiState(
@@ -28,6 +30,7 @@ internal fun buildWorkspaceCodePanelUiState(
     selectedOpenTab: OpenTabUiModel?,
     navigationRevealTarget: NavigationRevealTarget?,
     codeContents: Map<String, String>,
+    appSettings: AppSettings,
     resolveEditorState: (tab: OpenTabUiModel, kind: String) -> EditorContentStateSnapshot,
 ): WorkspaceCodePanelUiState {
     return WorkspaceCodePanelUiState(
@@ -41,6 +44,7 @@ internal fun buildWorkspaceCodePanelUiState(
         paneStates = buildWorkspaceCodePaneUiStates(
             openTabs = openTabs,
             codeContents = codeContents,
+            appSettings = appSettings,
             resolveEditorState = resolveEditorState,
         ),
     )
@@ -49,6 +53,7 @@ internal fun buildWorkspaceCodePanelUiState(
 internal fun buildWorkspaceCodePaneUiStates(
     openTabs: List<OpenTabUiModel>,
     codeContents: Map<String, String>,
+    appSettings: AppSettings,
     resolveEditorState: (tab: OpenTabUiModel, kind: String) -> EditorContentStateSnapshot,
 ): Map<String, WorkspaceCodePaneUiState> {
     return buildMap {
@@ -63,6 +68,7 @@ internal fun buildWorkspaceCodePaneUiStates(
                             contentKey = contentKey,
                             text = codeContents[contentKey].orEmpty(),
                             editorState = resolveEditorState(tab, kind),
+                            scrollPastEnd = appSettings.codeScrollPastEnd,
                         ),
                     )
                 }

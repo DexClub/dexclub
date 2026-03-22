@@ -50,6 +50,37 @@ internal fun TextFieldValue.deleteForward(): TextFieldValue {
     )
 }
 
+internal fun TextFieldValue.deleteSurroundingText(
+    beforeLength: Int,
+    afterLength: Int,
+): TextFieldValue {
+    if (beforeLength <= 0 && afterLength <= 0) {
+        return copy(composition = null)
+    }
+    if (!selection.collapsed) {
+        return replaceSelection("")
+    }
+
+    val cursorOffset = normalizedCaretOffset()
+    val start = (cursorOffset - beforeLength).coerceAtLeast(0)
+    val end = (cursorOffset + afterLength).coerceAtMost(text.length)
+    if (start >= end) {
+        return copy(composition = null)
+    }
+
+    return replaceRange(
+        range = TextRange(start, end),
+        replacement = "",
+    )
+}
+
+internal fun TextFieldValue.selectAll(): TextFieldValue {
+    return copy(
+        selection = TextRange(0, text.length),
+        composition = null,
+    )
+}
+
 internal fun TextFieldValue.moveCaretTo(
     targetOffset: Int,
     extendSelection: Boolean,

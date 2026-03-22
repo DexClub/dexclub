@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -50,6 +51,7 @@ internal fun CodeEditorContent(
     searchHighlight: LineSelection?,
     initialFirstVisibleLine: Int,
     initialScrollOffsetX: Int,
+    scrollPastEnd: Int,
     selection: LineSelection?,
     cursor: Cursor?,
     cursorTarget: CodeViewerCursorTarget?,
@@ -70,7 +72,9 @@ internal fun CodeEditorContent(
     val imeFocusRequester = remember(documentId) { FocusRequester() }
     var preferredColumn by remember(documentId) { mutableStateOf<Int?>(null) }
     var pendingAnchorFocusRequest by remember(documentId) { mutableStateOf(false) }
-    var suppressTouchSelectionToolbar by remember(documentId) { mutableStateOf(false) }
+    var touchInteractionState by remember(documentId) {
+        mutableStateOf<TouchSelectionInteractionState>(TouchSelectionInteractionState.Idle)
+    }
     var selectionToolbarRequestToken by remember(documentId) { mutableStateOf(0L) }
     var contentBoundsInWindow by remember(documentId) { mutableStateOf(Rect.Zero) }
     val composingOverlay = inputAnchorState.toComposingOverlayOrNull()
@@ -90,6 +94,7 @@ internal fun CodeEditorContent(
     }
 
     fun updateSelection(nextSelection: TextRange) {
+        if (fieldValue.selection == nextSelection) return
         onFieldValueChange(
             fieldValue.copy(
                 selection = nextSelection,
@@ -99,17 +104,67 @@ internal fun CodeEditorContent(
     }
 
     fun handleTouchSelectionInteractionStart() {
-        suppressTouchSelectionToolbar = true
+        resetPreferredColumn()
+        interruptInputAnchor()
+        touchInteractionState = TouchSelectionInteractionState.DraggingHandle()
+    }
+
+    fun handleTouchSelectionInteractionEnd() {
+        touchInteractionState = TouchSelectionInteractionState.Idle
+    }
+
+    fun handleTouchSelectionHandleAutoScrollStart(
+        target: TouchHandleAutoScrollTarget,
+        viewportPosition: Offset,
+    ) {
+        val session = HandleTouchSelectionAutoScrollSession(
+            target = target,
+            initialViewportPosition = viewportPosition,
+        )
+        touchInteractionState = TouchSelectionInteractionState.DraggingHandle(
+            autoScrollSession = session,
+        )
+    }
+
+    fun updateTouchAutoScrollViewportPosition(viewportPosition: Offset) {
+        touchInteractionState.autoScrollSession?.viewportPosition = viewportPosition
+    }
+
+    fun clearTouchAutoScrollSession() {
+        val currentState = touchInteractionState
+        touchInteractionState = when (currentState) {
+            is TouchSelectionInteractionState.DraggingHandle -> currentState.copy(
+                autoScrollSession = null,
+            )
+
+            else -> currentState
+        }
+    }
+
+    fun handleTouchSelectionGestureStart(
+        initialSelection: TextRange,
+        viewportPosition: Offset,
+    ) {
+        touchInteractionState = TouchSelectionInteractionState.LongPressSelecting(
+            autoScrollSession = LongPressTouchSelectionAutoScrollSession(
+                initialSelection = initialSelection,
+                initialViewportPosition = viewportPosition,
+            )
+        )
         resetPreferredColumn()
         interruptInputAnchor()
     }
 
-    fun handleTouchSelectionInteractionEnd() {
-        suppressTouchSelectionToolbar = false
+    fun handleTouchSelectionGestureMove(viewportPosition: Offset) {
+        updateTouchAutoScrollViewportPosition(viewportPosition)
+    }
+
+    fun handleTouchSelectionGestureEnd() {
+        touchInteractionState = TouchSelectionInteractionState.Idle
     }
 
     fun requestSelectionToolbar() {
-        suppressTouchSelectionToolbar = false
+        touchInteractionState = TouchSelectionInteractionState.Idle
         selectionToolbarRequestToken += 1L
     }
 
@@ -155,6 +210,7 @@ internal fun CodeEditorContent(
             textStyle = textStyle,
             initialFirstVisibleLine = initialFirstVisibleLine,
             initialScrollOffsetX = initialScrollOffsetX,
+            scrollPastEnd = scrollPastEnd,
             selection = selection,
             cursor = cursor,
             searchHighlight = searchHighlight,
@@ -172,7 +228,7 @@ internal fun CodeEditorContent(
             contentModifierTransform = if (readOnly) {
                 null
             } else {
-                { baseModifier, canvasMetrics, lineLayoutCache ->
+                { baseModifier, canvasMetrics, lineLayoutCache, scrollController ->
                     baseModifier.codeEditorInteractionModifier(
                         platformEditorBridge = platformEditorBridge,
                         useFallbackLongPressContextMenu = !selectionToolbarBridge.usePlatformSelectionToolbar,
@@ -187,9 +243,14 @@ internal fun CodeEditorContent(
                         preferredColumn = preferredColumn,
                         onPreferredColumnChange = { preferredColumn = it },
                         onRequestImeFocus = ::requestImeFocus,
+                        isSoftwareKeyboardVisible = platformEditorBridge::isSoftwareKeyboardVisible,
                         onInterruptInputAnchor = ::interruptInputAnchor,
                         onAnyPointerEditing = ::resetPreferredColumn,
+                        scrollController = scrollController,
                         onTapInsideSelection = ::requestSelectionToolbar,
+                        onLongPressSelectionGestureStart = ::handleTouchSelectionGestureStart,
+                        onLongPressSelectionGestureMove = ::handleTouchSelectionGestureMove,
+                        onLongPressSelectionGestureEnd = ::handleTouchSelectionGestureEnd,
                         onContextMenu = onContextMenu,
                         onFieldValueChange = onFieldValueChange,
                     )
@@ -227,11 +288,51 @@ internal fun CodeEditorContent(
             floatingContent = if (readOnly || (!showFloatingInputAnchor && !showTouchSelectionOverlays)) {
                 null
             } else {
-                { canvasMetrics, lineLayoutCache, viewportSnapshot ->
+                { canvasMetrics, lineLayoutCache, viewportSnapshot, scrollController ->
+                    val activeTouchAutoScrollSession = touchInteractionState.autoScrollSession
+                    if (activeTouchAutoScrollSession != null) {
+                        LaunchedEffect(
+                            activeTouchAutoScrollSession,
+                            scrollController,
+                            layoutSnapshot,
+                            canvasMetrics.lineHeightPx,
+                        ) {
+                            var previousFrameTimeNanos = 0L
+                            while (touchInteractionState.autoScrollSession === activeTouchAutoScrollSession) {
+                                val frameTimeNanos = withFrameNanos { it }
+                                val frameDurationNanos = if (previousFrameTimeNanos == 0L) {
+                                    DEFAULT_TOUCH_AUTO_SCROLL_FRAME_DURATION_NANOS
+                                } else {
+                                    frameTimeNanos - previousFrameTimeNanos
+                                }
+                                previousFrameTimeNanos = frameTimeNanos
+                                val autoScrollDelta = resolveTouchAutoScrollDelta(
+                                    viewportPosition = activeTouchAutoScrollSession.viewportPosition,
+                                    scrollController = scrollController,
+                                    frameDurationNanos = frameDurationNanos,
+                                )
+                                if (autoScrollDelta != Offset.Zero) {
+                                    scrollController.scrollBy(
+                                        horizontalDeltaPx = autoScrollDelta.x,
+                                        verticalDeltaPx = autoScrollDelta.y,
+                                    )
+                                    updateSelection(
+                                        activeTouchAutoScrollSession.resolveSelection(
+                                            layoutSnapshot = layoutSnapshot,
+                                            lineLayoutCache = lineLayoutCache,
+                                            lineHeightPx = canvasMetrics.lineHeightPx,
+                                            scrollController = scrollController,
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
                     if (showTouchSelectionOverlays) {
                         CodeEditorTouchInteractionOverlays(
                             selectionToolbarBridge = selectionToolbarBridge,
-                            showSelectionToolbar = !suppressTouchSelectionToolbar,
+                            showSelectionToolbar = touchInteractionState.showSelectionToolbar,
+                            showSelectionHandles = touchInteractionState.showSelectionHandles,
                             showSelectionToolbarRequestToken = selectionToolbarRequestToken,
                             layoutSnapshot = layoutSnapshot,
                             lineLayoutCache = lineLayoutCache,
@@ -246,6 +347,9 @@ internal fun CodeEditorContent(
                             onSelectionChange = ::updateSelection,
                             onHandleInteractionStart = ::handleTouchSelectionInteractionStart,
                             onHandleInteractionEnd = ::handleTouchSelectionInteractionEnd,
+                            onHandleAutoScrollStart = ::handleTouchSelectionHandleAutoScrollStart,
+                            onHandleAutoScrollMove = ::updateTouchAutoScrollViewportPosition,
+                            onHandleAutoScrollEnd = ::clearTouchAutoScrollSession,
                         )
                     }
                     if (SHOW_INPUT_ANCHOR_DEBUG_OVERLAY) {

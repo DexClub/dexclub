@@ -62,7 +62,9 @@ internal fun handleInputAnchorValueChange(
                 inputAnchorState.anchorSelection != null &&
                 previousImeFieldValue.text == newValue.text &&
                 previousImeFieldValue.selection != newValue.selection -> {
-            val delta = newValue.selection.end.compareTo(previousImeFieldValue.selection.end)
+            // Some Android IMEs update only the selection inside an existing preedit session.
+            // Preserve the full delta instead of assuming a single-character caret move.
+            val delta = newValue.selection.end - previousImeFieldValue.selection.end
             if (delta != 0) {
                 onPreferredColumnChange(null)
                 inputAnchorState.clear()
@@ -96,6 +98,8 @@ internal fun handleInputAnchorValueChange(
                     )
                 )
             }
+            // Once composing starts, keep the anchor collapsed at the insertion boundary so the
+            // IME-local text can be projected back into the document deterministically.
             val collapsedAnchorSelection = TextRange(effectiveAnchorSelection.normalizedStart)
             inputAnchorState.update(
                 newValue = newValue,
