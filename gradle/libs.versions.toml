@@ -21,8 +21,8 @@ smali = "3.0.9"
 jadx = "1.5.5"
 logback = "1.5.32"
 filekit = "0.13.0"
-binary-compatibility-validator = "0.17.0"
 code-view = "0.1.0"
+jewelDecoratedWindow = "0.34.0-253.31033.149"
 
 [libraries]
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-multiplatform" }
@@ -33,7 +33,6 @@ compose-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-pre
 compose-ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "compose-multiplatform" }
 compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "material3" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
-kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 androidx-activityCompose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
 androidx-lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
@@ -64,6 +63,7 @@ code-view-runtime = { module = "io.github.dexclub:code-view-runtime", version.re
 code-view-tree-sitter = { module = "io.github.dexclub:code-view-tree-sitter", version.ref = "code-view" }
 code-view-tree-sitter-java = { module = "io.github.dexclub:code-view-tree-sitter-java", version.ref = "code-view" }
 code-view-tree-sitter-smali = { module = "io.github.dexclub:code-view-tree-sitter-smali", version.ref = "code-view" }
+jewel-decorated-window = { module = "org.jetbrains.jewel:jewel-decorated-window", version.ref = "jewelDecoratedWindow" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -78,4 +78,3 @@ room = { id = "androidx.room", version.ref = "room" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 buildConfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildConfig" }
 ktreesitter-plugin = { id = "io.github.tree-sitter.ktreesitter-plugin", version.ref = "ktreesitter" }
-binary-compatibility-validator = { id = "org.jetbrains.kotlinx.binary-compatibility-validator", version.ref = "binary-compatibility-validator" }

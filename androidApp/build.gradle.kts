@@ -39,6 +39,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":shadcn-ui-compose"))
     implementation(project(":sharedUI"))
     implementation(libs.code.view.tree.sitter)
     implementation(libs.androidx.activityCompose)

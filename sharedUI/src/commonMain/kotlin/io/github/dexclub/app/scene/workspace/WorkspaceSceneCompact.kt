@@ -76,7 +76,8 @@ internal fun WorkspaceSceneCompact(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(ShadcnTheme.colors.background),
+                .background(ShadcnTheme.colors.background)
+                .workspaceSceneSystemBarsPadding(),
         ) {
             WorkspaceCompactTopBar(
                 uiState = uiState.headerUiState,

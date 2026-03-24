@@ -10,13 +10,23 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowInsetsControllerCompat
 import io.github.dexclub.app.App
+import io.github.dexclub.app.rememberAppThemeIsDarkState
+import io.github.shadcn.ui.compose.ShadcnTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            App(onThemeChanged = { ThemeChanged(it) })
+            val themeIsDarkState = rememberAppThemeIsDarkState()
+            ThemeChanged(!themeIsDarkState.value)
+            ShadcnTheme(
+                isDarkTheme = themeIsDarkState.value,
+            ) {
+                App(
+                    themeIsDarkState = themeIsDarkState,
+                )
+            }
         }
     }
 }

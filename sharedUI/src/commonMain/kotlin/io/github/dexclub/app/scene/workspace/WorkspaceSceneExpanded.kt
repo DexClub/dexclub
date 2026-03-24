@@ -1,5 +1,6 @@
 package io.github.dexclub.app.scene.workspace
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,6 +23,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import io.github.shadcn.ui.compose.Card
+import io.github.shadcn.ui.compose.ShadcnTheme
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -79,6 +81,8 @@ internal fun WorkspaceSceneExpanded(
     Row(
         modifier = modifier
             .fillMaxSize()
+            .background(ShadcnTheme.colors.background)
+            .workspaceSceneSystemBarsPadding()
             .onSizeChanged { containerWidthPx = it.width },
     ) {
         Card(
