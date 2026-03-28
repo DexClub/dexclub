@@ -10,7 +10,7 @@ import io.github.dexclub.app.model.OPEN_TAB_KIND_SMALI
 import io.github.dexclub.app.model.OPEN_TAB_TARGET_TYPE_CLASS
 import io.github.dexclub.app.model.OpenTabUiModel
 import io.github.dexclub.compat.directoriesCompat
-import io.github.dexclub.core.DexFactory
+import io.github.dexclub.core.DexEngine
 import io.github.dexclub.core.editor.CodeContentRuntime
 import io.github.dexclub.core.editor.CodeContentService
 import io.github.dexclub.core.editor.EditorStateRepository
@@ -27,11 +27,9 @@ import io.github.dexclub.core.search.ClassSearchService
 import io.github.dexclub.core.search.StringSearchLocationResolver
 import io.github.dexclub.core.search.StringSearchService
 import io.github.dexclub.core.settings.AppSettingsRepository
-import io.github.dexclub.core.workspace.WorkspaceDexKitRuntime
 import io.github.dexclub.core.workspace.WorkspaceIndexedClassRecord
 import io.github.dexclub.core.workspace.WorkspaceInitializer
 import io.github.dexclub.core.workspace.WorkspaceIndexService
-import io.github.dexclub.core.workspace.asWorkspaceClassSource
 import io.github.dexclub.loggerDebug
 import io.github.dexclub.loggerError
 import io.github.dexclub.loggerInfo
@@ -40,6 +38,7 @@ import io.github.dexclub.node.ClassTreeNode
 import io.github.dexclub.node.flatten
 import io.github.dexclub.settings.AppSettings
 import io.github.vinceglb.filekit.PlatformFile
+import io.github.vinceglb.filekit.absolutePath
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -228,9 +227,8 @@ class WorkspaceSceneViewModel internal constructor(
         )
     }
 
-    private val dexFactory by lazy {
-        val dexFiles = workspaceContext.dexsAbsolutePathList.map { PlatformFile(it) }
-        DexFactory.loadMultiDex(dexFiles)
+    private val dexEngine by lazy {
+        DexEngine(workspaceContext.dexsAbsolutePathList)
     }
 
     private fun logDebug(
@@ -329,16 +327,13 @@ class WorkspaceSceneViewModel internal constructor(
         scope = viewModelScope,
         onWarn = { text, throwable -> logWarn(text, throwable) },
     )
-    private val workspaceDexKitRuntime = WorkspaceDexKitRuntime(
-        dexPaths = workspaceContext.dexsAbsolutePathList,
-    )
     private val classSearchService = ClassSearchService(
         workspaceIndexService = workspaceIndexService,
-        dexKitBridgeProvider = workspaceDexKitRuntime::getOrCreateBridge,
+        dexEngineProvider = { dexEngine },
     )
     private val stringSearchService = StringSearchService(
         workspaceIndexService = workspaceIndexService,
-        dexKitBridgeProvider = workspaceDexKitRuntime::getOrCreateBridge,
+        dexEngineProvider = { dexEngine },
     )
     private val stringSearchLocationResolver = StringSearchLocationResolver()
     private val navigationService = NavigationService(
@@ -360,7 +355,7 @@ class WorkspaceSceneViewModel internal constructor(
 
     private suspend fun printDexKitDexNum() {
         runIoCatching {
-            workspaceDexKitRuntime.readDexNum()
+            dexEngine.readDexNum()
         }.onSuccess { dexNum ->
             if (dexNum != null) {
                 logDebug("DexKit dex 数量: $dexNum")
@@ -635,7 +630,7 @@ class WorkspaceSceneViewModel internal constructor(
             saveAppSettingsOnClear()
         }
         runCleanupStep("关闭 DexKit 失败") {
-            workspaceDexKitRuntime.close()
+            dexEngine.close()
         }
         super.onCleared()
         workspaceIndexService.close()
@@ -649,7 +644,8 @@ class WorkspaceSceneViewModel internal constructor(
             loadingFailurePrefix = "加载失败",
         ) {
             val bootstrap = workspaceInitializer.bootstrap(
-                classSource = dexFactory.asWorkspaceClassSource(),
+                expectedIndexedClassCount = dexEngine.classCount(),
+                indexedClassesProvider = dexEngine::workspaceIndexEntries,
                 currentSelectedTabId = _selectedTabId.value,
                 onProgress = { progress ->
                     updateLoadingMessage(progress)
@@ -725,11 +721,11 @@ class WorkspaceSceneViewModel internal constructor(
                 updateLoadingMessage("export single smali: ${cls.signature}")
                 val smaliOutput = workspaceExportDir("smali")
                 val smaliOutFile = PlatformFile(smaliOutput, cls.className)
-                dexFactory.exportSingleSmali(
+                dexEngine.exportSingleSmali(
                     autoUnicodeDecode = _appSettings.value.autoUnicodeDecode,
                     className = cls.signature,
-                    dex = PlatformFile(cls.dexAbsolutePath),
-                    output = smaliOutFile,
+                    dexPath = cls.dexAbsolutePath,
+                    outputPath = smaliOutFile.absolutePath(),
                 ).also {
                     logDebug("导出 Smali: $it")
                 }
@@ -739,10 +735,10 @@ class WorkspaceSceneViewModel internal constructor(
                 updateLoadingMessage("export single dex: ${cls.signature}")
                 val dexOutput = workspaceExportDir("dex")
                 val dexOutFile = PlatformFile(dexOutput, cls.className)
-                dexFactory.exportSingleDex(
+                dexEngine.exportSingleDex(
                     className = cls.signature,
-                    dex = PlatformFile(cls.dexAbsolutePath),
-                    output = dexOutFile,
+                    dexPath = cls.dexAbsolutePath,
+                    outputPath = dexOutFile.absolutePath(),
                 ).also {
                     logDebug("导出 Dex: $it")
                 }
@@ -750,9 +746,10 @@ class WorkspaceSceneViewModel internal constructor(
                 updateLoadingMessage("Dex to Java: ${cls.signature}")
                 val clsOutputDir = workspaceExportDir("java")
                 val clsOutput = PlatformFile(clsOutputDir, "${cls.className}.java")
-                dexFactory.jadxDexToJavaSource(
-                    dex = dexOutFile,
-                    output = clsOutput,
+                dexEngine.exportSingleJavaSource(
+                    className = cls.signature,
+                    dexPath = cls.dexAbsolutePath,
+                    outputPath = clsOutput.absolutePath(),
                 ).also {
                     logDebug("导出 Java: $it")
                 }

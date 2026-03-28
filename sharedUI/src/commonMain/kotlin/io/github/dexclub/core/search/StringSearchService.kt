@@ -1,9 +1,7 @@
 package io.github.dexclub.core.search
 
+import io.github.dexclub.core.DexEngine
 import io.github.dexclub.core.workspace.WorkspaceIndexService
-import io.github.dexclub.dexkit.DexKitBridge
-import io.github.dexclub.dexkit.findMethod
-import io.github.dexclub.dexkit.query.StringMatchType
 import io.github.dexclub.dexkit.result.MethodData
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -11,7 +9,7 @@ typealias StringSearchExecutor = suspend (String) -> List<MethodData>
 
 class StringSearchService(
     private val workspaceIndexService: WorkspaceIndexService,
-    private val dexKitBridgeProvider: (() -> DexKitBridge?)? = null,
+    private val dexEngineProvider: (() -> DexEngine?)? = null,
     private val searchExecutor: StringSearchExecutor? = null,
     private val searchTimeoutMs: Long = SEARCH_TIMEOUT_MS,
 ) {
@@ -55,18 +53,10 @@ class StringSearchService(
             return executor(keyword)
         }
 
-        val bridge = dexKitBridgeProvider?.invoke()
+        val dexEngine = dexEngineProvider?.invoke()
             ?: throw IllegalStateException("当前工作区没有可搜索的 dex 文件")
         return withTimeoutOrNull(searchTimeoutMs) {
-            bridge.findMethod {
-                matcher {
-                    addUsingString(
-                        value = keyword,
-                        matchType = StringMatchType.Contains,
-                        ignoreCase = true,
-                    )
-                }
-            }
+            dexEngine.searchMethodsByString(keyword)
         } ?: throw IllegalStateException("字符串搜索超时，请缩小范围后重试")
     }
 

@@ -11,4 +11,5 @@ plugins {
     alias(libs.plugins.buildConfig).apply(false)
     alias(libs.plugins.android.multiplatform.library) apply false
     alias(libs.plugins.ktreesitter.plugin) apply false
+    alias(libs.plugins.shadow) apply false
 }

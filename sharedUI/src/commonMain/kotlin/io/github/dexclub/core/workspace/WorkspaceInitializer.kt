@@ -18,7 +18,8 @@ class WorkspaceInitializer(
     private val editorSessionRepository: EditorSessionRepository,
 ) {
     suspend fun bootstrap(
-        classSource: WorkspaceClassSource,
+        expectedIndexedClassCount: Int,
+        indexedClassesProvider: () -> Sequence<WorkspaceIndexClassEntry>,
         preferredTabId: String? = null,
         currentSelectedTabId: String? = null,
         onProgress: (String) -> Unit = {},
@@ -30,7 +31,6 @@ class WorkspaceInitializer(
 
         onProgress("检查类索引完整性..")
         val actualIndexedClassCount = workspaceIndexService.countIndexedClasses()
-        val expectedIndexedClassCount = classSource.classCount
         val classIndexState = if (actualIndexedClassCount > 0 && actualIndexedClassCount == expectedIndexedClassCount) {
             onProgress("读取类索引..")
             workspaceIndexService.loadClassTree(onProgress = onProgress)
@@ -40,7 +40,7 @@ class WorkspaceInitializer(
             }
             onProgress("构建类索引..")
             workspaceIndexService.rebuildClassTree(
-                classSource = classSource,
+                indexedClasses = indexedClassesProvider(),
                 onProgress = onProgress,
             )
         }

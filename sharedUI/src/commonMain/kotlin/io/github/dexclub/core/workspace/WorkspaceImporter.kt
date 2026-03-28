@@ -6,7 +6,7 @@ import io.github.dexclub.compat.directoriesCompat
 import io.github.dexclub.compat.displayPath
 import io.github.dexclub.compat.findFileCompat
 import io.github.dexclub.compat.unzipTo
-import io.github.dexclub.core.DexFactory
+import io.github.dexclub.core.DexEngine
 import io.github.dexclub.loggerError
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.absolutePath
@@ -86,7 +86,7 @@ class WorkspaceImporter(
         return withContext(Dispatchers.IO) {
             when (targetFile.extension) {
                 "dex" -> {
-                    val isDex = DexFactory.isDex(targetFile)
+                    val isDex = DexEngine.isDex(targetFile.absolutePath())
                     if (!isDex) {
                         return@withContext emptyList()
                     }
@@ -113,7 +113,7 @@ class WorkspaceImporter(
 
                     dexs.filter {
                         onProgress("校验Dex: ${it.displayPath}")
-                        val isDex = DexFactory.isDex(it)
+                        val isDex = DexEngine.isDex(it.absolutePath())
                         if (!isDex) {
                             it.delete()
                         }

@@ -33,13 +33,13 @@ class WorkspaceIndexService(
     }
 
     suspend fun rebuildClassTree(
-        classSource: WorkspaceClassSource,
+        indexedClasses: Sequence<WorkspaceIndexClassEntry>,
         onProgress: (String) -> Unit = {},
     ): WorkspaceIndexState {
         classIndexRepository.clear()
 
         val classes = mutableListOf<WorkspaceIndexedClassRecord>()
-        for (indexedClass in classSource.classes()) {
+        for (indexedClass in indexedClasses) {
             onProgress("载入Class: ${indexedClass.signature}")
             classes += indexedClass.toWorkspaceIndexedClassRecord()
             if (classes.size >= INSERT_BATCH_SIZE) {

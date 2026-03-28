@@ -1,9 +1,7 @@
 package io.github.dexclub.core.search
 
+import io.github.dexclub.core.DexEngine
 import io.github.dexclub.core.workspace.WorkspaceIndexService
-import io.github.dexclub.dexkit.DexKitBridge
-import io.github.dexclub.dexkit.findClass
-import io.github.dexclub.dexkit.query.StringMatchType
 import io.github.dexclub.dexkit.result.ClassData
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -11,7 +9,7 @@ typealias ClassSearchExecutor = suspend (String) -> List<ClassData>
 
 class ClassSearchService(
     private val workspaceIndexService: WorkspaceIndexService,
-    private val dexKitBridgeProvider: (() -> DexKitBridge?)? = null,
+    private val dexEngineProvider: (() -> DexEngine?)? = null,
     private val searchExecutor: ClassSearchExecutor? = null,
     private val searchTimeoutMs: Long = SEARCH_TIMEOUT_MS,
 ) {
@@ -59,18 +57,10 @@ class ClassSearchService(
             return executor(keyword)
         }
 
-        val bridge = dexKitBridgeProvider?.invoke()
+        val dexEngine = dexEngineProvider?.invoke()
             ?: throw IllegalStateException("当前工作区没有可搜索的 dex 文件")
         return withTimeoutOrNull(searchTimeoutMs) {
-            bridge.findClass {
-                matcher {
-                    className(
-                        value = keyword,
-                        matchType = StringMatchType.Contains,
-                        ignoreCase = true,
-                    )
-                }
-            }
+            dexEngine.searchClassesByName(keyword)
         } ?: throw IllegalStateException("类名搜索超时，请缩小范围后重试")
     }
 

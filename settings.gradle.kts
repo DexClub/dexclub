@@ -51,8 +51,9 @@ includeBuild("code-view") {
     }
 }
 
-include(":dexkit-multiplatform")
-includeBuild("dexkit-multiplatform/DexKit") {
+include(":dex-engine")
+include(":dex-engine:cli")
+includeBuild("dex-engine/vendor/DexKit") {
     dependencySubstitution {
         substitute(module("io.github.dexclub.dexkit:desktop-core")).using(project(":dexkit"))
         substitute(module("io.github.dexclub.dexkit:android-core")).using(project(":dexkit-android"))

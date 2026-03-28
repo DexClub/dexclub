@@ -20,8 +20,9 @@
 - `androidApp`：Android 平台专属应用代码。
 - `desktopApp`：桌面端专属应用代码。
 - `shadcn-ui-compose`：共享 UI 组件库。
-- `dexkit-multiplatform`：DexKit 的 KMP 桥接模块，通过 `includeBuild("dexkit-multiplatform/DexKit")` 做依赖替换接入。
-- `dexkit-multiplatform/DexKit`：Git 子模块目录，通过 `settings.gradle.kts` 中 `includeBuild` + `dependencySubstitution` 与主工程联动。
+- `dex-engine`：Dex 引擎主库模块，封装 `dexkit + dexlib2 + baksmali + jadx`，供 `sharedUI` 和 CLI 复用。
+- `dex-engine/cli`：Dex 引擎命令行模块，负责 `main(args)` 与 fat jar 打包。
+- `dex-engine/vendor/DexKit`：DexKit 上游工程目录，通过 `settings.gradle.kts` 中 `includeBuild` + `dependencySubstitution` 与主工程联动。
 - `code-view`：独立的 Canvas 自绘代码预览 / 编辑器组件，不依赖 `shadcn-ui-compose`。
 
 ## 代码规范
@@ -157,9 +158,12 @@
 - **shadcn-ui-compose Android 编译**：`./gradlew :shadcn-ui-compose:compileAndroidMain`
 - **code-view-compose JVM 编译**：`./gradlew :code-view-compose:compileKotlinJvm`
 - **code-view-compose Android 编译**：`./gradlew :code-view-compose:compileAndroidMain`
-- **dexkit-multiplatform JVM 编译**：`./gradlew :dexkit-multiplatform:compileKotlinJvm`
-- **dexkit-multiplatform Android 编译**：`./gradlew :dexkit-multiplatform:compileAndroidMain`
-- **KMP 双端快速编译校验（示例：`dexkit-multiplatform`）**：`./gradlew :dexkit-multiplatform:compileKotlinJvm :dexkit-multiplatform:compileAndroidMain`
+- **dex-engine JVM 编译**：`./gradlew :dex-engine:compileKotlinJvm`
+- **dex-engine Android 编译**：`./gradlew :dex-engine:compileAndroidMain`
+- **dex-engine CLI 编译**：`./gradlew :dex-engine:cli:compileKotlin`
+- **dex-engine CLI shadowJar**：`./gradlew :dex-engine:cli:shadowJar`
+- **dex-engine CLI fat jar**：`./gradlew :dex-engine:cli:fatJar`
+- **KMP 双端快速编译校验（示例：`dex-engine`）**：`./gradlew :dex-engine:compileKotlinJvm :dex-engine:compileAndroidMain`
 - **KMP 任务注意**：`:xxx:compileKotlinAndroid` 通常不存在，请使用 `:xxx:compileAndroidMain`
 
 ### 测试
@@ -181,4 +185,4 @@
 - **Compose 编译器**：已启用并配置
 - **依赖管理**：使用 `gradle/libs.versions.toml` 中的版本目录
 - **配置缓存**：`gradle.properties` 中已启用
-- **首次克隆仓库**：执行 `git submodule update --init --recursive` 初始化 `tree-sitter/*` 与 `dexkit-multiplatform/DexKit` 子模块
+- **首次克隆仓库**：执行 `git submodule update --init --recursive` 初始化 `tree-sitter/*` 与 `dex-engine/vendor/DexKit` 目录所需内容

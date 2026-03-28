@@ -23,6 +23,7 @@ logback = "1.5.32"
 filekit = "0.13.0"
 code-view = "0.1.0"
 jewelDecoratedWindow = "0.34.0-253.31033.149"
+shadow = "9.4.1"
 
 [libraries]
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-multiplatform" }
@@ -78,3 +79,4 @@ room = { id = "androidx.room", version.ref = "room" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 buildConfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildConfig" }
 ktreesitter-plugin = { id = "io.github.tree-sitter.ktreesitter-plugin", version.ref = "ktreesitter" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

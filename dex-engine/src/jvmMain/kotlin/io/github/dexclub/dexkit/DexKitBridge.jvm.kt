@@ -271,8 +271,8 @@ actual class DexKitBridge {
             var current: File? = File(System.getProperty("user.dir")).absoluteFile
             repeat(5) {
                 if (current == null) return@repeat
-                result += File(current, "dexkit-multiplatform/DexKit/main/build/library")
-                result += File(current, "dexkit-multiplatform/DexKit/dexkit/build/library")
+                result += File(current, "dex-engine/vendor/DexKit/main/build/library")
+                result += File(current, "dex-engine/vendor/DexKit/dexkit/build/library")
                 current = current.parentFile
             }
             return result

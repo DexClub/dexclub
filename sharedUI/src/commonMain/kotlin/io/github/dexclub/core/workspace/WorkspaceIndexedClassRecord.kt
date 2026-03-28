@@ -12,7 +12,7 @@ data class WorkspaceIndexedClassRecord(
     val classVisualKind: ClassVisualKind,
 )
 
-internal fun WorkspaceIndexedClass.toWorkspaceIndexedClassRecord(): WorkspaceIndexedClassRecord {
+internal fun WorkspaceIndexClassEntry.toWorkspaceIndexedClassRecord(): WorkspaceIndexedClassRecord {
     val className = SignatureUtils.typeName(signature)
     return WorkspaceIndexedClassRecord(
         className = className,

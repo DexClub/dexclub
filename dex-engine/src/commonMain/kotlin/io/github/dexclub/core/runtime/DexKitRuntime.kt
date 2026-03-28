@@ -1,8 +1,8 @@
-package io.github.dexclub.core.workspace
+package io.github.dexclub.core.runtime
 
 import io.github.dexclub.dexkit.DexKitBridge
 
-class WorkspaceDexKitRuntime(
+internal class DexKitRuntime(
     private val dexPaths: List<String>,
     private val bridgeFactory: (List<String>) -> DexKitBridge = ::DexKitBridge,
 ) {

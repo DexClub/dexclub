@@ -38,16 +38,6 @@ kotlin {
             implementation(libs.sqlite.bundled)
             implementation(libs.kstore)
 
-            // dexlib2
-            implementation(libs.smali.dexlib2)
-            implementation(libs.smali.baksmali)
-
-            // jadx
-            implementation(libs.jadx.core)
-            implementation(libs.jadx.dex.input)
-            implementation(libs.jadx.kotlin.metadata)
-            implementation(libs.logback.classic)
-
             // filekit
             implementation(libs.filekit.core)
             implementation(libs.filekit.dialogs.compose)
@@ -61,8 +51,8 @@ kotlin {
             implementation(libs.code.view.tree.sitter.java)
             implementation(libs.code.view.tree.sitter.smali)
 
-            // dexkit-multiplatform
-            implementation(project(":dexkit-multiplatform"))
+            // dex-engine
+            implementation(project(":dex-engine"))
         }
 
         androidMain.dependencies {
