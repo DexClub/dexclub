@@ -708,7 +708,7 @@ Android overscroll 当前已确认最终落地方向：正文 stretch 使用平�
 
 ### 重点修改模块
 
-- `code-view/code-view-compose`
+- `libs/code-view/code-view-compose`
 
 ### 可能新增的内部文件
 
@@ -722,10 +722,10 @@ Android overscroll 当前已确认最终落地方向：正文 stretch 使用平�
 
 ### 预计需要修改的现有文件
 
-- `code-view/code-view-compose/src/commonMain/kotlin/io/github/dexclub/codeview/compose/CodeViewer.kt`
-- `code-view/code-view-compose/src/commonMain/kotlin/io/github/dexclub/codeview/compose/CodeEditor.kt`
-- `code-view/code-view-compose/src/commonMain/kotlin/io/github/dexclub/codeview/compose/CodeViewerOptions.kt`
-- `code-view/code-view-core/src/commonMain/kotlin/io/github/dexclub/codeview/core/text/*`
+- `libs/code-view/code-view-compose/src/commonMain/kotlin/io/github/dexclub/codeview/compose/CodeViewer.kt`
+- `libs/code-view/code-view-compose/src/commonMain/kotlin/io/github/dexclub/codeview/compose/CodeEditor.kt`
+- `libs/code-view/code-view-compose/src/commonMain/kotlin/io/github/dexclub/codeview/compose/CodeViewerOptions.kt`
+- `libs/code-view/code-view-core/src/commonMain/kotlin/io/github/dexclub/codeview/core/text/*`
 
 ### 是否需要修改其他模块
 

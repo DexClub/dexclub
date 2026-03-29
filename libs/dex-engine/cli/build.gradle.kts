@@ -16,7 +16,7 @@ application {
 }
 
 dependencies {
-    implementation(project(":dex-engine"))
+    implementation(project(":libs:dex-engine"))
     implementation(libs.filekit.core)
     implementation(libs.kotlinx.coroutines.core)
 }

@@ -11,7 +11,7 @@ kotlin {
 
     sourceSets {
         jvmMain.dependencies {
-            implementation(project(":shadcn-ui-compose"))
+            implementation(project(":libs:shadcn-ui-compose"))
             implementation(project(":sharedUI"))
             implementation(libs.jewel.decorated.window)
         }

@@ -43,7 +43,7 @@ kotlin {
             implementation(libs.filekit.dialogs.compose)
 
             // shadcn-ui-compose
-            implementation(project(":shadcn-ui-compose"))
+            implementation(project(":libs:shadcn-ui-compose"))
 
             // code-view (new architecture)
             implementation(libs.code.view.compose)
@@ -52,7 +52,7 @@ kotlin {
             implementation(libs.code.view.tree.sitter.smali)
 
             // dex-engine
-            implementation(project(":dex-engine"))
+            implementation(project(":libs:dex-engine"))
         }
 
         androidMain.dependencies {

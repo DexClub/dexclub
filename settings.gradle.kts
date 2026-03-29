@@ -35,9 +35,9 @@ include(":sharedUI")
 include(":androidApp")
 include(":desktopApp")
 
-include(":shadcn-ui-compose")
+include(":libs:shadcn-ui-compose")
 
-includeBuild("code-view") {
+includeBuild("libs/code-view") {
     dependencySubstitution {
         substitute(module("io.github.dexclub:code-view-bom")).using(project(":code-view-bom"))
         substitute(module("io.github.dexclub:code-view-compose")).using(project(":code-view-compose"))
@@ -51,9 +51,10 @@ includeBuild("code-view") {
     }
 }
 
-include(":dex-engine")
-include(":dex-engine:cli")
-includeBuild("dex-engine/vendor/DexKit") {
+include(":libs:dex-engine")
+include(":libs:dex-engine:cli")
+
+includeBuild("libs/dex-engine/vendor/DexKit") {
     dependencySubstitution {
         substitute(module("io.github.dexclub.dexkit:desktop-core")).using(project(":dexkit"))
         substitute(module("io.github.dexclub.dexkit:android-core")).using(project(":dexkit-android"))

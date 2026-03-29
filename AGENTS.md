@@ -19,11 +19,11 @@
 - `sharedUI`：跨平台共享的通用代码。
 - `androidApp`：Android 平台专属应用代码。
 - `desktopApp`：桌面端专属应用代码。
-- `shadcn-ui-compose`：共享 UI 组件库。
-- `dex-engine`：Dex 引擎主库模块，封装 `dexkit + dexlib2 + baksmali + jadx`，供 `sharedUI` 和 CLI 复用。
-- `dex-engine/cli`：Dex 引擎命令行模块，负责 `main(args)` 与 fat jar 打包。
-- `dex-engine/vendor/DexKit`：DexKit 上游工程目录，通过 `settings.gradle.kts` 中 `includeBuild` + `dependencySubstitution` 与主工程联动。
-- `code-view`：独立的 Canvas 自绘代码预览 / 编辑器组件，不依赖 `shadcn-ui-compose`。
+- `shadcn-ui-compose`：共享 UI 组件库，Gradle 路径为 `:libs:shadcn-ui-compose`，目录位于 `libs/shadcn-ui-compose`。
+- `dex-engine`：Dex 引擎主库模块，封装 `dexkit + dexlib2 + baksmali + jadx`，供 `sharedUI` 和 CLI 复用，Gradle 路径为 `:libs:dex-engine`，目录位于 `libs/dex-engine`。
+- `dex-engine/cli`：Dex 引擎命令行模块，负责 `main(args)` 与 fat jar 打包，Gradle 路径为 `:libs:dex-engine:cli`，目录位于 `libs/dex-engine/cli`。
+- `dex-engine/vendor/DexKit`：DexKit 上游工程目录，通过 `settings.gradle.kts` 中 `includeBuild` + `dependencySubstitution` 与主工程联动，目录位于 `libs/dex-engine/vendor/DexKit`。
+- `code-view`：独立的 Canvas 自绘代码预览 / 编辑器组件，不依赖 `shadcn-ui-compose`，目录位于 `libs/code-view`。
 
 ## 代码规范
 
@@ -154,16 +154,16 @@
 
 - **sharedUI JVM 编译**：`./gradlew :sharedUI:compileKotlinJvm`
 - **sharedUI Android 编译**：`./gradlew :sharedUI:compileAndroidMain`
-- **shadcn-ui-compose JVM 编译**：`./gradlew :shadcn-ui-compose:compileKotlinJvm`
-- **shadcn-ui-compose Android 编译**：`./gradlew :shadcn-ui-compose:compileAndroidMain`
+- **shadcn-ui-compose JVM 编译**：`./gradlew :libs:shadcn-ui-compose:compileKotlinJvm`
+- **shadcn-ui-compose Android 编译**：`./gradlew :libs:shadcn-ui-compose:compileAndroidMain`
 - **code-view-compose JVM 编译**：`./gradlew :code-view-compose:compileKotlinJvm`
 - **code-view-compose Android 编译**：`./gradlew :code-view-compose:compileAndroidMain`
-- **dex-engine JVM 编译**：`./gradlew :dex-engine:compileKotlinJvm`
-- **dex-engine Android 编译**：`./gradlew :dex-engine:compileAndroidMain`
-- **dex-engine CLI 编译**：`./gradlew :dex-engine:cli:compileKotlin`
-- **dex-engine CLI shadowJar**：`./gradlew :dex-engine:cli:shadowJar`
-- **dex-engine CLI fat jar**：`./gradlew :dex-engine:cli:fatJar`
-- **KMP 双端快速编译校验（示例：`dex-engine`）**：`./gradlew :dex-engine:compileKotlinJvm :dex-engine:compileAndroidMain`
+- **dex-engine JVM 编译**：`./gradlew :libs:dex-engine:compileKotlinJvm`
+- **dex-engine Android 编译**：`./gradlew :libs:dex-engine:compileAndroidMain`
+- **dex-engine CLI 编译**：`./gradlew :libs:dex-engine:cli:compileKotlin`
+- **dex-engine CLI shadowJar**：`./gradlew :libs:dex-engine:cli:shadowJar`
+- **dex-engine CLI fat jar**：`./gradlew :libs:dex-engine:cli:fatJar`
+- **KMP 双端快速编译校验（示例：`dex-engine`）**：`./gradlew :libs:dex-engine:compileKotlinJvm :libs:dex-engine:compileAndroidMain`
 - **KMP 任务注意**：`:xxx:compileKotlinAndroid` 通常不存在，请使用 `:xxx:compileAndroidMain`
 
 ### 测试
@@ -185,4 +185,4 @@
 - **Compose 编译器**：已启用并配置
 - **依赖管理**：使用 `gradle/libs.versions.toml` 中的版本目录
 - **配置缓存**：`gradle.properties` 中已启用
-- **首次克隆仓库**：执行 `git submodule update --init --recursive` 初始化 `tree-sitter/*` 与 `dex-engine/vendor/DexKit` 目录所需内容
+- **首次克隆仓库**：执行 `git submodule update --init --recursive` 初始化 `tree-sitter/*` 与 `libs/dex-engine/vendor/DexKit` 目录所需内容

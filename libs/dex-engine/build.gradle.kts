@@ -41,7 +41,7 @@ kotlin {
 
 tasks.named<ProcessResources>("jvmProcessResources") {
     dependsOn(gradle.includedBuild("DexKit").task(":dexkit:copyLibrary"))
-    from(rootProject.layout.projectDirectory.dir("dex-engine/vendor/DexKit/dexkit/build/library")) {
+    from(layout.projectDirectory.dir("vendor/DexKit/dexkit/build/library")) {
         include("**/*.so", "**/*.dll", "**/*.dylib")
         into("natives")
     }

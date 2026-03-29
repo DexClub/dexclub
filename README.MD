@@ -49,8 +49,8 @@ APK 输出路径：
 - 构建 fat jar：
 
 ```bash
-./gradlew :dex-engine:cli:shadowJar
-./gradlew :dex-engine:cli:fatJar
+./gradlew :libs:dex-engine:cli:shadowJar
+./gradlew :libs:dex-engine:cli:fatJar
 ```
 
 说明：
@@ -60,7 +60,7 @@ APK 输出路径：
 
 - 产物路径：
 
-`dex-engine/cli/build/libs/dex-engine-cli-all.jar`
+`libs/dex-engine/cli/build/libs/dex-engine-cli-all.jar`
 
 - 运行要求：
 
@@ -69,11 +69,11 @@ APK 输出路径：
 - 常用示例：
 
 ```bash
-java -jar dex-engine/cli/build/libs/dex-engine-cli-all.jar --help
-java -jar dex-engine/cli/build/libs/dex-engine-cli-all.jar inspect --input path/to/app.apk
-java -jar dex-engine/cli/build/libs/dex-engine-cli-all.jar search-class --input path/to/app.apk --keyword Main --limit 20
-java -jar dex-engine/cli/build/libs/dex-engine-cli-all.jar export-smali --input path/to/classes.dex --class com.example.Main --output out/Main.smali
-java -jar dex-engine/cli/build/libs/dex-engine-cli-all.jar export-java --input path/to/classes.dex --class com.example.Main --output out/Main.java
+java -jar libs/dex-engine/cli/build/libs/dex-engine-cli-all.jar --help
+java -jar libs/dex-engine/cli/build/libs/dex-engine-cli-all.jar inspect --input path/to/app.apk
+java -jar libs/dex-engine/cli/build/libs/dex-engine-cli-all.jar search-class --input path/to/app.apk --keyword Main --limit 20
+java -jar libs/dex-engine/cli/build/libs/dex-engine-cli-all.jar export-smali --input path/to/classes.dex --class com.example.Main --output out/Main.smali
+java -jar libs/dex-engine/cli/build/libs/dex-engine-cli-all.jar export-java --input path/to/classes.dex --class com.example.Main --output out/Main.java
 ```
 
 ## 测试
