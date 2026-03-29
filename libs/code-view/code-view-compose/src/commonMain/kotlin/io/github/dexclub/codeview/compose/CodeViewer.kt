@@ -42,6 +42,9 @@ public fun CodeViewer(
     onAnnotationHit: ((CodeAnnotationHit) -> Unit)? = null,
     onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)? = null,
     textStyle: TextStyle = CodeViewDefaults.CodeTextStyle,
+    gutterOptions: CodeGutterOptions = CodeViewDefaults.GutterOptions,
+    contentOptions: CodeContentOptions = CodeViewDefaults.ContentOptions,
+    decorationOptions: CodeDecorationOptions = CodeViewDefaults.DecorationOptions,
 ) {
     val document = remember(text, languageId) {
         CodeDocument.create(languageId, text)
@@ -64,6 +67,9 @@ public fun CodeViewer(
         onViewportChange = onViewportChange,
         onAnnotationHit = onAnnotationHit,
         onContextMenu = onContextMenu,
+        gutterOptions = gutterOptions,
+        contentOptions = contentOptions,
+        decorationOptions = decorationOptions,
     )
 }
 
@@ -87,6 +93,9 @@ public fun CodeViewer(
     onAnnotationHit: ((CodeAnnotationHit) -> Unit)? = null,
     onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)? = null,
     textStyle: TextStyle = CodeViewDefaults.CodeTextStyle,
+    gutterOptions: CodeGutterOptions = CodeViewDefaults.GutterOptions,
+    contentOptions: CodeContentOptions = CodeViewDefaults.ContentOptions,
+    decorationOptions: CodeDecorationOptions = CodeViewDefaults.DecorationOptions,
 ) {
     val document = remember(value) {
         CodeDocument.create(
@@ -112,6 +121,9 @@ public fun CodeViewer(
         onViewportChange = onViewportChange,
         onAnnotationHit = onAnnotationHit,
         onContextMenu = onContextMenu,
+        gutterOptions = gutterOptions,
+        contentOptions = contentOptions,
+        decorationOptions = decorationOptions,
     )
 }
 
@@ -139,6 +151,9 @@ public fun CodeViewer(
     onAnnotationHit: ((CodeAnnotationHit) -> Unit)? = null,
     onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)? = null,
     textStyle: TextStyle = CodeViewDefaults.CodeTextStyle,
+    gutterOptions: CodeGutterOptions = CodeViewDefaults.GutterOptions,
+    contentOptions: CodeContentOptions = CodeViewDefaults.ContentOptions,
+    decorationOptions: CodeDecorationOptions = CodeViewDefaults.DecorationOptions,
 ) {
     val controller = remember(document, addons) {
         runtime.getSurfaceController(document, addons)
@@ -185,6 +200,9 @@ public fun CodeViewer(
         onContextMenu = onContextMenu,
         onScrollChange = onScrollChange,
         onViewportChange = onViewportChange,
+        gutterOptions = gutterOptions,
+        contentOptions = contentOptions,
+        decorationOptions = decorationOptions,
         followCursorToken = null,
         overlayContent = null,
     )

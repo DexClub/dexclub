@@ -297,10 +297,10 @@
 
 ## 当前建议实现顺序
 
-1. 先继续稳固 Android `AndroidInputHostView + InputConnection` 输入桥，覆盖更多输入法与设备差异
-2. 明确 composing 被命令键 / 点击 / 失焦打断时的统一清理规则
-3. 继续验证输入桥跟随画布光标定位与候选窗定位的一致性
-4. 最后单独处理 Desktop 候选窗与边界一致性
+1. 先在 Desktop 工作区真实页面回归 composing 被命令键 / 点击 / 失焦打断时的统一清理规则
+2. 再验证 Desktop 长行横向滚动、caret reveal 与候选窗定位的一致性
+3. 再回 Android 继续稳固 `AndroidInputHostView + InputConnection` 输入桥，覆盖更多输入法与设备差异
+4. 最后统一收口两端输入桥与画布状态同步的边界一致性
 
 ## 当前未决项
 

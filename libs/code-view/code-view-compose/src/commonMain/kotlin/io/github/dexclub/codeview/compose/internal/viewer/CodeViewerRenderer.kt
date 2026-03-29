@@ -9,6 +9,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.dp
+import io.github.dexclub.codeview.compose.CodeDecorationOptions
 import io.github.dexclub.codeview.compose.internal.editor.CodeEditorComposingOverlay
 import io.github.dexclub.codeview.compose.internal.editor.normalizedEnd
 import io.github.dexclub.codeview.compose.internal.editor.normalizedStart
@@ -24,16 +25,19 @@ internal fun DrawScope.drawCodeViewerContent(
     contentHeightPx: Float,
     contentTopPaddingPx: Float,
     baselinePx: Float,
+    contentStartPaddingPx: Float,
+    contentEndPaddingPx: Float,
     selection: LineSelection?,
     searchHighlight: LineSelection?,
     cursor: Cursor?,
     composingOverlay: CodeEditorComposingOverlay?,
     cursorAlpha: Float,
     visibleLineRange: IntRange,
+    decorationOptions: CodeDecorationOptions,
 ) {
-    val selectionColor = Color(0x334096FF)
-    val searchHighlightColor = Color(0x40F4D03F)
-    val cursorColor = Color(0xFF1F2328)
+    val selectionColor = decorationOptions.selectionColor
+    val searchHighlightColor = decorationOptions.searchHighlightColor
+    val cursorColor = decorationOptions.cursorColor
 
     for (lineIndex in visibleLineRange) {
         val line = layoutSnapshot.lineAt(lineIndex)
@@ -49,7 +53,10 @@ internal fun DrawScope.drawCodeViewerContent(
             lineHeightPx = lineHeightPx,
             contentHeightPx = contentHeightPx,
             contentTopPaddingPx = contentTopPaddingPx,
+            contentStartPaddingPx = contentStartPaddingPx,
+            contentEndPaddingPx = contentEndPaddingPx,
             extendMultilineToContentRight = false,
+            fillLeadingContentPaddingWhenLineStartsSelected = false,
             verticalInsetPx = 1.dp.toPx(),
             cornerRadiusPx = 4.dp.toPx(),
         )
@@ -63,7 +70,10 @@ internal fun DrawScope.drawCodeViewerContent(
             lineHeightPx = lineHeightPx,
             contentHeightPx = contentHeightPx,
             contentTopPaddingPx = contentTopPaddingPx,
+            contentStartPaddingPx = contentStartPaddingPx,
+            contentEndPaddingPx = contentEndPaddingPx,
             extendMultilineToContentRight = true,
+            fillLeadingContentPaddingWhenLineStartsSelected = true,
             verticalInsetPx = 0f,
             cornerRadiusPx = 0f,
         )
@@ -74,6 +84,7 @@ internal fun DrawScope.drawCodeViewerContent(
             lineLayoutCache = lineLayoutCache,
             lineTop = lineTop,
             baselinePx = baselinePx,
+            contentStartPaddingPx = contentStartPaddingPx,
             composingOverlay = composingOverlay,
             overlayColor = cursorColor,
         )
@@ -94,7 +105,7 @@ internal fun DrawScope.drawCodeViewerContent(
         )
         if (inlineComposing != null) {
             val overlayLayout = lineLayoutCache.plainTextLayout(inlineComposing.overlayText)
-            val anchorStartX = lineLayoutCache.columnX(lineIndex, inlineComposing.startColumn)
+            val anchorStartX = contentStartPaddingPx + lineLayoutCache.columnX(lineIndex, inlineComposing.startColumn)
             val caretX = anchorStartX + overlayLayout.getCursorRect(inlineComposing.caretOffset).left
             val roundedCaretX = kotlin.math.round(caretX * density) / density
             drawLine(
@@ -105,7 +116,7 @@ internal fun DrawScope.drawCodeViewerContent(
                 cap = StrokeCap.Round,
             )
         } else if (cursor != null && cursor.line == lineIndex) {
-            val rawCursorX = lineLayoutCache.columnX(lineIndex, cursor.offset)
+            val rawCursorX = contentStartPaddingPx + lineLayoutCache.columnX(lineIndex, cursor.offset)
             val cursorX = kotlin.math.round(rawCursorX * density) / density
             drawLine(
                 color = cursorColor.copy(alpha = cursorColor.alpha * cursorAlpha),
@@ -128,7 +139,10 @@ private fun DrawScope.drawSelectionRange(
     lineHeightPx: Float,
     contentHeightPx: Float,
     contentTopPaddingPx: Float,
+    contentStartPaddingPx: Float,
+    contentEndPaddingPx: Float,
     extendMultilineToContentRight: Boolean,
+    fillLeadingContentPaddingWhenLineStartsSelected: Boolean,
     verticalInsetPx: Float,
     cornerRadiusPx: Float,
 ) {
@@ -145,10 +159,13 @@ private fun DrawScope.drawSelectionRange(
         else -> lineLength
     }.coerceIn(startColumn, lineLength)
 
-    val left = lineLayoutCache.columnX(lineIndex, startColumn)
+    val left = when {
+        fillLeadingContentPaddingWhenLineStartsSelected && startColumn == 0 -> 0f
+        else -> contentStartPaddingPx + lineLayoutCache.columnX(lineIndex, startColumn)
+    }
     val right = when {
         extendMultilineToContentRight && lineIndex < selection.endLine -> size.width
-        else -> lineLayoutCache.columnX(lineIndex, endColumn)
+        else -> contentStartPaddingPx + lineLayoutCache.columnX(lineIndex, endColumn)
     }
     val width = (right - left).coerceAtLeast(0f)
     if (width <= 0f) return
@@ -192,6 +209,7 @@ private fun DrawScope.drawCodeLineText(
     lineLayoutCache: CodeLineTextLayoutCache,
     lineTop: Float,
     baselinePx: Float,
+    contentStartPaddingPx: Float,
     composingOverlay: CodeEditorComposingOverlay?,
     overlayColor: Color,
 ) {
@@ -211,14 +229,14 @@ private fun DrawScope.drawCodeLineText(
             lineTop = lineTop,
             baselinePx = baselinePx,
             xResolver = { segment ->
-                lineLayoutCache.columnX(lineIndex, segment.startColumn)
+                contentStartPaddingPx + lineLayoutCache.columnX(lineIndex, segment.startColumn)
             },
         )
         return
     }
 
-    val anchorStartX = lineLayoutCache.columnX(lineIndex, inlineComposing.startColumn)
-    val anchorEndX = lineLayoutCache.columnX(lineIndex, inlineComposing.endColumn)
+    val anchorStartX = contentStartPaddingPx + lineLayoutCache.columnX(lineIndex, inlineComposing.startColumn)
+    val anchorEndX = contentStartPaddingPx + lineLayoutCache.columnX(lineIndex, inlineComposing.endColumn)
     val overlayLayout = lineLayoutCache.plainTextLayout(inlineComposing.overlayText)
     val overlaySegments = lineLayoutCache.plainTextRenderSegments(
         text = inlineComposing.overlayText,
@@ -238,7 +256,7 @@ private fun DrawScope.drawCodeLineText(
         lineTop = lineTop,
         baselinePx = baselinePx,
         xResolver = { segment ->
-            lineLayoutCache.columnX(lineIndex, segment.startColumn)
+            contentStartPaddingPx + lineLayoutCache.columnX(lineIndex, segment.startColumn)
         },
     )
     drawTextSegments(
@@ -260,7 +278,7 @@ private fun DrawScope.drawCodeLineText(
         lineTop = lineTop,
         baselinePx = baselinePx,
         xResolver = { segment ->
-            lineLayoutCache.columnX(lineIndex, segment.startColumn) + suffixShiftPx
+            contentStartPaddingPx + lineLayoutCache.columnX(lineIndex, segment.startColumn) + suffixShiftPx
         },
     )
 

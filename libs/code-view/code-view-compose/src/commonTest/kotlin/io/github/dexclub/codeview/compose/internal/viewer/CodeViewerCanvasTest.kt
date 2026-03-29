@@ -98,4 +98,48 @@ class CodeViewerCanvasTest {
         assertTrue(targetWithPartialReserve > targetWithoutReserve)
         assertEquals(9f, targetWithPartialReserve)
     }
+
+    @Test
+    fun resolveLineNumberDigits_respectsConfiguredMinimum() {
+        assertEquals(2, resolveLineNumberDigits(lineCount = 1, minDigits = 2))
+        assertEquals(3, resolveLineNumberDigits(lineCount = 99, minDigits = 3))
+        assertEquals(3, resolveLineNumberDigits(lineCount = 100, minDigits = 2))
+        assertEquals(4, resolveLineNumberDigits(lineCount = 1000, minDigits = 2))
+    }
+
+    @Test
+    fun resolveCodeContentViewportWidthPx_subtractsGutterWidth() {
+        assertEquals(
+            expected = 172f,
+            actual = resolveCodeContentViewportWidthPx(
+                viewportWidthPx = 220f,
+                contentLeftInsetPx = 48f,
+            ),
+        )
+        assertEquals(
+            expected = 0f,
+            actual = resolveCodeContentViewportWidthPx(
+                viewportWidthPx = 24f,
+                contentLeftInsetPx = 48f,
+            ),
+        )
+    }
+
+    @Test
+    fun contentXToViewportX_includesLineNumberInset() {
+        val viewportSnapshot = CodeViewerViewportSnapshot(
+            verticalScrollPx = 0f,
+            horizontalScrollPx = 20f,
+            viewportWidthPx = 240f,
+            viewportHeightPx = 160f,
+            lineHeightPx = 20f,
+            contentLeftInsetPx = 48f,
+            contentViewportWidthPx = 192f,
+            contentStartPaddingPx = 4f,
+            contentEndPaddingPx = 0f,
+        )
+
+        assertEquals(62f, viewportSnapshot.contentXToViewportX(30f))
+        assertEquals(62f, viewportSnapshot.contentXToHandleViewportX(30f))
+    }
 }

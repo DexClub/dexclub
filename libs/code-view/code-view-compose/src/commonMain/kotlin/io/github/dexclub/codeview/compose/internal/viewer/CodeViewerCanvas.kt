@@ -7,6 +7,7 @@ import androidx.compose.foundation.withoutVisualEffect
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -24,10 +25,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
+import io.github.dexclub.codeview.compose.CodeContentOptions
+import io.github.dexclub.codeview.compose.CodeDecorationOptions
 import io.github.dexclub.codeview.compose.CodeViewDefaults
+import io.github.dexclub.codeview.compose.CodeGutterOptions
 import io.github.dexclub.codeview.compose.CodeViewerCursorTarget
 import io.github.dexclub.codeview.compose.CodeViewerInteractionOptions
 import io.github.dexclub.codeview.compose.rememberPlatformImeBottomInsetPx
@@ -63,6 +69,9 @@ internal fun CodeViewerCanvas(
     onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)?,
     onScrollChange: ((firstVisibleLine: Int, scrollOffsetX: Int) -> Unit)?,
     onViewportChange: ((firstVisibleLine: Int, lastVisibleLine: Int) -> Unit)?,
+    gutterOptions: CodeGutterOptions,
+    contentOptions: CodeContentOptions,
+    decorationOptions: CodeDecorationOptions,
     followCursorToken: Long? = null,
     enablePrimaryAnnotationClick: Boolean = true,
     enableLongPressContextMenu: Boolean = true,
@@ -134,16 +143,50 @@ internal fun CodeViewerCanvas(
             val verticalScrollState = rememberScrollState()
             val horizontalScrollState = rememberScrollState()
             var latestViewportWidthPx by remember { mutableStateOf(0f) }
+            var latestContentViewportWidthPx by remember { mutableStateOf(0f) }
             var latestViewportHeightPx by remember { mutableStateOf(0f) }
             var maxObservedViewportHeightPx by remember { mutableStateOf(0f) }
             var initialScrollApplied by remember { mutableStateOf(false) }
             latestViewportWidthPx = viewportWidthPx
             latestViewportHeightPx = viewportHeightPx
             maxObservedViewportHeightPx = max(maxObservedViewportHeightPx, viewportHeightPx)
+            val lineNumberOptions = gutterOptions.lineNumbers
+            val lineNumberGutterStartPaddingPx = with(density) { lineNumberOptions.startPadding.toPx() }
+            val lineNumberGutterEndPaddingPx = with(density) { lineNumberOptions.endPadding.toPx() }
+            val contentStartPaddingPx = with(density) { contentOptions.startPadding.toPx() }
+            val contentEndPaddingPx = with(density) { contentOptions.endPadding.toPx() }
+            val lineNumberGutterWidthPx = remember(
+                gutterOptions,
+                lineLayoutCache,
+                layoutSnapshot.lineCount,
+                lineNumberGutterStartPaddingPx,
+                lineNumberGutterEndPaddingPx,
+            ) {
+                if (!gutterOptions.visible || !lineNumberOptions.visible) {
+                    0f
+                } else {
+                    resolveCodeGutterWidthPx(
+                        lineLayoutCache = lineLayoutCache,
+                        lineCount = layoutSnapshot.lineCount,
+                        gutterOptions = gutterOptions,
+                        startPaddingPx = lineNumberGutterStartPaddingPx,
+                        endPaddingPx = lineNumberGutterEndPaddingPx,
+                    )
+                }
+            }
+            val contentViewportWidthPx = resolveCodeContentViewportWidthPx(
+                viewportWidthPx = viewportWidthPx,
+                contentLeftInsetPx = lineNumberGutterWidthPx,
+            )
+            latestContentViewportWidthPx = contentViewportWidthPx
             val estimatedMaxLineWidthPx = remember(layoutSnapshot, charWidthPx) {
                 lineLayoutCache.estimatedMaxLineWidthPx(charWidthPx)
             }
-            val maxHorizontalScrollPx = max(0f, estimatedMaxLineWidthPx - viewportWidthPx)
+            val textContentWidthPx = max(
+                contentViewportWidthPx,
+                contentStartPaddingPx + estimatedMaxLineWidthPx + charWidthPx + contentEndPaddingPx,
+            )
+            val maxHorizontalScrollPx = max(0f, textContentWidthPx - contentViewportWidthPx)
             val safeScrollPastEnd = scrollPastEnd.coerceAtLeast(0)
 
             val currentViewport = CodeViewportState(
@@ -153,7 +196,7 @@ internal fun CodeViewerCanvas(
                     0
                 },
                 horizontalScrollPx = horizontalScrollState.value.toFloat(),
-                viewportWidthPx = viewportWidthPx,
+                viewportWidthPx = contentViewportWidthPx,
                 viewportHeightPx = viewportHeightPx,
                 lineHeightPx = lineHeightPx,
                 ).clamp(
@@ -177,7 +220,7 @@ internal fun CodeViewerCanvas(
                         0
                     },
                     horizontalScrollPx = horizontalScrollState.value.toFloat(),
-                    viewportWidthPx = latestViewportWidthPx,
+                    viewportWidthPx = latestContentViewportWidthPx,
                     viewportHeightPx = latestViewportHeightPx,
                     lineHeightPx = lineHeightPx,
                 ).clamp(
@@ -214,6 +257,7 @@ internal fun CodeViewerCanvas(
                     lineLayoutCache = lineLayoutCache,
                     cursorTarget = cursorTarget,
                     charWidthPx = charWidthPx,
+                    contentStartPaddingPx = contentStartPaddingPx,
                 ) ?: return@LaunchedEffect
                 revealCursorTargetIfNeeded(
                     currentViewport = currentViewportState(),
@@ -248,6 +292,7 @@ internal fun CodeViewerCanvas(
                     followCursorToken = followCursorToken,
                     composingOverlay = composingOverlay,
                     charWidthPx = charWidthPx,
+                    contentStartPaddingPx = contentStartPaddingPx,
                 ) ?: return@LaunchedEffect
                 revealCursorTargetIfNeeded(
                     currentViewport = currentViewportState(),
@@ -287,6 +332,7 @@ internal fun CodeViewerCanvas(
                         lineLayoutCache = lineLayoutCache,
                         cursorTarget = cursorTarget,
                         charWidthPx = charWidthPx,
+                        contentStartPaddingPx = contentStartPaddingPx,
                     ) ?: resolveEditingRevealTarget(
                         layoutSnapshot = layoutSnapshot,
                         lineLayoutCache = lineLayoutCache,
@@ -294,6 +340,7 @@ internal fun CodeViewerCanvas(
                         followCursorToken = followCursorToken,
                         composingOverlay = composingOverlay,
                         charWidthPx = charWidthPx,
+                        contentStartPaddingPx = contentStartPaddingPx,
                     ) ?: return@collectLatest
                     revealCursorTargetIfNeeded(
                         currentViewport = currentViewportState(),
@@ -328,7 +375,13 @@ internal fun CodeViewerCanvas(
             }
 
             val contentWidthDp = with(density) {
-                max(viewportWidthPx, estimatedMaxLineWidthPx + charWidthPx).toDp()
+                max(viewportWidthPx, lineNumberGutterWidthPx + textContentWidthPx).toDp()
+            }
+            val textContentWidthDp = with(density) {
+                textContentWidthPx.toDp()
+            }
+            val lineNumberGutterWidthDp = with(density) {
+                lineNumberGutterWidthPx.toDp()
             }
             val scrollPastEndReservedHeightPx = resolveScrollPastEndReservedHeightPx(
                 scrollPastEnd = safeScrollPastEnd,
@@ -347,13 +400,18 @@ internal fun CodeViewerCanvas(
                 contentHeightPx = contentHeightPx,
                 contentTopPaddingPx = contentTopPaddingPx,
                 baselinePx = baselinePx,
+                contentLeftInsetPx = lineNumberGutterWidthPx,
+                contentStartPaddingPx = contentStartPaddingPx,
+                contentEndPaddingPx = contentEndPaddingPx,
             )
-            val scrollController = remember(horizontalScrollState, verticalScrollState) {
+            val scrollController = remember(horizontalScrollState, verticalScrollState, lineNumberGutterWidthPx) {
                 CodeViewerScrollController(
                     horizontalScrollPxProvider = { horizontalScrollState.value.toFloat() },
                     verticalScrollPxProvider = { verticalScrollState.value.toFloat() },
-                    viewportWidthPxProvider = { latestViewportWidthPx },
+                    viewportWidthPxProvider = { latestContentViewportWidthPx },
                     viewportHeightPxProvider = { latestViewportHeightPx },
+                    contentLeftInsetPxProvider = { lineNumberGutterWidthPx },
+                    contentStartPaddingPxProvider = { contentStartPaddingPx },
                     scrollByHandler = { horizontalDeltaPx, verticalDeltaPx ->
                         if (horizontalDeltaPx != 0f) {
                             horizontalScrollState.dispatchRawDelta(horizontalDeltaPx)
@@ -370,6 +428,10 @@ internal fun CodeViewerCanvas(
                 viewportWidthPx = viewportWidthPx,
                 viewportHeightPx = viewportHeightPx,
                 lineHeightPx = lineHeightPx,
+                contentLeftInsetPx = lineNumberGutterWidthPx,
+                contentViewportWidthPx = contentViewportWidthPx,
+                contentStartPaddingPx = contentStartPaddingPx,
+                contentEndPaddingPx = contentEndPaddingPx,
                 horizontalContentOverscrollPx = contentOverscrollEffect.horizontalContentOffsetPx,
                 verticalContentOverscrollPx = contentOverscrollEffect.verticalContentOffsetPx,
             )
@@ -405,55 +467,107 @@ internal fun CodeViewerCanvas(
                             width = contentWidthDp,
                             height = contentHeightDp,
                         )
-                        .annotationInteractionModifier(
-                            layoutSnapshot = layoutSnapshot,
-                            lineLayoutCache = lineLayoutCache,
-                            documentKey = documentKey,
-                            documentRevision = documentRevision,
-                            lineHeightPx = lineHeightPx,
-                            interactionOptions = interactionOptions,
-                            onAnnotationHit = onAnnotationHit,
-                            onContextMenu = onContextMenu,
-                            enablePrimaryClick = enablePrimaryAnnotationClick,
-                            enableLongPressContextMenu = enableLongPressContextMenu,
-                            enableSecondaryClickContextMenu = enableSecondaryClickContextMenu,
+                    Box(modifier = contentModifier) {
+                        if (lineNumberGutterWidthPx > 0f) {
+                            Canvas(
+                                modifier = Modifier
+                                    .offset {
+                                        IntOffset(
+                                            x = horizontalScrollState.value,
+                                            y = 0,
+                                        )
+                                    }
+                                    .requiredSize(
+                                        width = lineNumberGutterWidthDp,
+                                        height = contentHeightDp,
+                                    ),
+                                onDraw = {
+                                    drawCodeLineNumbers(
+                                        layoutSnapshot = layoutSnapshot,
+                                        lineLayoutCache = lineLayoutCache,
+                                        visibleLineRange = renderLineRange,
+                                        lineHeightPx = lineHeightPx,
+                                        baselinePx = baselinePx,
+                                        gutterWidthPx = lineNumberGutterWidthPx,
+                                        cursor = safeCursor,
+                                        gutterOptions = gutterOptions,
+                                    )
+                            },
                         )
-                    val editorAwareContentModifier = contentModifierTransform?.invoke(
-                        contentModifier,
-                        canvasMetrics,
-                        lineLayoutCache,
-                        scrollController,
-                    ) ?: contentModifier
+                        }
 
-                    Box(modifier = editorAwareContentModifier) {
-                        underlayContent?.invoke(
-                            Modifier.fillMaxSize(),
-                            canvasMetrics,
-                            lineLayoutCache,
-                        )
-                        Canvas(
-                            modifier = Modifier.fillMaxSize(),
-                            onDraw = {
-                                drawCodeViewerContent(
-                                    layoutSnapshot = layoutSnapshot,
-                                    lineLayoutCache = lineLayoutCache,
-                                    lineHeightPx = lineHeightPx,
-                                    contentHeightPx = contentHeightPx,
-                                    contentTopPaddingPx = contentTopPaddingPx,
-                                    baselinePx = baselinePx,
-                                    selection = safeSelection,
-                                    searchHighlight = safeSearchHighlight,
-                                    cursor = safeCursor,
-                                    composingOverlay = composingOverlay,
-                                    cursorAlpha = cursorAlpha,
-                                    visibleLineRange = renderLineRange,
+                        val codeContentModifier = Modifier
+                            .offset {
+                                IntOffset(
+                                    x = lineNumberGutterWidthPx.roundToInt(),
+                                    y = 0,
                                 )
                             }
-                        )
-                        overlayContent?.invoke(
-                            Modifier.fillMaxSize(),
+                            .requiredSize(
+                                width = textContentWidthDp,
+                                height = contentHeightDp,
+                            )
+                            .annotationInteractionModifier(
+                                layoutSnapshot = layoutSnapshot,
+                                lineLayoutCache = lineLayoutCache,
+                                documentKey = documentKey,
+                                documentRevision = documentRevision,
+                                lineHeightPx = lineHeightPx,
+                                contentStartPaddingPx = contentStartPaddingPx,
+                                interactionOptions = interactionOptions,
+                                onAnnotationHit = onAnnotationHit,
+                                onContextMenu = onContextMenu?.let { contextMenuHandler ->
+                                    { annotationHit, offset ->
+                                        contextMenuHandler(
+                                            annotationHit,
+                                            offset + Offset(lineNumberGutterWidthPx, 0f),
+                                        )
+                                    }
+                                },
+                                enablePrimaryClick = enablePrimaryAnnotationClick,
+                                enableLongPressContextMenu = enableLongPressContextMenu,
+                                enableSecondaryClickContextMenu = enableSecondaryClickContextMenu,
+                            )
+                        val editorAwareContentModifier = contentModifierTransform?.invoke(
+                            codeContentModifier,
                             canvasMetrics,
-                        )
+                            lineLayoutCache,
+                            scrollController,
+                        ) ?: codeContentModifier
+
+                        Box(modifier = editorAwareContentModifier) {
+                            underlayContent?.invoke(
+                                Modifier.fillMaxSize(),
+                                canvasMetrics,
+                                lineLayoutCache,
+                            )
+                            Canvas(
+                                modifier = Modifier.fillMaxSize(),
+                                onDraw = {
+                                    drawCodeViewerContent(
+                                        layoutSnapshot = layoutSnapshot,
+                                        lineLayoutCache = lineLayoutCache,
+                                        lineHeightPx = lineHeightPx,
+                                        contentHeightPx = contentHeightPx,
+                                        contentTopPaddingPx = contentTopPaddingPx,
+                                        baselinePx = baselinePx,
+                                        contentStartPaddingPx = contentStartPaddingPx,
+                                        contentEndPaddingPx = contentEndPaddingPx,
+                                        selection = safeSelection,
+                                        searchHighlight = safeSearchHighlight,
+                                        cursor = safeCursor,
+                                        composingOverlay = composingOverlay,
+                                        cursorAlpha = cursorAlpha,
+                                        visibleLineRange = renderLineRange,
+                                        decorationOptions = decorationOptions,
+                                    )
+                                }
+                            )
+                            overlayContent?.invoke(
+                                Modifier.fillMaxSize(),
+                                canvasMetrics,
+                            )
+                        }
                     }
                 }
                 floatingContent?.invoke(
@@ -473,6 +587,9 @@ internal data class CodeViewerCanvasMetrics(
     val contentHeightPx: Float,
     val contentTopPaddingPx: Float,
     val baselinePx: Float,
+    val contentLeftInsetPx: Float,
+    val contentStartPaddingPx: Float,
+    val contentEndPaddingPx: Float,
 )
 
 private suspend fun applyRevealedViewportScrollIfNeeded(
@@ -504,6 +621,8 @@ internal class CodeViewerScrollController(
     private val verticalScrollPxProvider: () -> Float,
     private val viewportWidthPxProvider: () -> Float,
     private val viewportHeightPxProvider: () -> Float,
+    private val contentLeftInsetPxProvider: () -> Float,
+    private val contentStartPaddingPxProvider: () -> Float,
     private val scrollByHandler: (horizontalDeltaPx: Float, verticalDeltaPx: Float) -> Unit,
 ) {
     val horizontalScrollPx: Float
@@ -517,6 +636,12 @@ internal class CodeViewerScrollController(
 
     val viewportHeightPx: Float
         get() = viewportHeightPxProvider()
+
+    val contentLeftInsetPx: Float
+        get() = contentLeftInsetPxProvider()
+
+    val contentStartPaddingPx: Float
+        get() = contentStartPaddingPxProvider()
 
     fun scrollBy(
         horizontalDeltaPx: Float = 0f,
@@ -532,12 +657,22 @@ internal data class CodeViewerViewportSnapshot(
     val viewportWidthPx: Float,
     val viewportHeightPx: Float,
     val lineHeightPx: Float,
+    val contentLeftInsetPx: Float,
+    val contentViewportWidthPx: Float,
+    val contentStartPaddingPx: Float,
+    val contentEndPaddingPx: Float,
     val horizontalContentOverscrollPx: Float = 0f,
     val verticalContentOverscrollPx: Float = 0f,
 )
 
+internal val CodeViewerViewportSnapshot.contentViewportLeftPx: Float
+    get() = contentLeftInsetPx
+
+internal val CodeViewerViewportSnapshot.contentViewportRightPx: Float
+    get() = contentLeftInsetPx + contentViewportWidthPx
+
 internal fun CodeViewerViewportSnapshot.contentXToViewportX(contentXPx: Float): Float {
-    return stretchViewportX(contentXPx - horizontalScrollPx)
+    return stretchViewportX(contentLeftInsetPx + contentStartPaddingPx + contentXPx - horizontalScrollPx)
 }
 
 internal fun CodeViewerViewportSnapshot.contentYToViewportY(contentYPx: Float): Float {
@@ -547,7 +682,7 @@ internal fun CodeViewerViewportSnapshot.contentYToViewportY(contentYPx: Float): 
 internal fun CodeViewerViewportSnapshot.contentXToHandleViewportX(contentXPx: Float): Float {
     // Handles now live in the same overscroll-rendered subtree as the editor content,
     // so they only need the base scroll transform here.
-    return contentXPx - horizontalScrollPx
+    return contentLeftInsetPx + contentStartPaddingPx + contentXPx - horizontalScrollPx
 }
 
 internal fun CodeViewerViewportSnapshot.contentYToHandleViewportY(contentYPx: Float): Float {
@@ -699,6 +834,7 @@ private fun resolveNavigationRevealTarget(
     lineLayoutCache: CodeLineTextLayoutCache,
     cursorTarget: CodeViewerCursorTarget?,
     charWidthPx: Float,
+    contentStartPaddingPx: Float,
 ): CursorRevealTarget? {
     val target = cursorTarget ?: return null
     val safeTargetCursor = layoutSnapshot.clampCursor(
@@ -709,7 +845,7 @@ private fun resolveNavigationRevealTarget(
     ) ?: return null
     return CursorRevealTarget(
         cursor = safeTargetCursor,
-        xPx = lineLayoutCache.columnX(safeTargetCursor.line, safeTargetCursor.offset),
+        xPx = contentStartPaddingPx + lineLayoutCache.columnX(safeTargetCursor.line, safeTargetCursor.offset),
         widthPx = lineLayoutCache.cursorWidthPx(
             lineIndex = safeTargetCursor.line,
             column = safeTargetCursor.offset,
@@ -725,11 +861,13 @@ private fun resolveEditingRevealTarget(
     followCursorToken: Long?,
     composingOverlay: CodeEditorComposingOverlay?,
     charWidthPx: Float,
+    contentStartPaddingPx: Float,
 ): CursorRevealTarget? {
     val composingRevealTarget = resolveComposingRevealTarget(
         layoutSnapshot = layoutSnapshot,
         lineLayoutCache = lineLayoutCache,
         composingOverlay = composingOverlay,
+        contentStartPaddingPx = contentStartPaddingPx,
     )
     return when {
         composingRevealTarget != null -> CursorRevealTarget(
@@ -743,7 +881,7 @@ private fun resolveEditingRevealTarget(
 
         followCursorToken != null && safeCursor != null -> CursorRevealTarget(
             cursor = safeCursor,
-            xPx = lineLayoutCache.columnX(safeCursor.line, safeCursor.offset),
+            xPx = contentStartPaddingPx + lineLayoutCache.columnX(safeCursor.line, safeCursor.offset),
             widthPx = lineLayoutCache.cursorWidthPx(
                 lineIndex = safeCursor.line,
                 column = safeCursor.offset,
@@ -759,6 +897,7 @@ private fun resolveComposingRevealTarget(
     layoutSnapshot: CodeLayoutSnapshot,
     lineLayoutCache: CodeLineTextLayoutCache,
     composingOverlay: CodeEditorComposingOverlay?,
+    contentStartPaddingPx: Float,
 ): ComposingRevealTarget? {
     val overlay = composingOverlay ?: return null
     val overlayText = overlay.imeFieldValue.text
@@ -769,7 +908,7 @@ private fun resolveComposingRevealTarget(
     val anchorPosition = layoutSnapshot.offsetToPosition(anchorOffset)
     val overlayLayout = lineLayoutCache.plainTextLayout(overlayText)
     val caretOffset = overlay.imeFieldValue.selection.end.coerceIn(0, overlayText.length)
-    val anchorX = lineLayoutCache.columnX(anchorPosition.lineIndex, anchorPosition.columnIndex)
+    val anchorX = contentStartPaddingPx + lineLayoutCache.columnX(anchorPosition.lineIndex, anchorPosition.columnIndex)
     val caretX = anchorX + overlayLayout.getCursorRect(caretOffset).left
     return ComposingRevealTarget(
         lineIndex = anchorPosition.lineIndex,

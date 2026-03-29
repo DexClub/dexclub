@@ -62,6 +62,8 @@ internal class HandleTouchSelectionAutoScrollSession(
             layoutSnapshot = layoutSnapshot,
             lineLayoutCache = lineLayoutCache,
             lineHeightPx = lineHeightPx,
+            contentStartPaddingPx = scrollController.contentStartPaddingPx,
+            contentLeftInsetPx = scrollController.contentLeftInsetPx,
             horizontalScrollPx = scrollController.horizontalScrollPx,
             verticalScrollPx = scrollController.verticalScrollPx,
             viewportPosition = viewportPosition,
@@ -79,6 +81,7 @@ internal fun resolveTouchAutoScrollDelta(
         x = resolveTouchAutoScrollDeltaComponent(
             overflowPx = resolveTouchAutoScrollOverflowPx(
                 positionPx = viewportPosition.x,
+                viewportStartPx = scrollController.contentLeftInsetPx,
                 viewportSizePx = scrollController.viewportWidthPx,
             ),
             frameDurationNanos = frameDurationNanos,
@@ -95,11 +98,13 @@ internal fun resolveTouchAutoScrollDelta(
 
 private fun resolveTouchAutoScrollOverflowPx(
     positionPx: Float,
+    viewportStartPx: Float = 0f,
     viewportSizePx: Float,
 ): Float {
+    val viewportEndPx = viewportStartPx + viewportSizePx
     return when {
-        positionPx < 0f -> positionPx
-        positionPx > viewportSizePx -> positionPx - viewportSizePx
+        positionPx < viewportStartPx -> positionPx - viewportStartPx
+        positionPx > viewportEndPx -> positionPx - viewportEndPx
         else -> 0f
     }
 }

@@ -18,6 +18,7 @@ internal fun Modifier.codeEditorDesktopPointerInput(
     layoutSnapshot: CodeLayoutSnapshot,
     lineLayoutCache: CodeLineTextLayoutCache,
     lineHeightPx: Float,
+    contentStartPaddingPx: Float,
     onFieldValueChange: (TextFieldValue) -> Unit,
     requestContentFocus: () -> Unit,
     requestImeFocus: () -> Unit,
@@ -36,6 +37,7 @@ internal fun Modifier.codeEditorDesktopPointerInput(
                 layoutSnapshot = layoutSnapshot,
                 lineLayoutCache = lineLayoutCache,
                 lineHeightPx = lineHeightPx,
+                contentStartPaddingPx = contentStartPaddingPx,
                 position = down.position,
             )
             onFieldValueChange(
@@ -50,6 +52,7 @@ internal fun Modifier.codeEditorDesktopPointerInput(
                     layoutSnapshot = layoutSnapshot,
                     lineLayoutCache = lineLayoutCache,
                     lineHeightPx = lineHeightPx,
+                    contentStartPaddingPx = contentStartPaddingPx,
                     position = change.position,
                 )
                 onFieldValueChange(
@@ -68,6 +71,7 @@ internal fun Modifier.codeEditorTouchPointerInput(
     layoutSnapshot: CodeLayoutSnapshot,
     lineLayoutCache: CodeLineTextLayoutCache,
     lineHeightPx: Float,
+    contentStartPaddingPx: Float,
     selection: TextRange,
     onFieldValueChange: (TextFieldValue) -> Unit,
     requestContentFocus: () -> Unit,
@@ -91,6 +95,7 @@ internal fun Modifier.codeEditorTouchPointerInput(
                         layoutSnapshot = layoutSnapshot,
                         lineLayoutCache = lineLayoutCache,
                         lineHeightPx = lineHeightPx,
+                        contentStartPaddingPx = contentStartPaddingPx,
                         position = position,
                     )
                     val tapSelectionAction = resolveSelectionTapAction(
@@ -132,6 +137,7 @@ internal fun Modifier.codeEditorTouchPointerInput(
                     layoutSnapshot = layoutSnapshot,
                     lineLayoutCache = lineLayoutCache,
                     lineHeightPx = lineHeightPx,
+                    contentStartPaddingPx = contentStartPaddingPx,
                     position = longPress.position,
                 )
                 val initialSelection = resolveLongPressSelectionRange(
@@ -169,6 +175,7 @@ internal fun Modifier.codeEditorTouchPointerInput(
                         layoutSnapshot = layoutSnapshot,
                         lineLayoutCache = lineLayoutCache,
                         lineHeightPx = lineHeightPx,
+                        contentStartPaddingPx = contentStartPaddingPx,
                         position = latestPosition,
                     )
                     latestSelection = resolveLongPressDragSelection(
@@ -186,7 +193,11 @@ internal fun Modifier.codeEditorTouchPointerInput(
 
                 onLongPressSelectionGestureEnd?.invoke()
                 if (!latestSelection.collapsed) {
-                    onLongPressSelectionComplete?.invoke(latestOffset, latestSelection, latestPosition)
+                    onLongPressSelectionComplete?.invoke(
+                        latestOffset,
+                        latestSelection,
+                        latestViewportPosition,
+                    )
                 }
             }
         }
@@ -197,7 +208,7 @@ internal fun resolveViewportPositionFromContentPosition(
     scrollController: CodeViewerScrollController,
 ): Offset {
     return Offset(
-        x = contentPosition.x - scrollController.horizontalScrollPx,
+        x = scrollController.contentLeftInsetPx + contentPosition.x - scrollController.horizontalScrollPx,
         y = contentPosition.y - scrollController.verticalScrollPx,
     )
 }
@@ -211,13 +222,14 @@ internal fun resolveLongPressDragSelectionState(
     initialSelection: TextRange,
 ): LongPressDragSelectionState {
     val contentPosition = Offset(
-        x = viewportPosition.x + scrollController.horizontalScrollPx,
+        x = (viewportPosition.x - scrollController.contentLeftInsetPx) + scrollController.horizontalScrollPx,
         y = viewportPosition.y + scrollController.verticalScrollPx,
     )
     val textOffset = resolveEditorTextOffset(
         layoutSnapshot = layoutSnapshot,
         lineLayoutCache = lineLayoutCache,
         lineHeightPx = lineHeightPx,
+        contentStartPaddingPx = scrollController.contentStartPaddingPx,
         position = contentPosition,
     )
     return LongPressDragSelectionState(
@@ -234,6 +246,7 @@ internal fun resolveEditorTextOffset(
     layoutSnapshot: CodeLayoutSnapshot,
     lineLayoutCache: CodeLineTextLayoutCache,
     lineHeightPx: Float,
+    contentStartPaddingPx: Float,
     position: Offset,
 ): Int {
     if (lineHeightPx <= 0f) return 0
@@ -244,7 +257,7 @@ internal fun resolveEditorTextOffset(
         .coerceIn(0, layoutSnapshot.lineCount - 1)
     val lineOffset = lineLayoutCache.offsetForPosition(
         lineIndex = lineIndex,
-        xPx = position.x,
+        xPx = (position.x - contentStartPaddingPx).coerceAtLeast(0f),
         clampToLineEnd = true,
     ) ?: 0
     return layoutSnapshot.positionToOffset(lineIndex, lineOffset)

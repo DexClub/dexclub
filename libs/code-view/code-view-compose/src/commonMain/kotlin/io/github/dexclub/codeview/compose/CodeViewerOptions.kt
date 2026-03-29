@@ -7,6 +7,8 @@ import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.dexclub.codeview.core.api.CodeViewApi
 import io.github.dexclub.codeview.core.annotation.CodeAnnotationHit
@@ -34,6 +36,14 @@ public object CodeViewDefaults {
             trim = LineHeightStyle.Trim.None,
         ),
     )
+
+    public val LineNumberOptions: CodeLineNumberOptions = CodeLineNumberOptions()
+
+    public val GutterOptions: CodeGutterOptions = CodeGutterOptions()
+
+    public val ContentOptions: CodeContentOptions = CodeContentOptions()
+
+    public val DecorationOptions: CodeDecorationOptions = CodeDecorationOptions()
 }
 
 /**
@@ -43,6 +53,48 @@ public object CodeViewDefaults {
 public data class CodeViewerInteractionOptions(
     /** 用于识别可交互注解的 tag，对应 AnnotatedString 中的 annotation tag。 */
     public val annotationTag: String = "NODE_ID",
+)
+
+@CodeViewApi
+public data class CodeGutterOptions(
+    public val visible: Boolean = true,
+    public val backgroundColor: Color = Color(0xFFF6F8FA),
+    public val dividerColor: Color = Color(0x1F1F2328),
+    public val lineNumbers: CodeLineNumberOptions = CodeLineNumberOptions(),
+)
+
+@CodeViewApi
+public data class CodeLineNumberOptions(
+    public val visible: Boolean = true,
+    public val minDigits: Int = 2,
+    public val startPadding: Dp = 12.dp,
+    public val endPadding: Dp = 12.dp,
+    public val textColor: Color = Color(0xFF6E7781),
+    public val activeTextColor: Color = Color(0xFF1F2328),
+) {
+    init {
+        require(minDigits >= 1) { "minDigits 必须大于等于 1: $minDigits" }
+        require(startPadding.value >= 0f) { "startPadding 不能为负数: $startPadding" }
+        require(endPadding.value >= 0f) { "endPadding 不能为负数: $endPadding" }
+    }
+}
+
+@CodeViewApi
+public data class CodeContentOptions(
+    public val startPadding: Dp = 2.dp,
+    public val endPadding: Dp = 0.dp,
+) {
+    init {
+        require(startPadding.value >= 0f) { "startPadding 不能为负数: $startPadding" }
+        require(endPadding.value >= 0f) { "endPadding 不能为负数: $endPadding" }
+    }
+}
+
+@CodeViewApi
+public data class CodeDecorationOptions(
+    public val selectionColor: Color = Color(0x334096FF),
+    public val searchHighlightColor: Color = Color(0x40F4D03F),
+    public val cursorColor: Color = Color(0xFF1F2328),
 )
 
 /**

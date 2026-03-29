@@ -136,6 +136,8 @@ class CodeEditorPointerInputTest {
             verticalScrollPxProvider = { 0f },
             viewportWidthPxProvider = { 100f },
             viewportHeightPxProvider = { 80f },
+            contentLeftInsetPxProvider = { 0f },
+            contentStartPaddingPxProvider = { 4f },
             scrollByHandler = { _, _ -> },
         )
 

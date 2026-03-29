@@ -13,18 +13,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import io.github.dexclub.app.model.OpenTabUiModel
+import io.github.dexclub.codeview.compose.CodeContentOptions
+import io.github.dexclub.codeview.compose.CodeDecorationOptions
 import io.github.dexclub.codeview.compose.CodeEditor
+import io.github.dexclub.codeview.compose.CodeGutterOptions
 import io.github.dexclub.codeview.compose.CodeViewerCursorTarget
 import io.github.dexclub.codeview.compose.CodeViewerInteractionOptions
 import io.github.dexclub.codeview.compose.rememberCodeAddons
-import io.github.dexclub.codeview.core.text.Cursor
-import io.github.dexclub.codeview.core.text.LineSelection
 import io.github.dexclub.codeview.core.document.CodeDocument
 import io.github.dexclub.codeview.core.language.CodeLanguageId
+import io.github.dexclub.codeview.core.text.Cursor
+import io.github.dexclub.codeview.core.text.LineSelection
 import io.github.dexclub.codeview.treesitter.java.install.treeSitterJavaLanguage
 import io.github.dexclub.codeview.treesitter.smali.install.treeSitterSmaliLanguage
 import io.github.dexclub.core.editor.EDITOR_SESSION_KIND_JAVA
 import io.github.dexclub.core.navigation.NavigateRequestContext
+
+private val WORKSPACE_CODE_GUTTER_OPTIONS: CodeGutterOptions = CodeGutterOptions()
+private val WORKSPACE_CODE_CONTENT_OPTIONS: CodeContentOptions = CodeContentOptions()
+private val WORKSPACE_CODE_DECORATION_OPTIONS: CodeDecorationOptions = CodeDecorationOptions()
 
 @Composable
 internal fun CodeViewPane(
@@ -126,6 +133,9 @@ internal fun CodeViewPane(
             interactionOptions = CodeViewerInteractionOptions(
                 annotationTag = NODE_ANNOTATION_TAG,
             ),
+            gutterOptions = WORKSPACE_CODE_GUTTER_OPTIONS,
+            contentOptions = WORKSPACE_CODE_CONTENT_OPTIONS,
+            decorationOptions = WORKSPACE_CODE_DECORATION_OPTIONS,
             onScrollChange = { firstVisibleLine, scrollOffsetX ->
                 if (isSelectedTab) {
                     callbacks.onUpdateScrollOffset(tab.tabId, kind, firstVisibleLine, scrollOffsetX)

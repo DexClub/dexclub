@@ -9,6 +9,8 @@ import io.github.dexclub.codeview.compose.internal.layout.CodeLayoutSnapshot
 import io.github.dexclub.codeview.compose.internal.layout.CodeLineTextLayoutCache
 import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerCanvasMetrics
 import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerViewportSnapshot
+import io.github.dexclub.codeview.compose.internal.viewer.contentViewportLeftPx
+import io.github.dexclub.codeview.compose.internal.viewer.contentViewportRightPx
 import io.github.dexclub.codeview.compose.internal.viewer.contentXToViewportX
 import io.github.dexclub.codeview.compose.internal.viewer.contentYToViewportY
 import io.github.dexclub.codeview.core.text.Cursor
@@ -40,7 +42,10 @@ internal fun inputAnchorModifier(
     val contentTopPx = lineTopPx + canvasMetrics.contentTopPaddingPx
     val rawXPx = viewportSnapshot.contentXToViewportX(anchorPlacement.xPx)
     val rawYPx = contentTopPx
-    val xPx = rawXPx.coerceIn(0f, (viewportSnapshot.viewportWidthPx - widthPx).coerceAtLeast(0f))
+    val xPx = rawXPx.coerceIn(
+        viewportSnapshot.contentViewportLeftPx,
+        (viewportSnapshot.contentViewportRightPx - widthPx).coerceAtLeast(viewportSnapshot.contentViewportLeftPx),
+    )
     val yPx = rawYPx.coerceIn(0f, (viewportSnapshot.viewportHeightPx - heightPx).coerceAtLeast(0f))
 
     return Modifier

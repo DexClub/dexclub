@@ -24,6 +24,9 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import io.github.dexclub.codeview.compose.CodeContentOptions
+import io.github.dexclub.codeview.compose.CodeDecorationOptions
+import io.github.dexclub.codeview.compose.CodeGutterOptions
 import io.github.dexclub.codeview.compose.CodeViewerCursorTarget
 import io.github.dexclub.codeview.compose.CodeViewerInteractionOptions
 import io.github.dexclub.codeview.compose.rememberPlatformEditorBridge
@@ -60,6 +63,9 @@ internal fun CodeEditorContent(
     onViewportChange: ((firstVisibleLine: Int, lastVisibleLine: Int) -> Unit)?,
     onAnnotationHit: ((CodeAnnotationHit) -> Unit)?,
     onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)?,
+    gutterOptions: CodeGutterOptions,
+    contentOptions: CodeContentOptions,
+    decorationOptions: CodeDecorationOptions,
     followCursorToken: Long?,
     fieldValue: TextFieldValue,
     onFieldValueChange: (TextFieldValue) -> Unit,
@@ -222,6 +228,9 @@ internal fun CodeEditorContent(
             onScrollChange = onScrollChange,
             onViewportChange = onViewportChange,
             followCursorToken = followCursorToken,
+            gutterOptions = gutterOptions,
+            contentOptions = contentOptions,
+            decorationOptions = decorationOptions,
             enablePrimaryAnnotationClick = readOnly,
             enableLongPressContextMenu = readOnly,
             enableSecondaryClickContextMenu = true,
@@ -237,6 +246,7 @@ internal fun CodeEditorContent(
                         documentId = documentId,
                         documentRevision = documentRevision,
                         lineHeightPx = canvasMetrics.lineHeightPx,
+                        contentStartPaddingPx = canvasMetrics.contentStartPaddingPx,
                         fieldValue = fieldValue,
                         clipboard = clipboard,
                         scope = scope,

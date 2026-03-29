@@ -21,10 +21,10 @@
 
 ## 当前总状态
 
-- 最近更新时间：`2026-03-22`
+- 最近更新时间：`2026-03-29`
 - 总体状态：`进行中`
 - 当前阶段：`阶段 7：回归与收尾`
-- 当前结论：`Cursor` 与 API 先行调整已完成；共享布局快照与 viewport 已接入 `CodeViewer` / `CodeEditor`；`CodeViewer` 已切到 Canvas 自绘并支持 annotation 点击、长按上下文与 desktop 次键上下文；`CodeEditor` 已切到“共享 CodeViewerCanvas + 平台专属输入桥 + Canvas 自管编辑”的输入模型，编辑态不再依赖全屏透明 `BasicTextField` 作为主控；Desktop 侧专用输入宿主组件路径继续保留；Android 侧已完成到 `AndroidInputHostView + InputConnection` 低层输入桥的主链替换，删除、选区删除、软键盘全选/复制/剪切/粘贴、软键盘选择模式、手动收起后重新唤起键盘等场景当前手测已通过；Android 输入桥已补上对异常 collapsed `setSelection(...)` 的兼容归一化，覆盖“折叠回旧 anchor”和“折叠到无关 offset”的设备行为；Android 软键盘“开始选择”模式下穿过 anchor 进入逆选时，当前也能保持选择态，不会提前退化成普通 caret 移动；渲染链路当前已切到“稳定行度量 + 分段绘制”，横向 caret、selection、annotation 命中与横向 reveal 继续复用 `TextLayoutResult`，但整行垂直行框不再直接跟随当前行瞬时 mixed layout；`CodeViewer` / `CodeEditor` 已补 `scrollPastEnd` 参数，默认预留 5 行，viewport 裁剪与 reveal 约束已同步接入；Android 键盘顶起当前已切到“平台动态 IME inset + viewport 同步 reveal + 渲染 overscan”的组合方案，相关 IME inset 能力已内聚回 `code-view-compose` 内部，不再从 `sharedUI` 透传；Android overscroll 当前已确认最终方向为“平台 overscroll 负责正文 stretch，光标手柄 / 选区手柄 / 工具栏等 overlay 放入同一 overscroll 视觉层统一变形”，旧的 editor-local 自定义 stretch 与手工跟随估算路线不再继续；用户最新手测确认正文 stretch、光标手柄与选区手柄对齐效果可验收；`code-view-compose` 的 JVM / Android 编译与 `jvmTest` 已再次通过；当前进入 Android 真机回归与文档收尾阶段`
+- 当前结论：`Cursor` 与 API 先行调整已完成；共享布局快照与 viewport 已接入 `CodeViewer` / `CodeEditor`；`CodeViewer` 已切到 Canvas 自绘并支持 annotation 点击、长按上下文与 desktop 次键上下文；`CodeEditor` 已切到“共享 CodeViewerCanvas + 平台专属输入桥 + Canvas 自管编辑”的输入模型，编辑态不再依赖全屏透明 `BasicTextField` 作为主控；Desktop 侧专用输入宿主组件路径继续保留；Android 侧已完成到 `AndroidInputHostView + InputConnection` 低层输入桥的主链替换，删除、选区删除、软键盘全选/复制/剪切/粘贴、软键盘选择模式、手动收起后重新唤起键盘等场景当前手测已通过；Android 输入桥已补上对异常 collapsed `setSelection(...)` 的兼容归一化，覆盖“折叠回旧 anchor”和“折叠到无关 offset”的设备行为；Android 软键盘“开始选择”模式下穿过 anchor 进入逆选时，当前也能保持选择态，不会提前退化成普通 caret 移动；渲染链路当前已切到“稳定行度量 + 分段绘制”，横向 caret、selection、annotation 命中与横向 reveal 继续复用 `TextLayoutResult`，但整行垂直行框不再直接跟随当前行瞬时 mixed layout；`CodeViewer` / `CodeEditor` 已补 `scrollPastEnd` 参数，默认预留 5 行，viewport 裁剪与 reveal 约束已同步接入；Android 键盘顶起当前已切到“平台动态 IME inset + viewport 同步 reveal + 渲染 overscan”的组合方案，相关 IME inset 能力已内聚回 `code-view-compose` 内部，不再从 `sharedUI` 透传；Android overscroll 当前已确认最终方向为“平台 overscroll 负责正文 stretch，光标手柄 / 选区手柄 / 工具栏等 overlay 放入同一 overscroll 视觉层统一变形”，旧的 editor-local 自定义 stretch 与手工跟随估算路线不再继续；用户最新手测确认正文 stretch、光标手柄与选区手柄对齐效果可验收；`code-view-compose` 的 JVM / Android 编译与 `jvmTest` 已再次通过；当前执行顺序已调整为“先 Desktop 工作区真实页面回归，再回 Android 真机补收尾”`
 
 ## 阶段总览
 
@@ -37,7 +37,7 @@
 | 4 | Viewer 交互与命中细化 | 进行中 | annotation 点击 / 长按上下文已接入，点击定位、横向滚动下命中细化仍待补 |
 | 5 | CodeEditor 输入桥接 | 已完成 | Desktop 输入桥已稳定，Android 低层 `InputConnection` 输入桥主链已接通 |
 | 6 | 性能与稳定性 | 进行中 | 已切到“稳定行度量 + 分段绘制 + 横向 `TextLayoutResult`”渲染链，仍需继续做大文件与长行场景回归 |
-| 7 | 回归与收尾 | 进行中 | `code-view-compose` 测试和 `sharedUI` 双端编译已通过，Android 输入桥与 overscroll 主链均已回到可回归状态，当前继续做真机回归与收尾整理 |
+| 7 | 回归与收尾 | 进行中 | `code-view-compose` 测试和 `sharedUI` 双端编译已通过；当前先做 Desktop 工作区真实页面回归与文档收口，再回 Android 补剩余真机验证 |
 
 ## 已确认决议
 
@@ -258,14 +258,22 @@
   - Android 输入桥主链问题已完成一轮真机回归
   - `PLAN / PROGRESS / INPUT_ANCHOR_STATE_RULES` 已完成一轮现状同步，清理掉当前架构下明显过时的旧表述
 - 未完成：
-  - 尚未做 Android / Desktop 的完整手动交互回归
-  - Android 平台 overscroll 在真实工作区中的持续回归仍未完成
+  - 尚未做 Desktop 工作区真实页面的完整手动交互回归
   - 尚未验证工作区主路径下的实际滚动恢复、搜索高亮恢复与上下文菜单体验
-  - 尚未确认 Desktop 中文输入、长行输入和拖拽选区在真实页面中的体感
+  - 尚未确认 Desktop 中文输入、长行输入、composing 打断和拖拽选区在真实页面中的体感
+  - 尚未做 Android 真机的完整手动交互回归
+  - Android 平台 overscroll 在真实工作区中的持续回归仍未完成
 - 下一步：
-  - 继续做 UI 级手动回归或补自动回归
+  - 先做 Desktop 工作区真实页面 UI 级回归，优先验证中文输入、composing 打断、长行横向滚动、滚动恢复、搜索高亮与 annotation 右键菜单
+  - 根据 Desktop 手测结果决定是先补少量自动回归，还是直接进入 Android 真机收尾
 
 ## 最近变更
+
+### 2026-03-29
+
+- 阶段 7 的执行顺序已调整为 `Desktop -> Android`
+- `PROGRESS / SELECTION_INTERACTION_RULES / INPUT_ANCHOR_STATE_RULES` 将同步按 Desktop-first 收口
+- 当前会话优先整理文档与手测顺序，不重新打开 Android-first 的推进节奏
 
 ### 2026-03-22
 
@@ -466,6 +474,7 @@
 
 ### 输入法与平台
 
+- 当前执行顺序：先 `Desktop`，后 `Android`
 - [ ] Desktop 下使用中文输入法连续输入，确认 composing 不抖动、不丢字、不覆盖异常
 - [x] Desktop 下点击不同列位置后，caret 已能准确对齐目标列
 - [x] Desktop 下光标呼吸节奏、透明度和圆角效果符合预期
@@ -475,12 +484,12 @@
 - [x] Desktop 下输入法候选词列表能跟随画布光标位置显示
 - [x] Desktop 下 composing 期间当前输入行会及时滚回可视区
 - [ ] Desktop 下 composing 过程中直接回车、删除、方向键跳转或鼠标点击其他位置后，输入状态是否仍然正确
+- [ ] Desktop 下对长行进行横向滚动后继续输入，确认 caret reveal 和文本显示正常
 - [ ] Android 下使用输入法连续输入，确认 composing 和选区行为正常
 - [ ] Android 下普通滑动代码页时，确认优先表现为纵向 / 横向滚动，而不是直接进入选区
 - [ ] Android 下长按单词后，确认会出现菜单入口且首个选区范围合理
 - [ ] Android 下单击放置 caret 后，确认会出现单个光标手柄，拖拽后 caret 能稳定跟随
 - [ ] Android 下拖拽左右手柄时，确认选区范围更新稳定，没有明显跳动
-- [ ] Desktop 下对长行进行横向滚动后继续输入，确认 caret reveal 和文本显示正常
 - [ ] Android 下对长文本上下滚动后继续输入，确认 caret reveal 和滚动状态正常
 
 ### 结果记录
@@ -490,9 +499,9 @@
 
 ## 下一步建议
 
-1. 继续做 Android 真机 / 模拟器回归，重点验证不同输入法、长按选词、平台工具栏、双手柄、overscroll 与滚动优先策略
-2. 再验证 `CodeEditor` 编辑态下 selection、caret reveal、IME composing 和 desktop 次键上下文行为
-3. 根据手测结果决定是否只做少量文档整理与自动回归补充后结束阶段 7
+1. 先做 Desktop 工作区真实页面回归，重点验证中文输入、composing 被回车 / 删除 / 方向键 / 鼠标点击打断、长行横向滚动后继续输入、滚动恢复、搜索高亮与 annotation 右键菜单
+2. 根据 Desktop 手测结果决定是先补少量自动回归，还是直接进入 Android 真机 / 模拟器回归，继续验证不同输入法、长按选词、平台工具栏、双手柄、overscroll 与滚动优先策略
+3. 若 Desktop 主路径基本通过，再做文档收尾并评估阶段 7 是否可以结束
 
 ## 下次会话起点
 
@@ -508,17 +517,22 @@
   - 基础双手柄
 - 下次会话不要再从 `textStyle`、平均字符宽度、整行瞬时 `TextLayoutResult` 垂直几何，或“恢复 Android 隐藏 `BasicTextField` 宿主”重新开始
 - 下次实现优先级：
-  1. 先从 Android 工作区真实页面继续回归：
+  1. 先从 Desktop 工作区真实页面继续回归：
+     - 中文输入与 composing 是否稳定
+     - composing 被回车 / 删除 / 方向键 / 鼠标点击打断后，输入状态是否清理正确
+     - 长行横向滚动后继续输入时，caret reveal 与文本显示是否稳定
+     - 关闭并重新打开标签页后，纵向 / 横向滚动与 caret 是否正确恢复
+     - 搜索高亮恢复、annotation 命中和右键菜单位置是否正确
+  2. 若 Desktop 主问题基本通过，再回到 Android 真机继续回归：
      - 长按选词
      - 平台工具栏是否正常出现
      - 左右手柄是否继续错位或跳动
      - 普通拖动是否稳定保持滚动优先
-      - 不同输入法下的删除、候选提交和选择模式是否一致
-  2. 继续围绕 Android 真机场景回归平台 overscroll：
+     - 不同输入法下的删除、候选提交和选择模式是否一致
+  3. Android 基础交互通过后，再继续围绕真实工作区回归平台 overscroll：
      - 长按选词后进入边界 overscroll 时手柄是否仍稳定对齐
      - 按住边界不松时正文与手柄是否同步回弹
      - 工作区真实页面中是否还有只在业务页面出现的错位或抖动
-  3. 若 Android 主问题基本通过，再回头处理 Desktop 下 composing 被回车 / 删除 / 方向键 / 鼠标点击打断的一致性
 - 若本次已经完成手测，下一次会话请直接同步“哪些条目通过、哪些条目失败、失败现象是什么”
 - 若还未手测，下一次会话优先直接进入工作区真实页面做 UI 级回归
 - 如果手测发现问题，下一次会话建议直接附上：

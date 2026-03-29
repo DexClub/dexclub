@@ -20,6 +20,7 @@ internal fun Modifier.annotationInteractionModifier(
     documentKey: DocumentId,
     documentRevision: DocumentRevision,
     lineHeightPx: Float,
+    contentStartPaddingPx: Float,
     interactionOptions: CodeViewerInteractionOptions,
     onAnnotationHit: ((CodeAnnotationHit) -> Unit)?,
     onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)?,
@@ -51,6 +52,7 @@ internal fun Modifier.annotationInteractionModifier(
                         documentRevision = documentRevision,
                         position = position,
                         lineHeightPx = lineHeightPx,
+                        contentStartPaddingPx = contentStartPaddingPx,
                         trigger = CodeInteractionTrigger.ContextMenu,
                     )
                     onContextMenu?.invoke(hit, position)
@@ -76,6 +78,7 @@ internal fun Modifier.annotationInteractionModifier(
                             documentRevision = documentRevision,
                             position = offset,
                             lineHeightPx = lineHeightPx,
+                            contentStartPaddingPx = contentStartPaddingPx,
                             trigger = CodeInteractionTrigger.PrimaryClick,
                         )
                         if (hit != null) {
@@ -94,6 +97,7 @@ internal fun Modifier.annotationInteractionModifier(
                             documentRevision = documentRevision,
                             position = offset,
                             lineHeightPx = lineHeightPx,
+                            contentStartPaddingPx = contentStartPaddingPx,
                             trigger = CodeInteractionTrigger.ContextMenu,
                         )
                         onContextMenu?.invoke(hit, offset)
@@ -115,16 +119,19 @@ private fun buildAnnotationHit(
     documentRevision: DocumentRevision,
     position: Offset,
     lineHeightPx: Float,
+    contentStartPaddingPx: Float,
     trigger: CodeInteractionTrigger,
 ): CodeAnnotationHit? {
     if (lineHeightPx <= 0f || position.x < 0f || position.y < 0f) return null
     val contentHeightPx = layoutSnapshot.lineCount * lineHeightPx
     if (position.y >= contentHeightPx) return null
+    val textXPx = position.x - contentStartPaddingPx
+    if (textXPx < 0f) return null
 
     val lineIndex = (position.y / lineHeightPx).toInt().coerceIn(0, layoutSnapshot.lineCount - 1)
     val lineOffset = lineLayoutCache.offsetForPosition(
         lineIndex = lineIndex,
-        xPx = position.x,
+        xPx = textXPx,
         clampToLineEnd = false,
     ) ?: return null
     val offset = layoutSnapshot.positionToOffset(lineIndex, lineOffset)

@@ -55,6 +55,9 @@ public fun CodeEditor(
     onAnnotationHit: ((CodeAnnotationHit) -> Unit)? = null,
     onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)? = null,
     textStyle: TextStyle = CodeViewDefaults.CodeTextStyle,
+    gutterOptions: CodeGutterOptions = CodeViewDefaults.GutterOptions,
+    contentOptions: CodeContentOptions = CodeViewDefaults.ContentOptions,
+    decorationOptions: CodeDecorationOptions = CodeViewDefaults.DecorationOptions,
 ) {
     var text by remember { mutableStateOf(initialText) }
 
@@ -93,6 +96,9 @@ public fun CodeEditor(
         onViewportChange = onViewportChange,
         onAnnotationHit = onAnnotationHit,
         onContextMenu = onContextMenu,
+        gutterOptions = gutterOptions,
+        contentOptions = contentOptions,
+        decorationOptions = decorationOptions,
     )
 }
 
@@ -121,6 +127,9 @@ public fun CodeEditor(
     onAnnotationHit: ((CodeAnnotationHit) -> Unit)? = null,
     onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)? = null,
     textStyle: TextStyle = CodeViewDefaults.CodeTextStyle,
+    gutterOptions: CodeGutterOptions = CodeViewDefaults.GutterOptions,
+    contentOptions: CodeContentOptions = CodeViewDefaults.ContentOptions,
+    decorationOptions: CodeDecorationOptions = CodeViewDefaults.DecorationOptions,
 ) {
     val document = remember(languageId) {
         CodeDocument.create(languageId, text)
@@ -154,6 +163,9 @@ public fun CodeEditor(
         onViewportChange = onViewportChange,
         onAnnotationHit = onAnnotationHit,
         onContextMenu = onContextMenu,
+        gutterOptions = gutterOptions,
+        contentOptions = contentOptions,
+        decorationOptions = decorationOptions,
     )
 }
 
@@ -181,6 +193,9 @@ public fun CodeEditor(
     onAnnotationHit: ((CodeAnnotationHit) -> Unit)? = null,
     onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)? = null,
     textStyle: TextStyle = CodeViewDefaults.CodeTextStyle,
+    gutterOptions: CodeGutterOptions = CodeViewDefaults.GutterOptions,
+    contentOptions: CodeContentOptions = CodeViewDefaults.ContentOptions,
+    decorationOptions: CodeDecorationOptions = CodeViewDefaults.DecorationOptions,
 ) {
     val controller = remember(document, addons) {
         runtime.getSurfaceController(document, addons)
@@ -305,6 +320,9 @@ public fun CodeEditor(
         onViewportChange = onViewportChange,
         onAnnotationHit = onAnnotationHit,
         onContextMenu = onContextMenu,
+        gutterOptions = gutterOptions,
+        contentOptions = contentOptions,
+        decorationOptions = decorationOptions,
         followCursorToken = if (readOnly || followCursorToken == 0L) null else followCursorToken,
         fieldValue = fieldValue,
         onFieldValueChange = { newValue ->
