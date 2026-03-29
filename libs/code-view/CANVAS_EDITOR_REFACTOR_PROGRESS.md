@@ -24,7 +24,7 @@
 - 最近更新时间：`2026-03-29`
 - 总体状态：`进行中`
 - 当前阶段：`阶段 7：回归与收尾`
-- 当前结论：`Cursor` 与 API 先行调整已完成；共享布局快照与 viewport 已接入 `CodeViewer` / `CodeEditor`；`CodeViewer` 已切到 Canvas 自绘并支持 annotation 点击、长按上下文与 desktop 次键上下文；`CodeEditor` 已切到“共享 CodeViewerCanvas + 平台专属输入桥 + Canvas 自管编辑”的输入模型，编辑态不再依赖全屏透明 `BasicTextField` 作为主控；Desktop 侧专用输入宿主组件路径继续保留；Android 侧已完成到 `AndroidInputHostView + InputConnection` 低层输入桥的主链替换，删除、选区删除、软键盘全选/复制/剪切/粘贴、软键盘选择模式、手动收起后重新唤起键盘等场景当前手测已通过；Android 输入桥已补上对异常 collapsed `setSelection(...)` 的兼容归一化，覆盖“折叠回旧 anchor”和“折叠到无关 offset”的设备行为；Android 软键盘“开始选择”模式下穿过 anchor 进入逆选时，当前也能保持选择态，不会提前退化成普通 caret 移动；渲染链路当前已切到“稳定行度量 + 分段绘制”，横向 caret、selection、annotation 命中与横向 reveal 继续复用 `TextLayoutResult`，但整行垂直行框不再直接跟随当前行瞬时 mixed layout；`CodeViewer` / `CodeEditor` 已补 `scrollPastEnd` 参数，默认预留 5 行，viewport 裁剪与 reveal 约束已同步接入；Android 键盘顶起当前已切到“平台动态 IME inset + viewport 同步 reveal + 渲染 overscan”的组合方案，相关 IME inset 能力已内聚回 `code-view-compose` 内部，不再从 `sharedUI` 透传；Android overscroll 当前已确认最终方向为“平台 overscroll 负责正文 stretch，光标手柄 / 选区手柄 / 工具栏等 overlay 放入同一 overscroll 视觉层统一变形”，旧的 editor-local 自定义 stretch 与手工跟随估算路线不再继续；用户最新手测确认正文 stretch、光标手柄与选区手柄对齐效果可验收；`code-view-compose` 的 JVM / Android 编译与 `jvmTest` 已再次通过；当前执行顺序已调整为“先 Desktop 工作区真实页面回归，再回 Android 真机补收尾”`
+- 当前结论：`Cursor` 与 API 先行调整已完成；共享布局快照与 viewport 已接入 `CodeViewer` / `CodeEditor`；`CodeViewer` 已切到 Canvas 自绘并支持 annotation 点击、长按上下文与 desktop 次键上下文；`CodeEditor` 已切到“共享 CodeViewerCanvas + 平台专属输入桥 + Canvas 自管编辑”的输入模型，编辑态不再依赖全屏透明 `BasicTextField` 作为主控；Desktop 侧专用输入宿主组件路径继续保留；Android 侧已完成到 `AndroidInputHostView + InputConnection` 低层输入桥的主链替换，删除、选区删除、软键盘全选/复制/剪切/粘贴、软键盘选择模式、手动收起后重新唤起键盘等场景当前手测已通过；Android 输入桥已补上对异常 collapsed `setSelection(...)` 的兼容归一化，覆盖“折叠回旧 anchor”和“折叠到无关 offset”的设备行为；Android 软键盘“开始选择”模式下穿过 anchor 进入逆选时，当前也能保持选择态，不会提前退化成普通 caret 移动；渲染链路当前已切到“稳定行度量 + 分段绘制”，横向 caret、selection、annotation 命中与横向 reveal 继续复用 `TextLayoutResult`，但整行垂直行框不再直接跟随当前行瞬时 mixed layout；`CodeViewer` / `CodeEditor` 已补 `scrollPastEnd` 参数，默认预留 5 行，viewport 裁剪与 reveal 约束已同步接入；基础行号 gutter、内容区起始 inset 与 decoration 配置当前也已落地，相关公开配置已收口为 `CodeGutterOptions`、`CodeContentOptions` 与 `CodeDecorationOptions`；Android 键盘顶起当前已切到“平台动态 IME inset + viewport 同步 reveal + 渲染 overscan”的组合方案，相关 IME inset 能力已内聚回 `code-view-compose` 内部，不再从 `sharedUI` 透传；Android overscroll 当前已确认最终方向为“平台 overscroll 负责正文 stretch，光标手柄 / 选区手柄 / 工具栏等 overlay 放入同一 overscroll 视觉层统一变形”，旧的 editor-local 自定义 stretch 与手工跟随估算路线不再继续；用户最新手测确认正文 stretch、光标手柄与选区手柄对齐效果可验收；`code-view-compose` 的 JVM / Android 编译与 `jvmTest` 已再次通过；当前执行顺序已调整为“先 Desktop 工作区真实页面回归，再回 Android 真机补收尾”`
 
 ## 阶段总览
 
@@ -255,6 +255,9 @@
   - 完成 `:sharedUI:compileKotlinJvm`
   - 完成 `:sharedUI:compileAndroidMain`
   - `sharedUI` 的 `CodeViewPane` 已开始向 `CodeViewer` 传入 `cursor`
+  - 基础行号 gutter 已接入 `CodeViewer` / `CodeEditor`
+  - 公开配置已收口为 `CodeGutterOptions`、`CodeContentOptions` 与 `CodeDecorationOptions`
+  - `sharedUI` 工作区入口已显式传入工作区级 gutter / content / decoration 配置
   - Android 输入桥主链问题已完成一轮真机回归
   - `PLAN / PROGRESS / INPUT_ANCHOR_STATE_RULES` 已完成一轮现状同步，清理掉当前架构下明显过时的旧表述
 - 未完成：
@@ -274,6 +277,8 @@
 - 阶段 7 的执行顺序已调整为 `Desktop -> Android`
 - `PROGRESS / SELECTION_INTERACTION_RULES / INPUT_ANCHOR_STATE_RULES` 将同步按 Desktop-first 收口
 - 当前会话优先整理文档与手测顺序，不重新打开 Android-first 的推进节奏
+- `code-view-compose` 已新增 `CodeGutterOptions`、`CodeContentOptions` 与 `CodeDecorationOptions`
+- 工作区代码页已显式传入工作区级 gutter / content / decoration 配置；当前内容区 `startPadding` 已按最新手调结果收敛为 `2.dp`
 
 ### 2026-03-22
 
@@ -431,6 +436,7 @@
 - 工作区代码页在只读场景下是否会按 `editorState.cursorLine / cursorOffset` 正确显示 caret
 - 导航跳转到定义后，`cursorTarget` 驱动的自动滚动是否总能把目标位置带入可视区
 - 搜索命中恢复后，`searchHighlight` 与滚动恢复是否符合预期，没有错位或丢失
+- 行号 gutter、内容区起始 padding、选区与右键菜单在工作区真实页面中的视觉与命中是否稳定
 - Desktop 下对可跳转符号执行右键时，上下文菜单位置、命中对象和行为是否正确
 - 编辑态下连续输入、删除、方向键移动后，caret 自动 reveal 的体感是否正常，是否出现“跑出视口”或抖动
 - Android / Desktop 的 IME composing 是否稳定，是否出现选区错乱、输入抖动或文本覆盖异常
