@@ -24,6 +24,12 @@ kotlin {
                 implementation(project(":code-view-tree-sitter-smali:ktreesitter-smali"))
             }
         }
+
+        commonTest {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
     }
 }
 

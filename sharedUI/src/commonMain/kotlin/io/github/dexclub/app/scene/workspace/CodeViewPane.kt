@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import io.github.dexclub.app.model.OpenTabUiModel
@@ -101,6 +102,16 @@ internal fun CodeViewPane(
 
     LaunchedEffect(cursor) {
         latestCursor = cursor
+    }
+
+    LaunchedEffect(isSelectedTab, navigationRevealTarget, cursorTarget) {
+        if (!isSelectedTab) return@LaunchedEffect
+        val target = navigationRevealTarget ?: return@LaunchedEffect
+        if (cursorTarget == null) return@LaunchedEffect
+
+        // 等当前组合把 reveal target 传给 CodeEditor 后再清空外层待消费状态，避免后续重组重复触发。
+        withFrameNanos { }
+        callbacks.onConsumeNavigationRevealTarget(target)
     }
 
     fun updateCursorSelection(

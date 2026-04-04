@@ -1030,7 +1030,6 @@ class WorkspaceSceneViewModel internal constructor(
     }
 
     fun onToggleOpenTab(tab: OpenTabUiModel) {
-        clearSearchHighlightsForTab(tab.tabId)
         _selectedTabId.value = tab.tabId
         persistTabViewedAsync(tab.tabId)
 

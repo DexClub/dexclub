@@ -1,86 +1,23 @@
+;; Minimal Smali highlights query for ktreesitter compatibility.
+;;
+;; The upstream query currently triggers Query initialization failure on JVM
+;; through ktreesitter. Keep this version intentionally conservative so the
+;; workspace can at least render stable baseline syntax colors.
+
 ; Types
 
-(class_identifier
-  (identifier) @type)
-
+(class_identifier) @type
 (primitive_type) @type.builtin
 
-((class_identifier
-   . (identifier) @_first @type.builtin
-   (identifier) @type.builtin)
-  (#any-of? @_first "android" "dalvik" "java" "kotlinx"))
+; Methods / fields
 
-((class_identifier
-   . (identifier) @_first @type.builtin
-   .  (identifier) @_second @type.builtin
-   (identifier) @type.builtin)
-  (#eq? @_first "com")
-  (#any-of? @_second "android" "google"))
+(method_identifier) @method
+(field_identifier) @field
 
-; Methods
+; Registers / parameters
 
-(method_definition
-  (method_signature (method_identifier) @method))
-
-(expression
-  (opcode) @_invoke
-	(body
-	  (full_method_signature
-      (method_signature (method_identifier) @method.call)))
-  (#lua-match? @_invoke "^invoke"))
-
-(method_handle
-  (full_method_signature
-	(method_signature (method_identifier) @method.call)))
-
-(custom_invoke
-  . (identifier) @method.call
-  (method_signature (method_identifier) @method.call))
-
-(annotation_value
-  (body
-    (method_signature (method_identifier) @method.call)))
-
-(annotation_value
-  (body
-    (full_method_signature
-      (method_signature (method_identifier) @method.call))))
-
-(field_definition
-	(body
-		(method_signature (method_identifier) @method.call)))
-
-(field_definition
-	(body
-	  (full_method_signature
-		  (method_signature (method_identifier) @method.call))))
-
-((method_identifier) @constructor
-  (#any-of? @constructor "<init>" "<clinit>"))
-
-"constructor" @constructor
-
-; Fields
-
-[
-  (field_identifier)
-  (annotation_key)
-] @field
-
-((field_identifier) @constant
-  (#lua-match? @constant "^[%u_]*$"))
-
-; Variables
-
+(parameter) @parameter
 (variable) @variable.builtin
-
-(local_directive
-  (identifier) @variable)
-
-; Parameters
-
-(parameter) @parameter.builtin
-(param_identifier) @parameter
 
 ; Labels
 
@@ -89,130 +26,29 @@
   (jmp_label)
 ] @label
 
-; Operators
+; Operators / keywords
 
 (opcode) @keyword.operator
-
-((opcode) @keyword.return
-  (#lua-match? @keyword.return "^return"))
-
-((opcode) @conditional
-  (#lua-match? @conditional "^if"))
-
-((opcode) @conditional
-  (#lua-match? @conditional "^cmp"))
-
-((opcode) @exception
-  (#lua-match? @exception "^throw"))
-
-((opcode) @comment
-  (#eq? @comment "nop")) ; haha, anyone get it? ;)
-
-[
-  "="
-  ".."
-] @operator
-
-; Keywords
-
-[
-  ".class"
-  ".super"
-  ".implements"
-  ".field"
-  ".end field"
-  ".annotation"
-  ".end annotation"
-  ".subannotation"
-  ".end subannotation"
-  ".param"
-  ".end param"
-  ".parameter"
-  ".end parameter"
-  ".line"
-  ".locals"
-  ".local"
-  ".end local"
-  ".restart local"
-  ".registers"
-  ".packed-switch"
-  ".end packed-switch"
-  ".sparse-switch"
-  ".end sparse-switch"
-  ".array-data"
-  ".end array-data"
-  ".enum"
-  (prologue_directive)
-  (epilogue_directive)
-] @keyword
-
-[
-  ".source"
-] @include
-
-[
-  ".method"
-  ".end method"
-] @keyword.function
-
-[
-  ".catch"
-  ".catchall"
-] @exception
+(annotation_visibility) @storageclass
+(access_modifier) @type.qualifier
 
 ; Literals
 
 (string) @string
-(source_directive (string "\"" _ @text.uri "\""))
 (escape_sequence) @string.escape
-
 (character) @character
 
-"L" @character.special
-
-(number) @number
-
 [
- (float)
- (NaN)
- (Infinity)
-] @float
+  (number)
+  (float)
+  (NaN)
+  (Infinity)
+] @number
 
 (boolean) @boolean
-
 (null) @constant.builtin
 
-; Misc
+; Comments / errors
 
-(annotation_visibility) @storageclass
-
-(access_modifier) @type.qualifier
-
-(array_type
-  "[" @punctuation.special)
-
-["{" "}"] @punctuation.bracket
-
-["(" ")"] @punctuation.bracket
-
-[
-  "->"
-  ","
-  ":"
-  ";"
-  "@"
-  "/"
-] @punctuation.delimiter
-
-(line_directive (number) @text.underline @text.literal)
-
-; Comments
-
-(comment) @comment @spell
-
-(class_definition
-  (comment) @comment.documentation)
-
-; Errors
-
+(comment) @comment
 (ERROR) @error

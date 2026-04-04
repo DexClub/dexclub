@@ -18,7 +18,11 @@ internal class LanguageResolver {
             language = snapshot.languageId,
         )
         return addons.languages.firstOrNull { language ->
-            language.matcher?.matches(textValue) == true
+            val matcher = language.matcher
+            when {
+                matcher != null -> matcher.matches(textValue)
+                else -> language.descriptor.languageId == snapshot.languageId
+            }
         }
     }
 }
