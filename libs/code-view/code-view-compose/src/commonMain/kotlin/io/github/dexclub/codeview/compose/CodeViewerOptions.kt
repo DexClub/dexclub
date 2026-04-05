@@ -23,7 +23,7 @@ public object CodeViewDefaults {
     public const val ScrollPastEnd: Int = 5
 
     public val CodeTextStyle: TextStyle = TextStyle(
-        color = Color(0xFF1F2328),
+        color = Color(0xFF080808),
         fontSize = 14.sp,
         lineHeight = 20.sp,
         fontFamily = FontFamily.Monospace,
@@ -58,8 +58,8 @@ public data class CodeViewerInteractionOptions(
 @CodeViewApi
 public data class CodeGutterOptions(
     public val visible: Boolean = true,
-    public val backgroundColor: Color = Color(0xFFF6F8FA),
-    public val dividerColor: Color = Color(0x1F1F2328),
+    public val backgroundColor: Color = Color(0xFFFFFFFF),
+    public val dividerColor: Color = Color(0x1FD0D0D0),
     public val lineNumbers: CodeLineNumberOptions = CodeLineNumberOptions(),
 )
 
@@ -69,8 +69,8 @@ public data class CodeLineNumberOptions(
     public val minDigits: Int = 2,
     public val startPadding: Dp = 12.dp,
     public val endPadding: Dp = 12.dp,
-    public val textColor: Color = Color(0xFF6E7781),
-    public val activeTextColor: Color = Color(0xFF1F2328),
+    public val textColor: Color = Color(0xFFAEB3C2),
+    public val activeTextColor: Color = Color(0xFF767A8A),
 ) {
     init {
         require(minDigits >= 1) { "minDigits 必须大于等于 1: $minDigits" }
@@ -94,7 +94,7 @@ public data class CodeContentOptions(
 public data class CodeDecorationOptions(
     public val selectionColor: Color = Color(0x334096FF),
     public val searchHighlightColor: Color = Color(0x40F4D03F),
-    public val cursorColor: Color = Color(0xFF1F2328),
+    public val cursorColor: Color = Color(0xFF000000),
 )
 
 /**

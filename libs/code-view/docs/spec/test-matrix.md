@@ -43,6 +43,7 @@
 - `LineSelection / CodeSelection / Cursor` 转换
 - viewport reveal
 - token / annotation 切片
+- 编辑后 token 刷新
 - 行渲染分段
 - 输入桥中的纯状态机逻辑
 - 多击计数与选区纯逻辑
@@ -103,6 +104,7 @@
 | offset / line / column 映射 | 必测 |
 | viewport reveal | 必测 |
 | token / annotation 切片 | 必测 |
+| 编辑后 token 刷新 | 必测 |
 | 渲染分段 | 必测 |
 | Selection 纯逻辑 | 必测 |
 | 多击计数 | 必测 |
@@ -140,6 +142,7 @@
 - 方向键移动
 - 选区替换
 - 粘贴多行文本
+- 关键字与普通标识符互改后的高亮刷新
 - 拖拽选区
 - 编辑态右键 annotation
 - 双击选词
@@ -170,6 +173,7 @@
 当前建议至少覆盖这些真实工作区场景：
 
 - 从工作区侧边栏或搜索结果打开代码页，确认初始 caret、selection 与滚动位置没有明显异常
+- 在编辑态把关键字改成普通标识符或反向修改，确认语法高亮会跟随新文本刷新，旧 token 不残留
 - 在同一标签页内切换 Java / Smali 或 single / mixed 视图，确认 active pane、显示内容与光标状态同步正常
 - 关闭并重新打开同一标签页，确认纵向滚动、横向滚动与 caret 恢复正常
 - 通过搜索结果定位文本，确认 selection、search highlight 与 reveal 同时生效

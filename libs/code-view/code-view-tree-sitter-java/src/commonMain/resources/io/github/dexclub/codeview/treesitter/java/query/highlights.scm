@@ -31,17 +31,13 @@
   name: (identifier) @type)
 
 ((field_access
-  object: (identifier) @type)
- (#match? @type "^[A-Z]"))
+  object: (identifier) @type))
 ((scoped_identifier
-  scope: (identifier) @type)
- (#match? @type "^[A-Z]"))
+  scope: (identifier) @type))
 ((method_invocation
-  object: (identifier) @type)
- (#match? @type "^[A-Z]"))
+  object: (identifier) @type))
 ((method_reference
-  . (identifier) @type)
- (#match? @type "^[A-Z]"))
+  . (identifier) @type))
 
 (constructor_declaration
   name: (identifier) @type)
@@ -56,8 +52,7 @@
 
 ; Constants
 
-((identifier) @constant
- (#match? @constant "^_*[A-Z][A-Z\\d_]+$"))
+((identifier) @constant)
 
 ; Builtins
 

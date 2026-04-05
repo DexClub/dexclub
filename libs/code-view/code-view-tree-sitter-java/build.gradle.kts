@@ -24,6 +24,12 @@ kotlin {
                 implementation(project(":code-view-tree-sitter-java:ktreesitter-java"))
             }
         }
+
+        commonTest {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
     }
 }
 

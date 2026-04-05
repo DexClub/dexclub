@@ -43,11 +43,15 @@ internal fun normalizeSearchTargetClassName(value: String): String {
         return SignatureUtils.typeName(beforeMember)
     }
 
-    return beforeMember
+    val normalized = beforeMember
         .replace('/', '.')
-        .removePrefix("L")
         .removeSuffix(";")
         .trim()
+    return if ('/' in beforeMember) {
+        normalized.removePrefix("L")
+    } else {
+        normalized
+    }
 }
 
 internal fun normalizeDexKitClassName(

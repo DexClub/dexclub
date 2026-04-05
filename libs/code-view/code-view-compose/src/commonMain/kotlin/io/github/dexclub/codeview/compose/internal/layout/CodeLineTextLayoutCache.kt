@@ -15,8 +15,9 @@ import io.github.dexclub.codeview.core.token.CodeTokenKind
 internal class CodeLineTextLayoutCache(
     private val textMeasurer: TextMeasurer,
     private val textStyle: TextStyle,
-    private val layoutSnapshot: CodeLayoutSnapshot,
+    layoutSnapshot: CodeLayoutSnapshot,
 ) {
+    private var layoutSnapshot: CodeLayoutSnapshot = layoutSnapshot
     private val lineTextCache: MutableMap<Int, AnnotatedString> = mutableMapOf()
     private val lineLayoutCache: MutableMap<Int, TextLayoutResult> = mutableMapOf()
     private val lineWidthCache: MutableMap<Int, Float> = mutableMapOf()
@@ -24,6 +25,30 @@ internal class CodeLineTextLayoutCache(
     private val lineRenderSegmentsCache: MutableMap<Int, List<CodeLineRenderSegment>> = mutableMapOf()
     private val plainTextRenderSegmentsCache: MutableMap<SegmentRenderKey, List<CodeLineRenderSegment>> = mutableMapOf()
     private val segmentLayoutCache: MutableMap<SegmentRenderKey, TextLayoutResult> = mutableMapOf()
+
+    fun updateLayoutSnapshot(nextLayoutSnapshot: CodeLayoutSnapshot) {
+        val previousLayoutSnapshot = layoutSnapshot
+        if (previousLayoutSnapshot === nextLayoutSnapshot) return
+        layoutSnapshot = nextLayoutSnapshot
+
+        val sharedLineCount = minOf(previousLayoutSnapshot.lineCount, nextLayoutSnapshot.lineCount)
+        for (lineIndex in 0 until sharedLineCount) {
+            val previousLine = previousLayoutSnapshot.lineAt(lineIndex)
+            val nextLine = nextLayoutSnapshot.lineAt(lineIndex)
+            val textChanged = previousLine != nextLine ||
+                previousLayoutSnapshot.lineText(lineIndex) != nextLayoutSnapshot.lineText(lineIndex)
+            if (textChanged) {
+                invalidateMeasuredLine(lineIndex)
+                continue
+            }
+
+            if (previousLayoutSnapshot.tokensForLine(lineIndex) != nextLayoutSnapshot.tokensForLine(lineIndex)) {
+                invalidateDecoratedLine(lineIndex)
+            }
+        }
+
+        trimLineCaches(nextLayoutSnapshot.lineCount)
+    }
 
     fun estimatedMaxLineWidthPx(fallbackCharWidthPx: Float): Float {
         return (layoutSnapshot.maxLineLength * fallbackCharWidthPx).coerceAtLeast(0f)
@@ -195,19 +220,23 @@ internal class CodeLineTextLayoutCache(
         return when (kind) {
             CodeTokenKind.Keyword,
             CodeTokenKind.KeywordModifier,
-            CodeTokenKind.KeywordType -> Color(0xFF7C3AED)
+            CodeTokenKind.KeywordType -> IdeaLightSemanticPalette.KeywordBlue
 
             CodeTokenKind.StringLiteral,
-            CodeTokenKind.EscapeSequence,
-            CodeTokenKind.Interpolation -> Color(0xFF0A7F5A)
+            CodeTokenKind.Interpolation -> IdeaLightSemanticPalette.StringGreen
+
+            CodeTokenKind.EscapeSequence -> IdeaLightSemanticPalette.EscapeTeal
 
             CodeTokenKind.NumberLiteral,
             CodeTokenKind.BooleanLiteral,
-            CodeTokenKind.NullLiteral -> Color(0xFF0550AE)
+            CodeTokenKind.NullLiteral -> IdeaLightSemanticPalette.NumberBlue
 
-            CodeTokenKind.Comment -> Color(0xFF6E7781)
-            CodeTokenKind.TypeName,
-            CodeTokenKind.Annotation -> Color(0xFFB35900)
+            CodeTokenKind.Comment -> IdeaLightSemanticPalette.CommentGray
+            CodeTokenKind.TypeName -> IdeaLightSemanticPalette.PlainText
+
+            CodeTokenKind.Builtin -> IdeaLightSemanticPalette.BuiltinBlue
+
+            CodeTokenKind.Annotation -> IdeaLightSemanticPalette.AnnotationOlive
 
             CodeTokenKind.FunctionName,
             CodeTokenKind.VariableName,
@@ -216,18 +245,47 @@ internal class CodeLineTextLayoutCache(
             CodeTokenKind.ConstantName,
             CodeTokenKind.LabelName,
             CodeTokenKind.Namespace,
-            CodeTokenKind.Builtin -> Color(0xFF1F2328)
-
             CodeTokenKind.Operator,
-            CodeTokenKind.Punctuation -> Color(0xFF57606A)
+            CodeTokenKind.Punctuation -> IdeaLightSemanticPalette.PlainText
 
-            CodeTokenKind.Invalid -> Color(0xFFCF222E)
-            CodeTokenKind.PlainText -> Color(0xFF1F2328)
+            CodeTokenKind.Invalid -> IdeaLightSemanticPalette.InvalidRed
+            CodeTokenKind.PlainText -> IdeaLightSemanticPalette.PlainText
         }
+    }
+
+    private fun invalidateMeasuredLine(lineIndex: Int) {
+        lineTextCache.remove(lineIndex)
+        lineLayoutCache.remove(lineIndex)
+        lineWidthCache.remove(lineIndex)
+        lineRenderSegmentsCache.remove(lineIndex)
+    }
+
+    private fun invalidateDecoratedLine(lineIndex: Int) {
+        lineTextCache.remove(lineIndex)
+        lineRenderSegmentsCache.remove(lineIndex)
+    }
+
+    private fun trimLineCaches(lineCount: Int) {
+        lineTextCache.keys.removeAll { it >= lineCount }
+        lineLayoutCache.keys.removeAll { it >= lineCount }
+        lineWidthCache.keys.removeAll { it >= lineCount }
+        lineRenderSegmentsCache.keys.removeAll { it >= lineCount }
     }
 
     private data class SegmentRenderKey(
         val text: String,
         val color: Color,
     )
+}
+
+private object IdeaLightSemanticPalette {
+    val PlainText: Color = Color(0xFF080808)
+    val KeywordBlue: Color = Color(0xFF0033B3)
+    val BuiltinBlue: Color = Color(0xFF0033B3)
+    val StringGreen: Color = Color(0xFF067D17)
+    val EscapeTeal: Color = Color(0xFF0037A6)
+    val NumberBlue: Color = Color(0xFF1750EB)
+    val CommentGray: Color = Color(0xFF8C8C8C)
+    val AnnotationOlive: Color = Color(0xFF9E880D)
+    val InvalidRed: Color = Color(0xFFFF0000)
 }

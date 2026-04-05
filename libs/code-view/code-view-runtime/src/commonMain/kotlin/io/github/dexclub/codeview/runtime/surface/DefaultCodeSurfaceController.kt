@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 @InternalCodeViewApi
@@ -33,6 +35,7 @@ internal class DefaultCodeSurfaceController(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val degradePolicy = DefaultSurfaceDegradePolicy()
     private val reconciler = CapabilityResultReconciler()
+    private val refreshMutex = Mutex()
 
     private val _state = MutableStateFlow<CodeSurfaceState>(CodeSurfaceState.Idle)
     override val state: StateFlow<CodeSurfaceState> = _state
@@ -51,15 +54,17 @@ internal class DefaultCodeSurfaceController(
     }
 
     override suspend fun refresh() {
-        withContext(Dispatchers.Default) {
-            val snapshot = document.snapshots.value
-            val degradeDecision = degradePolicy.evaluate(snapshot)
+        refreshMutex.withLock {
+            withContext(Dispatchers.Default) {
+                val snapshot = document.snapshots.value
+                val degradeDecision = degradePolicy.evaluate(snapshot)
 
-            when (degradeDecision) {
-                is DegradeDecision.None -> processNormal()
-                is DegradeDecision.LargeFile -> processWithWarning(degradeDecision)
-                is DegradeDecision.OversizedFile -> processFallback(degradeDecision)
-                is DegradeDecision.LongLines -> processWithWarning(degradeDecision)
+                when (degradeDecision) {
+                    is DegradeDecision.None -> processNormal()
+                    is DegradeDecision.LargeFile -> processWithWarning(degradeDecision)
+                    is DegradeDecision.OversizedFile -> processFallback(degradeDecision)
+                    is DegradeDecision.LongLines -> processWithWarning(degradeDecision)
+                }
             }
         }
     }
@@ -67,7 +72,7 @@ internal class DefaultCodeSurfaceController(
     private suspend fun processNormal() {
         _state.value = CodeSurfaceState.Loading
         val session = sessionHost.getOrCreateSession(document, addons)
-        
+
         if (session == null) {
             processFallback(DegradeDecision.None)
             return
@@ -75,32 +80,40 @@ internal class DefaultCodeSurfaceController(
 
         val snapshot = document.snapshots.value
         val requestId = reconciler.nextSequence()
-        
-        try {
-            val tokens = session.highlightTokens(snapshot)
-            val annotations = session.annotations(snapshot)
-            if (reconciler.shouldAccept(document.documentId, snapshot.revision, requestId)) {
-                _tokens.value = tokens
-                _annotations.value = annotations
-                _state.value = CodeSurfaceState.Ready
-            }
-        } catch (e: Exception) {
-            _state.value = CodeSurfaceState.Failed
-            _annotations.value = emptyList()
-            _diagnostics.trySend(
-                CodeDiagnostic(
-                    level = CodeDiagnostic.Level.Error,
-                    code = "HIGHLIGHT_FAILED",
-                    message = "Highlight failed: ${e.message}",
-                )
+
+        val tokenResult = runCatching { session.highlightTokens(snapshot) }
+        val annotationResult = runCatching { session.annotations(snapshot) }
+        if (!reconciler.shouldAccept(document.documentId, snapshot.revision, requestId)) {
+            return
+        }
+
+        _tokens.value = tokenResult.getOrElse { error ->
+            emitDiagnostic(
+                level = CodeDiagnostic.Level.Error,
+                code = "HIGHLIGHT_FAILED",
+                message = "Highlight failed: ${error.message}",
             )
+            PlainTextFallback.generateTokens(snapshot)
+        }
+        _annotations.value = annotationResult.getOrElse { error ->
+            emitDiagnostic(
+                level = CodeDiagnostic.Level.Warning,
+                code = "ANNOTATION_FAILED",
+                message = "Annotation build failed: ${error.message}",
+            )
+            emptyList()
+        }
+        _state.value = when {
+            tokenResult.isFailure -> CodeSurfaceState.Failed
+            annotationResult.isFailure -> CodeSurfaceState.Degraded
+            else -> CodeSurfaceState.Ready
         }
     }
 
     private suspend fun processWithWarning(decision: DegradeDecision) {
         _state.value = CodeSurfaceState.Loading
         val session = sessionHost.getOrCreateSession(document, addons)
-        
+
         if (session == null) {
             processFallback(decision)
             return
@@ -108,19 +121,30 @@ internal class DefaultCodeSurfaceController(
 
         val snapshot = document.snapshots.value
         val requestId = reconciler.nextSequence()
-        
-        try {
-            val tokens = session.highlightTokens(snapshot)
-            val annotations = session.annotations(snapshot)
-            if (reconciler.shouldAccept(document.documentId, snapshot.revision, requestId)) {
-                _tokens.value = tokens
-                _annotations.value = annotations
-                _state.value = CodeSurfaceState.Degraded
-                emitDegradeWarning(decision)
-            }
-        } catch (e: Exception) {
-            processFallback(decision)
+        val tokenResult = runCatching { session.highlightTokens(snapshot) }
+        val annotationResult = runCatching { session.annotations(snapshot) }
+        if (!reconciler.shouldAccept(document.documentId, snapshot.revision, requestId)) {
+            return
         }
+
+        _tokens.value = tokenResult.getOrElse { error ->
+            emitDiagnostic(
+                level = CodeDiagnostic.Level.Error,
+                code = "HIGHLIGHT_FAILED",
+                message = "Highlight failed: ${error.message}",
+            )
+            PlainTextFallback.generateTokens(snapshot)
+        }
+        _annotations.value = annotationResult.getOrElse { error ->
+            emitDiagnostic(
+                level = CodeDiagnostic.Level.Warning,
+                code = "ANNOTATION_FAILED",
+                message = "Annotation build failed: ${error.message}",
+            )
+            emptyList()
+        }
+        _state.value = CodeSurfaceState.Degraded
+        emitDegradeWarning(decision)
     }
 
     private fun processFallback(decision: DegradeDecision) {
@@ -138,10 +162,22 @@ internal class DefaultCodeSurfaceController(
             is DegradeDecision.LongLines -> "Long lines detected"
             DegradeDecision.None -> "Language support unavailable"
         }
+        emitDiagnostic(
+            level = CodeDiagnostic.Level.Warning,
+            code = "DEGRADED",
+            message = message,
+        )
+    }
+
+    private fun emitDiagnostic(
+        level: CodeDiagnostic.Level,
+        code: String,
+        message: String,
+    ) {
         _diagnostics.trySend(
             CodeDiagnostic(
-                level = CodeDiagnostic.Level.Warning,
-                code = "DEGRADED",
+                level = level,
+                code = code,
                 message = message,
             )
         )

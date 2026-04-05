@@ -139,11 +139,15 @@ class NavigationService(
             return SignatureUtils.typeName(beforeMember)
         }
 
-        return beforeMember
+        val normalized = beforeMember
             .replace('/', '.')
-            .removePrefix("L")
             .removeSuffix(";")
             .trim()
+        return if ('/' in beforeMember) {
+            normalized.removePrefix("L")
+        } else {
+            normalized
+        }
     }
 
     fun resolveTargetCursor(

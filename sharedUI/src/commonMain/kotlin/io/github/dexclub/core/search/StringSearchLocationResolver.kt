@@ -747,11 +747,15 @@ class StringSearchLocationResolver {
             return SignatureUtils.typeName(beforeMember)
         }
 
-        return beforeMember
+        val normalized = beforeMember
             .replace('/', '.')
-            .removePrefix("L")
             .removeSuffix(";")
             .trim()
+        return if ('/' in beforeMember) {
+            normalized.removePrefix("L")
+        } else {
+            normalized
+        }
     }
 
     private fun Char.isJavaIdentifierChar(): Boolean = isLetterOrDigit() || this == '_' || this == '$'

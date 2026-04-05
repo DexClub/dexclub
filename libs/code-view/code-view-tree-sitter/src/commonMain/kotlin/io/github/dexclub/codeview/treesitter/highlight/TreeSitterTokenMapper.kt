@@ -50,13 +50,13 @@ object TreeSitterTokenMapper {
         // Functions / methods
         "function",
         "function.method",
-        "function.builtin",
         "method",
         "method.call" -> CodeTokenKind.FunctionName
 
         // Variables
-        "variable",
-        "variable.builtin" -> CodeTokenKind.VariableName
+        "variable" -> CodeTokenKind.VariableName
+
+        "variable.builtin" -> CodeTokenKind.Builtin
 
         // Properties / fields
         "property",
@@ -97,7 +97,8 @@ object TreeSitterTokenMapper {
         "text.underline" -> CodeTokenKind.Interpolation
 
         // Builtins
-        "builtin" -> CodeTokenKind.Builtin
+        "builtin",
+        "function.builtin" -> CodeTokenKind.Builtin
 
         // Errors
         "error" -> CodeTokenKind.Invalid

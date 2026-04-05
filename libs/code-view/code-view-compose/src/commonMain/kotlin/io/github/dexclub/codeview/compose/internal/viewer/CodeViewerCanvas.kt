@@ -119,13 +119,14 @@ internal fun CodeViewerCanvas(
             layoutSnapshot.text.length,
         ),
     )
-    val lineLayoutCache = remember(textMeasurer, effectiveTextStyle, layoutSnapshot) {
+    val lineLayoutCache = remember(textMeasurer, effectiveTextStyle, documentKey) {
         CodeLineTextLayoutCache(
             textMeasurer = textMeasurer,
             textStyle = effectiveTextStyle,
             layoutSnapshot = layoutSnapshot,
         )
     }
+    lineLayoutCache.updateLayoutSnapshot(layoutSnapshot)
     val contentOverscrollEffect = rememberCodeViewerHandleOverscrollEffect()
     val horizontalScrollOverscrollEffect = remember(contentOverscrollEffect) {
         contentOverscrollEffect.withoutVisualEffect()
