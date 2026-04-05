@@ -2,13 +2,104 @@ package io.github.dexclub.codeview.compose.internal.editor
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.TextRange
+import io.github.dexclub.codeview.compose.internal.layout.CodeLayoutSnapshotFactory
 import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerScrollController
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class CodeEditorPointerInputTest {
+    @Test
+    fun resolveDesktopMultiClickCount_upgradesToDoubleAndTripleWithinThreshold() {
+        val doubleClick = resolveDesktopMultiClickCount(
+            clickUptimeMillis = 140L,
+            clickPosition = Offset(12f, 18f),
+            previousClickUptimeMillis = 100L,
+            previousClickPosition = Offset(10f, 20f),
+            previousClickCount = 1,
+            multiClickTimeoutMillis = 300L,
+            multiClickSlopPx = 8f,
+        )
+        val tripleClick = resolveDesktopMultiClickCount(
+            clickUptimeMillis = 180L,
+            clickPosition = Offset(11f, 19f),
+            previousClickUptimeMillis = 140L,
+            previousClickPosition = Offset(12f, 18f),
+            previousClickCount = 2,
+            multiClickTimeoutMillis = 300L,
+            multiClickSlopPx = 8f,
+        )
+
+        assertEquals(2, doubleClick)
+        assertEquals(3, tripleClick)
+    }
+
+    @Test
+    fun resolveDesktopMultiClickCount_resetsWhenTimeoutOrDistanceExceeded() {
+        assertEquals(
+            1,
+            resolveDesktopMultiClickCount(
+                clickUptimeMillis = 500L,
+                clickPosition = Offset(10f, 20f),
+                previousClickUptimeMillis = 100L,
+                previousClickPosition = Offset(10f, 20f),
+                previousClickCount = 1,
+                multiClickTimeoutMillis = 300L,
+                multiClickSlopPx = 8f,
+            )
+        )
+        assertEquals(
+            1,
+            resolveDesktopMultiClickCount(
+                clickUptimeMillis = 140L,
+                clickPosition = Offset(30f, 20f),
+                previousClickUptimeMillis = 100L,
+                previousClickPosition = Offset(10f, 20f),
+                previousClickCount = 1,
+                multiClickTimeoutMillis = 300L,
+                multiClickSlopPx = 8f,
+            )
+        )
+    }
+
+    @Test
+    fun resolveDesktopClickSelection_selectsWordOnDoubleClick() {
+        val snapshot = CodeLayoutSnapshotFactory.create("foo bar+baz")
+
+        val selection = resolveDesktopClickSelection(
+            layoutSnapshot = snapshot,
+            clickCount = 2,
+            anchorOffset = 5,
+        )
+
+        assertEquals(TextRange(4, 7), selection)
+    }
+
+    @Test
+    fun resolveDesktopClickSelection_selectsLineOnTripleClickIncludingTrailingNewline() {
+        val snapshot = CodeLayoutSnapshotFactory.create("first\nsecond\nthird")
+
+        val selection = resolveDesktopClickSelection(
+            layoutSnapshot = snapshot,
+            clickCount = 3,
+            anchorOffset = 8,
+        )
+
+        assertEquals(TextRange(6, 13), selection)
+    }
+
+    @Test
+    fun resolveSelectionLineRange_usesLineEndOnLastLineWithoutTrailingNewline() {
+        val snapshot = CodeLayoutSnapshotFactory.create("first\nsecond")
+
+        val selection = resolveSelectionLineRange(
+            layoutSnapshot = snapshot,
+            rawOffset = snapshot.text.length,
+        )
+
+        assertEquals(TextRange(6, 12), selection)
+    }
+
     @Test
     fun resolveSelectionTapAction_keepsSelectionWhenTapFallsInsideAndKeyboardHidden() {
         assertEquals(

@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
@@ -13,6 +14,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import io.github.dexclub.codeview.compose.internal.layout.CodeLayoutSnapshot
 import io.github.dexclub.codeview.compose.internal.layout.CodeLineTextLayoutCache
 import io.github.dexclub.codeview.compose.internal.viewer.CodeViewerScrollController
+import kotlin.math.pow
 
 internal fun Modifier.codeEditorDesktopPointerInput(
     layoutSnapshot: CodeLayoutSnapshot,
@@ -26,8 +28,21 @@ internal fun Modifier.codeEditorDesktopPointerInput(
     onAnyPointerEditing: () -> Unit,
 ): Modifier {
     return pointerInput(layoutSnapshot.text, lineHeightPx) {
+        var previousClickUptimeMillis = Long.MIN_VALUE
+        var previousClickPosition = Offset.Unspecified
+        var previousClickCount = 0
+
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
+            val clickCount = resolveDesktopMultiClickCount(
+                clickUptimeMillis = down.uptimeMillis,
+                clickPosition = down.position,
+                previousClickUptimeMillis = previousClickUptimeMillis,
+                previousClickPosition = previousClickPosition,
+                previousClickCount = previousClickCount,
+                multiClickTimeoutMillis = viewConfiguration.doubleTapTimeoutMillis,
+                multiClickSlopPx = viewConfiguration.touchSlop,
+            )
             requestContentFocus()
             requestImeFocus()
             onInterruptInputAnchor()
@@ -43,25 +58,45 @@ internal fun Modifier.codeEditorDesktopPointerInput(
             onFieldValueChange(
                 TextFieldValue(
                     text = layoutSnapshot.text,
-                    selection = TextRange(anchorOffset),
+                    selection = resolveDesktopClickSelection(
+                        layoutSnapshot = layoutSnapshot,
+                        clickCount = clickCount,
+                        anchorOffset = anchorOffset,
+                    ),
                 )
             )
 
-            drag(down.id) { change ->
-                val targetOffset = resolveEditorTextOffset(
-                    layoutSnapshot = layoutSnapshot,
-                    lineLayoutCache = lineLayoutCache,
-                    lineHeightPx = lineHeightPx,
-                    contentStartPaddingPx = contentStartPaddingPx,
-                    position = change.position,
-                )
-                onFieldValueChange(
-                    TextFieldValue(
-                        text = layoutSnapshot.text,
-                        selection = TextRange(anchorOffset, targetOffset),
+            var dragged = false
+            if (clickCount == 1) {
+                drag(down.id) { change ->
+                    dragged = true
+                    val targetOffset = resolveEditorTextOffset(
+                        layoutSnapshot = layoutSnapshot,
+                        lineLayoutCache = lineLayoutCache,
+                        lineHeightPx = lineHeightPx,
+                        contentStartPaddingPx = contentStartPaddingPx,
+                        position = change.position,
                     )
-                )
-                change.consume()
+                    onFieldValueChange(
+                        TextFieldValue(
+                            text = layoutSnapshot.text,
+                            selection = TextRange(anchorOffset, targetOffset),
+                        )
+                    )
+                    change.consume()
+                }
+            } else {
+                waitForUpOrCancellation()
+            }
+
+            if (dragged) {
+                previousClickUptimeMillis = Long.MIN_VALUE
+                previousClickPosition = Offset.Unspecified
+                previousClickCount = 0
+            } else {
+                previousClickUptimeMillis = down.uptimeMillis
+                previousClickPosition = down.position
+                previousClickCount = clickCount
             }
         }
     }
@@ -140,7 +175,7 @@ internal fun Modifier.codeEditorTouchPointerInput(
                     contentStartPaddingPx = contentStartPaddingPx,
                     position = longPress.position,
                 )
-                val initialSelection = resolveLongPressSelectionRange(
+                val initialSelection = resolveSelectionWordRange(
                     text = layoutSnapshot.text,
                     rawOffset = initialOffset,
                 )
@@ -263,7 +298,7 @@ internal fun resolveEditorTextOffset(
     return layoutSnapshot.positionToOffset(lineIndex, lineOffset)
 }
 
-private fun resolveLongPressSelectionRange(
+internal fun resolveSelectionWordRange(
     text: String,
     rawOffset: Int,
 ): TextRange {
@@ -303,6 +338,72 @@ private fun resolveLongPressSelectionRange(
     }
 
     return TextRange(start, end)
+}
+
+internal fun resolveSelectionLineRange(
+    layoutSnapshot: CodeLayoutSnapshot,
+    rawOffset: Int,
+): TextRange {
+    if (layoutSnapshot.text.isEmpty()) return TextRange.Zero
+
+    val position = layoutSnapshot.offsetToPosition(rawOffset)
+    val lineIndex = position.lineIndex
+    val start = layoutSnapshot.positionToOffset(lineIndex, 0)
+    val end = if (lineIndex < layoutSnapshot.lineCount - 1) {
+        layoutSnapshot.lineAt(lineIndex + 1).startOffset
+    } else {
+        layoutSnapshot.positionToOffset(lineIndex, layoutSnapshot.lineLength(lineIndex))
+    }
+
+    return TextRange(start, end)
+}
+
+internal fun resolveDesktopClickSelection(
+    layoutSnapshot: CodeLayoutSnapshot,
+    clickCount: Int,
+    anchorOffset: Int,
+): TextRange {
+    return when (clickCount) {
+        2 -> resolveSelectionWordRange(
+            text = layoutSnapshot.text,
+            rawOffset = anchorOffset,
+        )
+
+        3 -> resolveSelectionLineRange(
+            layoutSnapshot = layoutSnapshot,
+            rawOffset = anchorOffset,
+        )
+
+        else -> TextRange(anchorOffset)
+    }
+}
+
+internal fun resolveDesktopMultiClickCount(
+    clickUptimeMillis: Long,
+    clickPosition: Offset,
+    previousClickUptimeMillis: Long,
+    previousClickPosition: Offset,
+    previousClickCount: Int,
+    multiClickTimeoutMillis: Long,
+    multiClickSlopPx: Float,
+): Int {
+    if (previousClickUptimeMillis == Long.MIN_VALUE || previousClickPosition == Offset.Unspecified) {
+        return 1
+    }
+
+    val elapsedMillis = clickUptimeMillis - previousClickUptimeMillis
+    if (elapsedMillis < 0L || elapsedMillis > multiClickTimeoutMillis) {
+        return 1
+    }
+
+    val maxDistanceSquared = multiClickSlopPx.pow(2)
+    val distanceSquared = (clickPosition.x - previousClickPosition.x).pow(2) +
+        (clickPosition.y - previousClickPosition.y).pow(2)
+    if (distanceSquared > maxDistanceSquared) {
+        return 1
+    }
+
+    return if (previousClickCount in 1..2) previousClickCount + 1 else 1
 }
 
 private fun Char.isSelectionWordChar(): Boolean {
