@@ -22,11 +22,20 @@ internal class DefaultLanguageSessionHost : LanguageSessionHost {
         }
     }
 
+    override fun invalidateSession(documentId: DocumentId) {
+        closeSession(documentId)
+    }
+
     override fun releaseSession(documentId: DocumentId) {
-        sessions.remove(documentId)
+        invalidateSession(documentId)
     }
 
     override fun releaseAll() {
+        sessions.keys.toList().forEach(::closeSession)
         sessions.clear()
+    }
+
+    private fun closeSession(documentId: DocumentId) {
+        sessions.remove(documentId)?.close()
     }
 }

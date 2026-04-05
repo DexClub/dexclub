@@ -20,6 +20,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class DefaultCodeSurfaceControllerTest {
@@ -67,29 +68,27 @@ class DefaultCodeSurfaceControllerTest {
     }
 
     @Test
-    fun refreshFallsBackToPlainTextWhenHighlightFailsAfterPreviousSuccess() = runBlocking {
+    fun refreshKeepsPreviousTokensAndInvalidatesSessionWhenHighlightFailsAfterPreviousSuccess() = runBlocking {
         val document = CodeDocument.create(
             languageId = CodeLanguageId("java"),
             initialText = "static",
         )
-        val session = FakeLanguageSession(
-            highlightTokens = { snapshot ->
-                when (snapshot.text) {
-                    "static" -> listOf(
-                        CodeTokenSpan(
-                            range = TextOffsetRange(0, snapshot.text.length),
-                            kind = CodeTokenKind.Keyword,
-                        )
+        val unstableSession = FakeLanguageSession(
+            highlightTokens = failAfterSuccessfulHighlights(
+                successfulCalls = 2,
+            ) { snapshot ->
+                listOf(
+                    CodeTokenSpan(
+                        range = TextOffsetRange(0, snapshot.text.length),
+                        kind = CodeTokenKind.Keyword,
                     )
-
-                    else -> error("highlight parse failed")
-                }
+                )
             },
         )
         val controller = DefaultCodeSurfaceController(
             document = document,
             addons = CodeAddons.build { },
-            sessionHost = FakeLanguageSessionHost(session),
+            sessionHost = SingleSessionHost(unstableSession),
         )
 
         try {
@@ -100,9 +99,66 @@ class DefaultCodeSurfaceControllerTest {
             controller.refresh()
 
             val token = controller.tokens.value.single()
-            assertEquals(CodeTokenKind.PlainText, token.kind)
+            assertEquals(CodeTokenKind.Keyword, token.kind)
             assertEquals(TextOffsetRange(0, 4), token.range)
             assertEquals(CodeSurfaceState.Failed, controller.state.value)
+            assertTrue(unstableSession.closed, "高亮失败后应丢弃并关闭坏 session")
+        } finally {
+            controller.close()
+        }
+    }
+
+    @Test
+    fun refreshRecreatesSessionAfterPreviousHighlightFailure() = runBlocking {
+        val document = CodeDocument.create(
+            languageId = CodeLanguageId("java"),
+            initialText = "static",
+        )
+        val unstableSession = FakeLanguageSession(
+            highlightTokens = failAfterSuccessfulHighlights(
+                successfulCalls = 2,
+            ) {
+                listOf(
+                    CodeTokenSpan(
+                        range = TextOffsetRange(0, 6),
+                        kind = CodeTokenKind.Keyword,
+                    )
+                )
+            },
+        )
+        val recoveredSession = FakeLanguageSession(
+            highlightTokens = { snapshot ->
+                listOf(
+                    CodeTokenSpan(
+                        range = TextOffsetRange(0, snapshot.text.length),
+                        kind = CodeTokenKind.VariableName,
+                    )
+                )
+            },
+        )
+        val sessionHost = SequencedLanguageSessionHost(
+            unstableSession,
+            recoveredSession,
+        )
+        val controller = DefaultCodeSurfaceController(
+            document = document,
+            addons = CodeAddons.build { },
+            sessionHost = sessionHost,
+        )
+
+        try {
+            controller.refresh()
+            document.update("abcd")
+            controller.refresh()
+            assertTrue(unstableSession.closed, "失败 session 应在本次刷新后关闭")
+
+            controller.refresh()
+
+            val token = controller.tokens.value.single()
+            assertEquals(CodeTokenKind.VariableName, token.kind)
+            assertEquals(TextOffsetRange(0, 4), token.range)
+            assertEquals(CodeSurfaceState.Ready, controller.state.value)
+            assertFalse(recoveredSession.closed, "恢复后的 session 不应被误关闭")
         } finally {
             controller.close()
         }
@@ -135,21 +191,89 @@ class DefaultCodeSurfaceControllerTest {
 
     private class FakeLanguageSessionHost(
         private val session: CodeLanguageSession,
-    ) : LanguageSessionHost {
+    ) : BaseFakeLanguageSessionHost() {
         override suspend fun getOrCreateSession(
             document: CodeDocument,
             addons: CodeAddons,
         ): CodeLanguageSession = session
+    }
 
-        override fun releaseSession(documentId: DocumentId) = Unit
+    private class SingleSessionHost(
+        private val session: FakeLanguageSession,
+    ) : BaseFakeLanguageSessionHost() {
+        private var activeSession: FakeLanguageSession? = session
+
+        override suspend fun getOrCreateSession(
+            document: CodeDocument,
+            addons: CodeAddons,
+        ): CodeLanguageSession {
+            return checkNotNull(activeSession) { "session 已失效" }
+        }
+
+        override fun invalidateSession(documentId: DocumentId) {
+            activeSession?.close()
+            activeSession = null
+        }
+    }
+
+    private class SequencedLanguageSessionHost(
+        vararg sessions: FakeLanguageSession,
+    ) : BaseFakeLanguageSessionHost() {
+        private val createdSessions = sessions.toMutableList()
+        private var activeSession: FakeLanguageSession? = null
+
+        override suspend fun getOrCreateSession(
+            document: CodeDocument,
+            addons: CodeAddons,
+        ): CodeLanguageSession {
+            return activeSession ?: createdSessions.removeAt(0).also { session ->
+                activeSession = session
+            }
+        }
+
+        override fun invalidateSession(documentId: DocumentId) {
+            activeSession?.close()
+            activeSession = null
+        }
+
+        override fun releaseAll() {
+            super.releaseAll()
+            createdSessions.forEach { session -> session.close() }
+            createdSessions.clear()
+        }
+    }
+
+    private abstract class BaseFakeLanguageSessionHost : LanguageSessionHost {
+        override fun invalidateSession(documentId: DocumentId) = Unit
+
+        override fun releaseSession(documentId: DocumentId) {
+            invalidateSession(documentId)
+        }
 
         override fun releaseAll() = Unit
+    }
+
+    private fun failAfterSuccessfulHighlights(
+        successfulCalls: Int,
+        producer: suspend (CodeDocumentSnapshot) -> List<CodeTokenSpan>,
+    ): suspend (CodeDocumentSnapshot) -> List<CodeTokenSpan> {
+        var callCount = 0
+        return { snapshot ->
+            callCount += 1
+            if (callCount > successfulCalls) {
+                error("highlight parse failed")
+            }
+            producer(snapshot)
+        }
     }
 
     private class FakeLanguageSession(
         private val highlightTokens: suspend (CodeDocumentSnapshot) -> List<CodeTokenSpan>,
         private val annotations: suspend (CodeDocumentSnapshot) -> List<CodeAnnotation> = { emptyList() },
     ) : CodeLanguageSession {
+        var closed: Boolean = false
+            private set
+
         override suspend fun highlightTokens(snapshot: CodeDocumentSnapshot): List<CodeTokenSpan> {
             return highlightTokens.invoke(snapshot)
         }
@@ -158,7 +282,9 @@ class DefaultCodeSurfaceControllerTest {
             return annotations.invoke(snapshot)
         }
 
-        override fun close() = Unit
+        override fun close() {
+            closed = true
+        }
     }
 
     private class CountingLanguageSession : CodeLanguageSession {

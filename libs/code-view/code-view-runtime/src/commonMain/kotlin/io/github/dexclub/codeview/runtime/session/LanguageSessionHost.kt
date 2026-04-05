@@ -13,6 +13,8 @@ internal interface LanguageSessionHost {
         addons: CodeAddons,
     ): CodeLanguageSession?
 
+    fun invalidateSession(documentId: DocumentId)
+
     fun releaseSession(documentId: DocumentId)
 
     fun releaseAll()

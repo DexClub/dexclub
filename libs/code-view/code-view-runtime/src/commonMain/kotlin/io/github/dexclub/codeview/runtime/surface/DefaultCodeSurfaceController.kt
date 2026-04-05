@@ -4,9 +4,11 @@ import io.github.dexclub.codeview.core.annotation.CodeAnnotation
 import io.github.dexclub.codeview.core.api.InternalCodeViewApi
 import io.github.dexclub.codeview.core.diagnostic.CodeDiagnostic
 import io.github.dexclub.codeview.core.document.CodeDocument
+import io.github.dexclub.codeview.core.document.CodeDocumentSnapshot
 import io.github.dexclub.codeview.core.surface.CodeSurfaceState
 import io.github.dexclub.codeview.core.token.CodeTokenSpan
 import io.github.dexclub.codeview.language.addon.CodeAddons
+import io.github.dexclub.codeview.language.session.CodeLanguageSession
 import io.github.dexclub.codeview.runtime.degrade.DefaultSurfaceDegradePolicy
 import io.github.dexclub.codeview.runtime.degrade.DegradeDecision
 import io.github.dexclub.codeview.runtime.fallback.PlainTextFallback
@@ -56,85 +58,56 @@ internal class DefaultCodeSurfaceController(
     override suspend fun refresh() {
         refreshMutex.withLock {
             withContext(Dispatchers.Default) {
-                val snapshot = document.snapshots.value
-                val degradeDecision = degradePolicy.evaluate(snapshot)
-
-                when (degradeDecision) {
-                    is DegradeDecision.None -> processNormal()
-                    is DegradeDecision.LargeFile -> processWithWarning(degradeDecision)
+                when (val degradeDecision = degradePolicy.evaluate(document.snapshots.value)) {
+                    is DegradeDecision.None -> processWithSession()
+                    is DegradeDecision.LargeFile -> processWithSession(degradeDecision)
+                    is DegradeDecision.LongLines -> processWithSession(degradeDecision)
                     is DegradeDecision.OversizedFile -> processFallback(degradeDecision)
-                    is DegradeDecision.LongLines -> processWithWarning(degradeDecision)
                 }
             }
         }
     }
 
-    private suspend fun processNormal() {
+    private suspend fun processWithSession(
+        degradeDecision: DegradeDecision? = null,
+    ) {
         _state.value = CodeSurfaceState.Loading
         val session = sessionHost.getOrCreateSession(document, addons)
-
         if (session == null) {
-            processFallback(DegradeDecision.None)
+            processFallback(degradeDecision ?: DegradeDecision.None)
             return
         }
 
         val snapshot = document.snapshots.value
         val requestId = reconciler.nextSequence()
-
         val tokenResult = runCatching { session.highlightTokens(snapshot) }
         val annotationResult = runCatching { session.annotations(snapshot) }
         if (!reconciler.shouldAccept(document.documentId, snapshot.revision, requestId)) {
             return
         }
 
-        _tokens.value = tokenResult.getOrElse { error ->
-            emitDiagnostic(
-                level = CodeDiagnostic.Level.Error,
-                code = "HIGHLIGHT_FAILED",
-                message = "Highlight failed: ${error.message}",
-            )
-            PlainTextFallback.generateTokens(snapshot)
-        }
-        _annotations.value = annotationResult.getOrElse { error ->
-            emitDiagnostic(
-                level = CodeDiagnostic.Level.Warning,
-                code = "ANNOTATION_FAILED",
-                message = "Annotation build failed: ${error.message}",
-            )
-            emptyList()
-        }
+        applyResults(
+            snapshot = snapshot,
+            tokenResult = tokenResult,
+            annotationResult = annotationResult,
+        )
         _state.value = when {
+            degradeDecision != null -> CodeSurfaceState.Degraded
             tokenResult.isFailure -> CodeSurfaceState.Failed
             annotationResult.isFailure -> CodeSurfaceState.Degraded
             else -> CodeSurfaceState.Ready
         }
+        if (degradeDecision != null) {
+            emitDegradeWarning(degradeDecision)
+        }
     }
 
-    private suspend fun processWithWarning(decision: DegradeDecision) {
-        _state.value = CodeSurfaceState.Loading
-        val session = sessionHost.getOrCreateSession(document, addons)
-
-        if (session == null) {
-            processFallback(decision)
-            return
-        }
-
-        val snapshot = document.snapshots.value
-        val requestId = reconciler.nextSequence()
-        val tokenResult = runCatching { session.highlightTokens(snapshot) }
-        val annotationResult = runCatching { session.annotations(snapshot) }
-        if (!reconciler.shouldAccept(document.documentId, snapshot.revision, requestId)) {
-            return
-        }
-
-        _tokens.value = tokenResult.getOrElse { error ->
-            emitDiagnostic(
-                level = CodeDiagnostic.Level.Error,
-                code = "HIGHLIGHT_FAILED",
-                message = "Highlight failed: ${error.message}",
-            )
-            PlainTextFallback.generateTokens(snapshot)
-        }
+    private fun applyResults(
+        snapshot: CodeDocumentSnapshot,
+        tokenResult: Result<List<CodeTokenSpan>>,
+        annotationResult: Result<List<CodeAnnotation>>,
+    ) {
+        _tokens.value = tokenResult.resolveTokens(snapshot)
         _annotations.value = annotationResult.getOrElse { error ->
             emitDiagnostic(
                 level = CodeDiagnostic.Level.Warning,
@@ -143,8 +116,23 @@ internal class DefaultCodeSurfaceController(
             )
             emptyList()
         }
-        _state.value = CodeSurfaceState.Degraded
-        emitDegradeWarning(decision)
+    }
+
+    private fun Result<List<CodeTokenSpan>>.resolveTokens(
+        snapshot: CodeDocumentSnapshot,
+    ): List<CodeTokenSpan> {
+        val previousTokens = _tokens.value
+        return getOrElse { error ->
+            sessionHost.invalidateSession(document.documentId)
+            emitDiagnostic(
+                level = CodeDiagnostic.Level.Error,
+                code = "HIGHLIGHT_FAILED",
+                message = "Highlight failed: ${error.message}",
+            )
+            previousTokens.ifEmpty {
+                PlainTextFallback.generateTokens(snapshot)
+            }
+        }
     }
 
     private fun processFallback(decision: DegradeDecision) {
@@ -183,7 +171,7 @@ internal class DefaultCodeSurfaceController(
         )
     }
 
-    fun close() {
+    internal fun close() {
         scope.cancel()
         _diagnostics.close()
     }
