@@ -22,6 +22,7 @@ internal fun DrawScope.drawCodeViewerContent(
     layoutSnapshot: CodeLayoutSnapshot,
     lineLayoutCache: CodeLineTextLayoutCache,
     lineHeightPx: Float,
+    verticalScrollPx: Float,
     contentHeightPx: Float,
     contentTopPaddingPx: Float,
     baselinePx: Float,
@@ -41,7 +42,7 @@ internal fun DrawScope.drawCodeViewerContent(
 
     for (lineIndex in visibleLineRange) {
         val line = layoutSnapshot.lineAt(lineIndex)
-        val lineTop = lineIndex * lineHeightPx
+        val lineTop = lineIndex * lineHeightPx - verticalScrollPx
 
         drawSelectionRange(
             lineIndex = lineIndex,

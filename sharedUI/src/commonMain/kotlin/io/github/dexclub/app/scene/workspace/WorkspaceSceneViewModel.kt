@@ -1084,7 +1084,7 @@ class WorkspaceSceneViewModel internal constructor(
                     tabId = destination.tabId,
                     kind = kind,
                     cursorLine = location.line,
-                    cursorOffset = location.offset,
+                    cursorOffset = location.selection.endOffset,
                     selection = location.selection,
                 )
                 seedInPageSearchState(
@@ -1369,6 +1369,27 @@ class WorkspaceSceneViewModel internal constructor(
         state: EditorInPageSearchState,
     ) {
         editorStateRepository.updateInPageSearchState(tabId, kind, state)
+    }
+
+    fun requestInPageSearchForSelectedPane() {
+        val selectedTab = _openTabs.value.firstOrNull { tab ->
+            tab.tabId == _selectedTabId.value
+        } ?: return
+        val activeKind = selectedTab.activeKind
+        val currentState = editorStateRepository.getInPageSearchState(selectedTab.tabId, activeKind)
+        editorStateRepository.updateInPageSearchState(
+            tabId = selectedTab.tabId,
+            kind = activeKind,
+            state = currentState.copy(
+                isVisible = true,
+                source = if (currentState.queryText.isEmpty() && currentState.matchQuery.isEmpty()) {
+                    EditorInPageSearchSource.Manual
+                } else {
+                    currentState.source
+                },
+                requestFocusToken = currentState.requestFocusToken + 1,
+            ),
+        )
     }
 
     fun clearSearchHighlightsForTab(tabId: String) {

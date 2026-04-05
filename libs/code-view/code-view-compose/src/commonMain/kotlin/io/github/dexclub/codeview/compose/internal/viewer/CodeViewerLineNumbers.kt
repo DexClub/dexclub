@@ -52,6 +52,7 @@ internal fun DrawScope.drawCodeLineNumbers(
     lineLayoutCache: CodeLineTextLayoutCache,
     visibleLineRange: IntRange,
     lineHeightPx: Float,
+    verticalScrollPx: Float,
     baselinePx: Float,
     gutterWidthPx: Float,
     cursor: Cursor?,
@@ -87,7 +88,7 @@ internal fun DrawScope.drawCodeLineNumbers(
             text = lineNumberText,
             color = color,
         )
-        val lineTop = lineIndex * lineHeightPx
+        val lineTop = lineIndex * lineHeightPx - verticalScrollPx
         drawText(
             textLayoutResult = lineNumberLayout,
             topLeft = Offset(

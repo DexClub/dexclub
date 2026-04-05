@@ -1,5 +1,10 @@
 package io.github.dexclub.app.scene.workspace
 
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
 import io.github.dexclub.codeview.core.text.Cursor
 import io.github.dexclub.codeview.core.text.LineSelection
 
@@ -11,7 +16,7 @@ internal data class WorkspaceInPageSearchMatch(
     val cursor: Cursor
         get() = Cursor(
             line = line,
-            offset = startOffset,
+            offset = endOffset,
         )
 
     val selection: LineSelection
@@ -73,4 +78,11 @@ internal fun findInPageSearchMatchIndex(
     return matches.indexOfFirst { match ->
         match.selection == normalizedSelection
     }.takeIf { index -> index >= 0 }
+}
+
+internal fun isInPageSearchShortcut(
+    keyEvent: KeyEvent,
+): Boolean {
+    return keyEvent.key == Key.F &&
+            (keyEvent.isCtrlPressed || keyEvent.isMetaPressed)
 }

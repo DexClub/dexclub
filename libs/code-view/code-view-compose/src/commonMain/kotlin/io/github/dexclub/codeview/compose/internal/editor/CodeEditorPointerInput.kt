@@ -21,6 +21,7 @@ internal fun Modifier.codeEditorDesktopPointerInput(
     lineLayoutCache: CodeLineTextLayoutCache,
     lineHeightPx: Float,
     contentStartPaddingPx: Float,
+    scrollController: CodeViewerScrollController,
     onFieldValueChange: (TextFieldValue) -> Unit,
     requestContentFocus: () -> Unit,
     requestImeFocus: () -> Unit,
@@ -53,7 +54,10 @@ internal fun Modifier.codeEditorDesktopPointerInput(
                 lineLayoutCache = lineLayoutCache,
                 lineHeightPx = lineHeightPx,
                 contentStartPaddingPx = contentStartPaddingPx,
-                position = down.position,
+                position = resolveContentPositionFromViewportPosition(
+                    viewportPosition = down.position,
+                    scrollController = scrollController,
+                ),
             )
             onFieldValueChange(
                 TextFieldValue(
@@ -75,7 +79,10 @@ internal fun Modifier.codeEditorDesktopPointerInput(
                         lineLayoutCache = lineLayoutCache,
                         lineHeightPx = lineHeightPx,
                         contentStartPaddingPx = contentStartPaddingPx,
-                        position = change.position,
+                        position = resolveContentPositionFromViewportPosition(
+                            viewportPosition = change.position,
+                            scrollController = scrollController,
+                        ),
                     )
                     onFieldValueChange(
                         TextFieldValue(
@@ -131,7 +138,10 @@ internal fun Modifier.codeEditorTouchPointerInput(
                         lineLayoutCache = lineLayoutCache,
                         lineHeightPx = lineHeightPx,
                         contentStartPaddingPx = contentStartPaddingPx,
-                        position = position,
+                        position = resolveContentPositionFromViewportPosition(
+                            viewportPosition = position,
+                            scrollController = scrollController,
+                        ),
                     )
                     val tapSelectionAction = resolveSelectionTapAction(
                         selection = selection,
@@ -173,7 +183,10 @@ internal fun Modifier.codeEditorTouchPointerInput(
                     lineLayoutCache = lineLayoutCache,
                     lineHeightPx = lineHeightPx,
                     contentStartPaddingPx = contentStartPaddingPx,
-                    position = longPress.position,
+                    position = resolveContentPositionFromViewportPosition(
+                        viewportPosition = longPress.position,
+                        scrollController = scrollController,
+                    ),
                 )
                 val initialSelection = resolveSelectionWordRange(
                     text = layoutSnapshot.text,
@@ -182,8 +195,8 @@ internal fun Modifier.codeEditorTouchPointerInput(
                 var latestOffset = initialOffset
                 var latestSelection = initialSelection
                 var latestPosition = longPress.position
-                var latestViewportPosition = resolveViewportPositionFromContentPosition(
-                    contentPosition = longPress.position,
+                var latestViewportPosition = resolveViewportPositionFromContentViewportPosition(
+                    contentViewportPosition = longPress.position,
                     scrollController = scrollController,
                 )
 
@@ -201,8 +214,8 @@ internal fun Modifier.codeEditorTouchPointerInput(
 
                 drag(longPress.id) { change ->
                     latestPosition = change.position
-                    latestViewportPosition = resolveViewportPositionFromContentPosition(
-                        contentPosition = latestPosition,
+                    latestViewportPosition = resolveViewportPositionFromContentViewportPosition(
+                        contentViewportPosition = latestPosition,
                         scrollController = scrollController,
                     )
                     onLongPressSelectionGestureMove?.invoke(latestViewportPosition)
@@ -211,7 +224,10 @@ internal fun Modifier.codeEditorTouchPointerInput(
                         lineLayoutCache = lineLayoutCache,
                         lineHeightPx = lineHeightPx,
                         contentStartPaddingPx = contentStartPaddingPx,
-                        position = latestPosition,
+                        position = resolveContentPositionFromViewportPosition(
+                            viewportPosition = latestPosition,
+                            scrollController = scrollController,
+                        ),
                     )
                     latestSelection = resolveLongPressDragSelection(
                         initialSelection = initialSelection,
@@ -245,6 +261,26 @@ internal fun resolveViewportPositionFromContentPosition(
     return Offset(
         x = scrollController.contentLeftInsetPx + contentPosition.x - scrollController.horizontalScrollPx,
         y = contentPosition.y - scrollController.verticalScrollPx,
+    )
+}
+
+internal fun resolveViewportPositionFromContentViewportPosition(
+    contentViewportPosition: Offset,
+    scrollController: CodeViewerScrollController,
+): Offset {
+    return Offset(
+        x = scrollController.contentLeftInsetPx + contentViewportPosition.x,
+        y = contentViewportPosition.y,
+    )
+}
+
+internal fun resolveContentPositionFromViewportPosition(
+    viewportPosition: Offset,
+    scrollController: CodeViewerScrollController,
+): Offset {
+    return Offset(
+        x = viewportPosition.x + scrollController.horizontalScrollPx,
+        y = viewportPosition.y + scrollController.verticalScrollPx,
     )
 }
 

@@ -113,6 +113,7 @@ viewport 是显示范围与滚动恢复的真相源。
 
 - 首可见行
 - 横向滚动偏移
+- 纵向虚拟滚动偏移
 - 当前可见区范围
 
 ### 约束
@@ -120,6 +121,8 @@ viewport 是显示范围与滚动恢复的真相源。
 - `initialFirstVisibleLine` 与 `initialScrollOffsetX` 是初始输入，不是持续真相源
 - 真实滚动发生后，应以内部 viewport 状态和回调结果为准
 - reveal、滚动恢复、可见区裁剪都应围绕同一套 viewport 状态工作
+- 当前纵向滚动已经是虚拟滚动模型：真实布局高度固定在视口大小，文档总高度只作为逻辑值存在
+- 当前横向滚动仍可继续使用原生 `ScrollState`，但纵向不能再退回真实超高内容节点
 
 ## in-page search
 
@@ -163,6 +166,7 @@ viewport 是显示范围与滚动恢复的真相源。
 - Java 与 Smali 不能共享同一份页内搜索真相源
 - 编辑后命中重算属于上层搜索会话职责，不属于 `code-view` core 内部状态
 - `searchHighlight` 只是上层活动命中投影到 `code-view` 的单值输入
+- 活动命中的范围选区和 caret 当前仍由上层工作区同步驱动；`searchHighlight` 不单独拥有 reveal 或 cursor 语义
 
 ## selection
 
@@ -303,7 +307,7 @@ input anchor 是平台输入会话宿主的几何锚点。
 - `CodeRuntime / CodeSurfaceController`
   tokens / annotations 真相源
 - 内部 viewport 状态
-  可见区与滚动真相源
+  可见区与滚动真相源，其中纵向以虚拟滚动偏移为准
 - 工作区上层页内搜索会话
   `query / source / activeMatchIndex / visible` 真相源
 - 编辑态内部 `TextFieldValue`

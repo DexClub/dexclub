@@ -258,4 +258,46 @@ class CodeEditorPointerInputTest {
         assertTrue(deepOverflowDelta.y > 0f)
         assertTrue(longFrameDelta.x > deepOverflowDelta.x)
     }
+
+    @Test
+    fun resolveContentPositionFromViewportPosition_addsCurrentScrollOffsets() {
+        val scrollController = CodeViewerScrollController(
+            horizontalScrollPxProvider = { 24f },
+            verticalScrollPxProvider = { 80f },
+            viewportWidthPxProvider = { 100f },
+            viewportHeightPxProvider = { 80f },
+            contentLeftInsetPxProvider = { 48f },
+            contentStartPaddingPxProvider = { 4f },
+            scrollByHandler = { _, _ -> },
+        )
+
+        assertEquals(
+            Offset(36f, 96f),
+            resolveContentPositionFromViewportPosition(
+                viewportPosition = Offset(12f, 16f),
+                scrollController = scrollController,
+            ),
+        )
+    }
+
+    @Test
+    fun resolveViewportPositionFromContentViewportPosition_preservesViewportYAndAddsInset() {
+        val scrollController = CodeViewerScrollController(
+            horizontalScrollPxProvider = { 24f },
+            verticalScrollPxProvider = { 80f },
+            viewportWidthPxProvider = { 100f },
+            viewportHeightPxProvider = { 80f },
+            contentLeftInsetPxProvider = { 48f },
+            contentStartPaddingPxProvider = { 4f },
+            scrollByHandler = { _, _ -> },
+        )
+
+        assertEquals(
+            Offset(60f, 16f),
+            resolveViewportPositionFromContentViewportPosition(
+                contentViewportPosition = Offset(12f, 16f),
+                scrollController = scrollController,
+            ),
+        )
+    }
 }

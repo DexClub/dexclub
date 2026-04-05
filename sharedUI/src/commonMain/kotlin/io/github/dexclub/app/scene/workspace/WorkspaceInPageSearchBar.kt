@@ -11,7 +11,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -22,7 +25,9 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import io.github.shadcn.ui.compose.OutlineButton
 import io.github.shadcn.ui.compose.ShadcnTheme
@@ -43,14 +48,40 @@ internal fun WorkspaceInPageSearchBar(
     modifier: Modifier = Modifier,
 ) {
     val focusRequester = remember { FocusRequester() }
+    var textFieldValue by remember {
+        mutableStateOf(
+            TextFieldValue(
+                text = queryText,
+                selection = TextRange(queryText.length),
+            )
+        )
+    }
     val countText = when {
         queryText.isEmpty() -> ""
         matchCount == 0 -> "0 / 0"
         else -> "${activeMatchIndex + 1} / $matchCount"
     }
 
+    fun moveCaretToEnd() {
+        textFieldValue = textFieldValue.copy(
+            selection = TextRange(textFieldValue.text.length),
+            composition = null,
+        )
+    }
+
+    LaunchedEffect(queryText) {
+        if (textFieldValue.text == queryText) {
+            return@LaunchedEffect
+        }
+        textFieldValue = TextFieldValue(
+            text = queryText,
+            selection = TextRange(queryText.length),
+        )
+    }
+
     LaunchedEffect(requestFocusToken) {
         if (requestFocusToken > 0L) {
+            moveCaretToEnd()
             focusRequester.requestFocus()
         }
     }
@@ -63,8 +94,13 @@ internal fun WorkspaceInPageSearchBar(
             .padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
         TextField(
-            value = queryText,
-            onValueChange = onQueryChange,
+            value = textFieldValue,
+            onValueChange = { nextValue ->
+                textFieldValue = nextValue
+                if (nextValue.text != queryText) {
+                    onQueryChange(nextValue.text)
+                }
+            },
             placeholder = "页内搜索",
             singleLine = true,
             keyboardOptions = KeyboardOptions(

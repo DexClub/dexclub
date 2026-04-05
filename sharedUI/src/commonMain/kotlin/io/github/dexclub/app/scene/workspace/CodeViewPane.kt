@@ -16,11 +16,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.isMetaPressed
-import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import io.github.dexclub.app.model.OpenTabUiModel
@@ -46,6 +43,19 @@ import io.github.shadcn.ui.compose.ShadcnTheme
 private val WORKSPACE_CODE_GUTTER_OPTIONS: CodeGutterOptions = CodeGutterOptions()
 private val WORKSPACE_CODE_CONTENT_OPTIONS: CodeContentOptions = CodeContentOptions()
 private val WORKSPACE_CODE_DECORATION_OPTIONS: CodeDecorationOptions = CodeDecorationOptions()
+
+private data class PendingSelectionCursorSync(
+    val selection: LineSelection?,
+    val cursor: Cursor?,
+)
+
+private data class SearchRevealStateKey(
+    val matchQuery: String,
+    val activeMatchIndex: Int,
+    val cursorLine: Int,
+    val cursorOffset: Int,
+    val isVisible: Boolean,
+)
 
 @Composable
 internal fun CodeViewPane(
@@ -82,8 +92,12 @@ internal fun CodeViewPane(
     var menuExpanded by remember { mutableStateOf(false) }
     var menuPos by remember { mutableStateOf(Offset.Zero) }
     var menuNavigateContext by remember { mutableStateOf<NavigateRequestContext?>(null) }
+    var pendingSearchRevealTarget by remember(tab.tabId, kind) { mutableStateOf<CodeViewerCursorTarget?>(null) }
+    var searchRevealToken by remember(tab.tabId, kind) { mutableStateOf(0L) }
+    var lastAppliedSearchRevealKey by remember(tab.tabId, kind) { mutableStateOf<SearchRevealStateKey?>(null) }
+    var pendingSelectionCursorSync by remember(tab.tabId, kind) { mutableStateOf<PendingSelectionCursorSync?>(null) }
 
-    val cursorTarget = remember(navigationRevealTarget, editorState.cursorLine, editorState.cursorOffset) {
+    val navigationCursorTarget = remember(navigationRevealTarget, editorState.cursorLine, editorState.cursorOffset) {
         if (navigationRevealTarget == null) return@remember null
         if (navigationRevealTarget.tabId != tab.tabId) return@remember null
         if (navigationRevealTarget.kind != null && navigationRevealTarget.kind != kind) return@remember null
@@ -107,10 +121,12 @@ internal fun CodeViewPane(
     }
     var latestSelection by remember(tab.tabId, kind) { mutableStateOf(editorState.selection) }
     var latestCursor by remember(tab.tabId, kind) { mutableStateOf(externalCursor) }
-    val selectedText = remember(currentText, latestSelection) {
+    val effectiveSelection = pendingSelectionCursorSync?.selection ?: latestSelection
+    val effectiveCursor = pendingSelectionCursorSync?.cursor ?: latestCursor
+    val selectedText = remember(currentText, effectiveSelection) {
         extractSelectedText(
             text = currentText,
-            selection = latestSelection,
+            selection = effectiveSelection,
         )
     }
     val inPageSearchMatches = remember(currentText, inPageSearchState.matchQuery) {
@@ -139,12 +155,45 @@ internal fun CodeViewPane(
             editorState.searchHighlight
         }
     }
+    val effectiveCursorTarget = navigationCursorTarget ?: pendingSearchRevealTarget
 
-    LaunchedEffect(editorState.selection) {
-        latestSelection = editorState.selection
+    fun requestSearchReveal(
+        matchQuery: String,
+        activeMatchIndex: Int,
+        cursor: Cursor,
+        isVisible: Boolean,
+    ) {
+        val revealKey = SearchRevealStateKey(
+            matchQuery = matchQuery,
+            activeMatchIndex = activeMatchIndex,
+            cursorLine = cursor.line,
+            cursorOffset = cursor.offset,
+            isVisible = isVisible,
+        )
+        if (lastAppliedSearchRevealKey == revealKey) return
+        searchRevealToken += 1L
+        pendingSearchRevealTarget = CodeViewerCursorTarget(
+            line = cursor.line,
+            offset = cursor.offset,
+            token = searchRevealToken,
+        )
+        lastAppliedSearchRevealKey = revealKey
     }
 
-    LaunchedEffect(externalCursor) {
+    LaunchedEffect(editorState.selection, externalCursor) {
+        val pendingSync = pendingSelectionCursorSync
+        if (pendingSync != null) {
+            if (
+                editorState.selection == pendingSync.selection &&
+                externalCursor == pendingSync.cursor
+            ) {
+                latestSelection = editorState.selection
+                latestCursor = externalCursor
+                pendingSelectionCursorSync = null
+            }
+            return@LaunchedEffect
+        }
+        latestSelection = editorState.selection
         latestCursor = externalCursor
     }
 
@@ -158,10 +207,32 @@ internal fun CodeViewPane(
         }
     }
 
-    LaunchedEffect(isSelectedTab, navigationRevealTarget, cursorTarget) {
+    LaunchedEffect(
+        isSelectedTab,
+        inPageSearchState.matchQuery,
+        inPageSearchState.isVisible,
+        activeSearchMatchIndex,
+        activeSearchMatch?.cursor?.line,
+        activeSearchMatch?.cursor?.offset,
+    ) {
+        if (!isSelectedTab) return@LaunchedEffect
+        val match = activeSearchMatch ?: run {
+            lastAppliedSearchRevealKey = null
+            pendingSearchRevealTarget = null
+            return@LaunchedEffect
+        }
+        requestSearchReveal(
+            matchQuery = inPageSearchState.matchQuery,
+            activeMatchIndex = activeSearchMatchIndex,
+            cursor = match.cursor,
+            isVisible = inPageSearchState.isVisible,
+        )
+    }
+
+    LaunchedEffect(isSelectedTab, navigationRevealTarget, navigationCursorTarget) {
         if (!isSelectedTab) return@LaunchedEffect
         val target = navigationRevealTarget ?: return@LaunchedEffect
-        if (cursorTarget == null) return@LaunchedEffect
+        if (navigationCursorTarget == null) return@LaunchedEffect
 
         // 等当前组合把 reveal target 传给 CodeEditor 后再清空外层待消费状态，避免后续重组重复触发。
         withFrameNanos { }
@@ -182,6 +253,10 @@ internal fun CodeViewPane(
         selection: LineSelection?,
         nextCursor: Cursor?,
     ) {
+        pendingSelectionCursorSync = PendingSelectionCursorSync(
+            selection = selection,
+            cursor = nextCursor,
+        )
         callbacks.onUpdateCursorSelection(
             tab.tabId,
             kind,
@@ -191,23 +266,59 @@ internal fun CodeViewPane(
         )
     }
 
+    fun updateLocalCursorSelection(
+        selection: LineSelection?,
+        cursor: Cursor?,
+    ) {
+        latestSelection = selection
+        latestCursor = cursor
+    }
+
+    fun applySearchMatch(
+        match: WorkspaceInPageSearchMatch,
+        matchQuery: String,
+        matchIndex: Int,
+    ) {
+        updateLocalCursorSelection(
+            selection = match.selection,
+            cursor = match.cursor,
+        )
+        requestSearchReveal(
+            matchQuery = matchQuery,
+            activeMatchIndex = matchIndex,
+            cursor = match.cursor,
+            isVisible = true,
+        )
+        updateCursorSelection(
+            selection = latestSelection,
+            nextCursor = latestCursor,
+        )
+    }
+
+    fun clearSearchSelection() {
+        latestSelection = null
+        updateCursorSelection(
+            selection = null,
+            nextCursor = effectiveCursor,
+        )
+    }
+
     fun activateSearchMatch(
         index: Int,
     ) {
         if (inPageSearchMatches.isEmpty()) return
         val normalizedIndex = index.coerceIn(0, inPageSearchMatches.lastIndex)
         val match = inPageSearchMatches[normalizedIndex]
-        latestSelection = match.selection
-        latestCursor = match.cursor
         pushInPageSearchState(
             inPageSearchState.copy(
                 activeMatchIndex = normalizedIndex,
                 isVisible = true,
             ),
         )
-        updateCursorSelection(
-            selection = latestSelection,
-            nextCursor = latestCursor,
+        applySearchMatch(
+            match = match,
+            matchQuery = inPageSearchState.matchQuery,
+            matchIndex = normalizedIndex,
         )
     }
 
@@ -237,13 +348,13 @@ internal fun CodeViewPane(
             ),
         )
         if (matches.isNotEmpty()) {
-            val firstMatch = matches.first()
-            latestSelection = firstMatch.selection
-            latestCursor = firstMatch.cursor
-            updateCursorSelection(
-                selection = latestSelection,
-                nextCursor = latestCursor,
+            applySearchMatch(
+                match = matches.first(),
+                matchQuery = query,
+                matchIndex = 0,
             )
+        } else {
+            clearSearchSelection()
         }
     }
 
@@ -263,27 +374,27 @@ internal fun CodeViewPane(
     }
 
     fun closeSearchBar() {
+        pendingSearchRevealTarget = null
         pushInPageSearchState(
             inPageSearchState.copy(isVisible = false),
         )
     }
 
-    Box(
-        modifier = modifier.onPreviewKeyEvent { keyEvent ->
-            if (!isSelectedTab || keyEvent.type != KeyEventType.KeyDown) {
-                return@onPreviewKeyEvent false
-            }
+    fun handleSearchShortcut(
+        keyEvent: KeyEvent,
+    ): Boolean {
+        if (!isSelectedTab || keyEvent.type != KeyEventType.KeyDown) {
+            return false
+        }
+        if (isInPageSearchShortcut(keyEvent)) {
+            openSearchBar()
+            return true
+        }
+        return false
+    }
 
-            if (
-                keyEvent.key == Key.F &&
-                (keyEvent.isCtrlPressed || keyEvent.isMetaPressed)
-            ) {
-                openSearchBar()
-                true
-            } else {
-                false
-            }
-        },
+    Box(
+        modifier = modifier.onPreviewKeyEvent(::handleSearchShortcut),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             if (inPageSearchState.isVisible) {
@@ -308,14 +419,15 @@ internal fun CodeViewPane(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(paddingValues),
+                    .padding(paddingValues)
+                    .onPreviewKeyEvent(::handleSearchShortcut),
                 initialFirstVisibleLine = editorState.scrollOffsetY,
                 initialScrollOffsetX = editorState.scrollOffsetX,
                 scrollPastEnd = paneState.scrollPastEnd,
-                selection = latestSelection,
-                cursor = latestCursor,
+                selection = effectiveSelection,
+                cursor = effectiveCursor,
                 searchHighlight = searchHighlight,
-                cursorTarget = cursorTarget,
+                cursorTarget = effectiveCursorTarget,
                 interactionOptions = CodeViewerInteractionOptions(
                     annotationTag = NODE_ANNOTATION_TAG,
                 ),

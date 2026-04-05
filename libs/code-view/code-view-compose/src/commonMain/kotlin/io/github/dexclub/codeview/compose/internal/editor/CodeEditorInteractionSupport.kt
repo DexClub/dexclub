@@ -81,6 +81,7 @@ internal fun Modifier.codeEditorInteractionModifier(
             lineLayoutCache = lineLayoutCache,
             lineHeightPx = lineHeightPx,
             contentStartPaddingPx = contentStartPaddingPx,
+            scrollController = scrollController,
             onFieldValueChange = onFieldValueChange,
             requestContentFocus = {},
             requestImeFocus = onRequestImeFocus,

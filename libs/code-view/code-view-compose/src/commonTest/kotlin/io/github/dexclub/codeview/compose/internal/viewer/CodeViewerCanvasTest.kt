@@ -6,35 +6,6 @@ import kotlin.test.assertTrue
 
 class CodeViewerCanvasTest {
     @Test
-    fun resolveScrollPastEndReservedHeightPx_returnsZeroWhenDisabled() {
-        assertEquals(
-            expected = 0f,
-            actual = resolveScrollPastEndReservedHeightPx(
-                scrollPastEnd = 0,
-                lineHeightPx = 20f,
-            ),
-        )
-        assertEquals(
-            expected = 0f,
-            actual = resolveScrollPastEndReservedHeightPx(
-                scrollPastEnd = -3,
-                lineHeightPx = 20f,
-            ),
-        )
-    }
-
-    @Test
-    fun resolveScrollPastEndReservedHeightPx_scalesWithLineHeight() {
-        assertEquals(
-            expected = 100f,
-            actual = resolveScrollPastEndReservedHeightPx(
-                scrollPastEnd = 5,
-                lineHeightPx = 20f,
-            ),
-        )
-    }
-
-    @Test
     fun resolveViewportRevealBottomReservePx_growsWithViewportShrinkUntilOneLine() {
         assertEquals(
             expected = 0f,
