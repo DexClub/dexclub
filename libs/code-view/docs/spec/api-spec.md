@@ -167,13 +167,19 @@
 - `cursor`
   当前 caret 投影
 - `searchHighlight`
-  搜索命中范围高亮
+  当前活动搜索命中范围高亮投影
 - `cursorTarget`
   一次程序化 reveal 请求
 - `textStyle`
   Canvas 文本绘制与测量基准样式
 - gutter / content / decoration options
   只读和编辑渲染的结构性配置
+
+补充说明：
+
+- 当前完整页内搜索会话并不是 `CodeEditor` 的公开输入模型
+- 上层若需要“搜索框是否显示、查询词、命中计数、上一项 / 下一项”，应在业务层自行维护搜索会话
+- 当前 `searchHighlight` 只负责把“当前活动命中”投影给 `code-view`
 
 ## 回调语义
 

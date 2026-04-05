@@ -177,6 +177,7 @@
 - 在同一标签页内切换 Java / Smali 或 single / mixed 视图，确认 active pane、显示内容与光标状态同步正常
 - 关闭并重新打开同一标签页，确认纵向滚动、横向滚动与 caret 恢复正常
 - 通过搜索结果定位文本，确认 selection、search highlight 与 reveal 同时生效
+- 打开页内搜索框后输入查询词，确认命中计数、`Enter / Shift+Enter` 导航与 `Esc` 关闭符合预期
 - 通过 annotation 或上下文跳转定义，确认目标标签页、目标 pane 和 `cursorTarget` reveal 正常
 - 在长行场景下进行横向滚动后，再次验证 annotation 命中、右键菜单位置和继续输入体感
 - 在编辑态进行连续输入、删除、方向键移动、选区替换和多行粘贴，确认工作区外层状态保存没有丢失

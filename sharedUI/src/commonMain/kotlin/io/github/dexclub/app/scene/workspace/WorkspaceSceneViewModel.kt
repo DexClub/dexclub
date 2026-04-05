@@ -13,6 +13,8 @@ import io.github.dexclub.compat.directoriesCompat
 import io.github.dexclub.core.DexEngine
 import io.github.dexclub.core.editor.CodeContentRuntime
 import io.github.dexclub.core.editor.CodeContentService
+import io.github.dexclub.core.editor.EditorInPageSearchSource
+import io.github.dexclub.core.editor.EditorInPageSearchState
 import io.github.dexclub.core.editor.EditorStateRepository
 import io.github.dexclub.core.editor.EditorSessionSidePanelSnapshot
 import io.github.dexclub.core.editor.EditorSessionRepository
@@ -174,7 +176,8 @@ class WorkspaceSceneViewModel internal constructor(
         val paneContentState = combine(
             codeContents,
             editorStateRepository.searchHighlightRevision,
-        ) { codeContents, _ ->
+            editorStateRepository.inPageSearchRevision,
+        ) { codeContents, _, _ ->
             codeContents
         }
 
@@ -776,6 +779,83 @@ class WorkspaceSceneViewModel internal constructor(
         )
     }
 
+    fun onOpenClassSearchResult(result: WorkspaceClassSearchResult) {
+        launchWarnCancelableLoadingTask(
+            initialMessage = "正在打开类搜索结果...",
+            failureText = "类搜索结果打开失败: class=${result.className}",
+            loadingFailurePrefix = "打开失败",
+        ) {
+            val destination = withContext(Dispatchers.IO) {
+                navigationService.prepareSearchDestination(
+                    className = result.className,
+                    preferredKind = OPEN_TAB_KIND_SMALI,
+                    exportCodePathForClass = ::exportCodePathForClass,
+                )
+            } ?: throw IllegalStateException("无法打开目标类：${result.className}")
+
+            val destinationTab = loadPreparedDestination(destination)
+                ?: throw IllegalStateException("目标标签页状态未同步")
+            val targetKinds = destinationTab.resolveNavigationTargetKinds(destination.kind)
+            val activeSearchKinds = mutableSetOf<String>()
+
+            for (kind in targetKinds) {
+                val lines = loadedCodeLines(
+                    tabId = destination.tabId,
+                    kind = kind,
+                )
+                if (lines.isEmpty()) {
+                    continue
+                }
+
+                val query = resolveDexKitClassSearchQuery(
+                    tab = destinationTab,
+                    result = result,
+                    kind = kind,
+                )
+                val matches = resolveInPageSearchMatches(
+                    lines = lines,
+                    query = query,
+                )
+
+                seedInPageSearchState(
+                    tabId = destination.tabId,
+                    kind = kind,
+                    queryText = query,
+                    matchQuery = query,
+                    source = EditorInPageSearchSource.DexKitClass,
+                    activeMatchIndex = 0,
+                    requestFocus = kind == destination.kind,
+                )
+                if (matches.isNotEmpty()) {
+                    val activeMatch = matches.first()
+                    updateCursorSelection(
+                        tabId = destination.tabId,
+                        kind = kind,
+                        cursorLine = activeMatch.cursor.line,
+                        cursorOffset = activeMatch.cursor.offset,
+                        selection = activeMatch.selection,
+                    )
+                }
+                activeSearchKinds += kind
+            }
+
+            focusPreparedDestination(
+                destination = destination,
+                destinationTab = destinationTab,
+                revealPlan = destinationTab.resolveNavigationRevealPlan(
+                    preferredKind = if (destination.kind in activeSearchKinds) {
+                        destination.kind
+                    } else {
+                        activeSearchKinds.firstOrNull() ?: destination.kind
+                    },
+                    fallbackPaneIndex = destination.paneIndex,
+                    revealAllKindsInMixedMode = true,
+                ),
+                token = nextNavigationRequestId(),
+            )
+        }
+    }
+
     private fun openClassTab(
         className: String,
         classLoader: suspend () -> WorkspaceIndexedClassRecord,
@@ -991,6 +1071,14 @@ class WorkspaceSceneViewModel internal constructor(
                     methodDescriptor = result.methodDescriptor,
                     methodName = result.methodName,
                 ) ?: continue
+                val matches = resolveInPageSearchMatches(
+                    lines = activeLines,
+                    query = normalizedQuery,
+                )
+                val activeMatchIndex = findInPageSearchMatchIndex(
+                    matches = matches,
+                    selection = location.selection,
+                ) ?: 0
 
                 updateCursorSelection(
                     tabId = destination.tabId,
@@ -999,10 +1087,14 @@ class WorkspaceSceneViewModel internal constructor(
                     cursorOffset = location.offset,
                     selection = location.selection,
                 )
-                updateSearchHighlight(
+                seedInPageSearchState(
                     tabId = destination.tabId,
                     kind = kind,
-                    highlight = location.selection,
+                    queryText = normalizedQuery,
+                    matchQuery = normalizedQuery,
+                    source = EditorInPageSearchSource.DexKitString,
+                    activeMatchIndex = activeMatchIndex,
+                    requestFocus = kind == destination.kind,
                 )
                 resolvedKinds += kind
             }
@@ -1062,6 +1154,46 @@ class WorkspaceSceneViewModel internal constructor(
         return codeContents.value[buildEditorContentKey(tabId, kind)]
             ?.lines()
             .orEmpty()
+    }
+
+    private fun resolveDexKitClassSearchQuery(
+        tab: OpenTabUiModel,
+        result: WorkspaceClassSearchResult,
+        kind: String,
+    ): String {
+        return when (kind) {
+            OPEN_TAB_KIND_SMALI -> result.descriptor.ifBlank { result.className }
+            OPEN_TAB_KIND_JAVA -> tab.title.ifBlank { result.className.substringAfterLast('.') }
+            else -> result.className
+        }
+    }
+
+    private fun seedInPageSearchState(
+        tabId: String,
+        kind: String,
+        queryText: String,
+        matchQuery: String,
+        source: EditorInPageSearchSource,
+        activeMatchIndex: Int,
+        requestFocus: Boolean,
+    ) {
+        val currentState = editorStateRepository.getInPageSearchState(tabId, kind)
+        editorStateRepository.updateInPageSearchState(
+            tabId = tabId,
+            kind = kind,
+            state = currentState.copy(
+                queryText = queryText,
+                matchQuery = matchQuery,
+                source = source,
+                activeMatchIndex = activeMatchIndex,
+                isVisible = true,
+                requestFocusToken = if (requestFocus) {
+                    currentState.requestFocusToken + 1
+                } else {
+                    currentState.requestFocusToken
+                },
+            ),
+        )
     }
 
     private suspend fun loadPreparedDestination(
@@ -1229,6 +1361,14 @@ class WorkspaceSceneViewModel internal constructor(
         highlight: LineSelection?,
     ) {
         editorStateRepository.updateSearchHighlight(tabId, kind, highlight)
+    }
+
+    fun updateInPageSearchState(
+        tabId: String,
+        kind: String,
+        state: EditorInPageSearchState,
+    ) {
+        editorStateRepository.updateInPageSearchState(tabId, kind, state)
     }
 
     fun clearSearchHighlightsForTab(tabId: String) {

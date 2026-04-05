@@ -18,6 +18,7 @@ data class EditorContentStateSnapshot(
     val cursorOffset: Int = 0,
     val selection: LineSelection? = null,
     val searchHighlight: LineSelection? = null,
+    val inPageSearchState: EditorInPageSearchState = EditorInPageSearchState(),
 )
 
 class EditorStateRepository(
@@ -33,11 +34,14 @@ class EditorStateRepository(
     private val scrollStatesX = mutableMapOf<String, Int>()
     private val cursorStates = mutableMapOf<String, EditorCursorState>()
     private val searchHighlightStates = mutableMapOf<String, LineSelection?>()
+    private val inPageSearchStates = mutableMapOf<String, EditorInPageSearchState>()
     private val scrollSaveJobs = mutableMapOf<String, Job>()
     private val cursorSaveJobs = mutableMapOf<String, Job>()
     private val _searchHighlightRevision = MutableStateFlow(0L)
+    private val _inPageSearchRevision = MutableStateFlow(0L)
 
     val searchHighlightRevision: StateFlow<Long> = _searchHighlightRevision
+    val inPageSearchRevision: StateFlow<Long> = _inPageSearchRevision
 
     fun hydrateContents(
         tabId: String,
@@ -230,6 +234,29 @@ class EditorStateRepository(
         }
     }
 
+    fun updateInPageSearchState(
+        tabId: String,
+        kind: String,
+        state: EditorInPageSearchState,
+    ) {
+        synchronized(stateLock) {
+            val key = buildEditorContentKey(tabId, kind)
+            if (inPageSearchStates[key] == state) return
+            inPageSearchStates[key] = state
+            _inPageSearchRevision.value += 1
+        }
+    }
+
+    fun getInPageSearchState(
+        tabId: String,
+        kind: String,
+        fallback: EditorInPageSearchState = EditorInPageSearchState(),
+    ): EditorInPageSearchState {
+        synchronized(stateLock) {
+            return inPageSearchStates[buildEditorContentKey(tabId, kind)] ?: fallback
+        }
+    }
+
     fun getContentStateSnapshot(
         tabId: String,
         kind: String,
@@ -247,6 +274,7 @@ class EditorStateRepository(
                     ?: 0,
                 selection = cursorState?.selection ?: fallbackContent?.selection,
                 searchHighlight = searchHighlightStates[key],
+                inPageSearchState = inPageSearchStates[key] ?: EditorInPageSearchState(),
             )
         }
     }
@@ -258,6 +286,16 @@ class EditorStateRepository(
             if (keys.isEmpty()) return
             keys.forEach(searchHighlightStates::remove)
             _searchHighlightRevision.value += 1
+        }
+    }
+
+    fun clearInPageSearchStatesForTab(tabId: String) {
+        synchronized(stateLock) {
+            val keys = inPageSearchStates.keys
+                .filter { key -> key.startsWith("$tabId#") }
+            if (keys.isEmpty()) return
+            keys.forEach(inPageSearchStates::remove)
+            _inPageSearchRevision.value += 1
         }
     }
 
@@ -274,8 +312,16 @@ class EditorStateRepository(
                 searchHighlightStates.remove(key)
                 removedSearchHighlights = true
             }
+            var removedInPageSearchStates = false
+            inPageSearchStates.keys.filter { key -> isStateKeyForTabs(key, tabIds) }.forEach { key ->
+                inPageSearchStates.remove(key)
+                removedInPageSearchStates = true
+            }
             if (removedSearchHighlights) {
                 _searchHighlightRevision.value += 1
+            }
+            if (removedInPageSearchStates) {
+                _inPageSearchRevision.value += 1
             }
             scrollSaveJobs.keys.filter { key -> isStateKeyForTabs(key, tabIds) }.forEach { key ->
                 scrollSaveJobs.remove(key)?.let(jobs::add)

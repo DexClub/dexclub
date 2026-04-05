@@ -25,6 +25,7 @@
 - selection
 - caret
 - viewport
+- in-page search
 - composing
 - input anchor
 - annotations
@@ -119,6 +120,49 @@ viewport 是显示范围与滚动恢复的真相源。
 - `initialFirstVisibleLine` 与 `initialScrollOffsetX` 是初始输入，不是持续真相源
 - 真实滚动发生后，应以内部 viewport 状态和回调结果为准
 - reveal、滚动恢复、可见区裁剪都应围绕同一套 viewport 状态工作
+
+## in-page search
+
+### 角色
+
+页内搜索当前分成两层状态：
+
+- 工作区上层搜索会话状态
+- `CodeViewer / CodeEditor` 的 `searchHighlight` 输入投影
+
+当前真相源不在 `code-view` 内部，而在工作区上层按 `tabId#kind` 维护。
+
+### 当前上层会话状态
+
+当前工作区页内搜索会话至少需要稳定表达：
+
+- `queryText`
+- `matchQuery`
+- `source`
+- `activeMatchIndex`
+- `isVisible`
+
+这些状态当前属于代码页工作区集成层，而不是 `CodeDocument` 或 `CodeEditor` 内部真相源。
+
+### `searchHighlight`
+
+`searchHighlight` 当前只表达：
+
+- 当前活动命中的范围投影
+
+它不表达：
+
+- 全部命中列表
+- 搜索框是否可见
+- 命中来源
+- 当前命中索引以外的会话语义
+
+### 当前约束
+
+- mixed 模式下搜索会话必须按 `tabId#kind` 分离维护
+- Java 与 Smali 不能共享同一份页内搜索真相源
+- 编辑后命中重算属于上层搜索会话职责，不属于 `code-view` core 内部状态
+- `searchHighlight` 只是上层活动命中投影到 `code-view` 的单值输入
 
 ## selection
 
@@ -260,6 +304,8 @@ input anchor 是平台输入会话宿主的几何锚点。
   tokens / annotations 真相源
 - 内部 viewport 状态
   可见区与滚动真相源
+- 工作区上层页内搜索会话
+  `query / source / activeMatchIndex / visible` 真相源
 - 编辑态内部 `TextFieldValue`
   当前编辑中文本、selection 与 composing 的直接真相源
 - `CodeSelection` 映射
@@ -268,6 +314,8 @@ input anchor 是平台输入会话宿主的几何锚点。
   范围投影视图
 - `Cursor`
   caret 投影视图
+- `searchHighlight`
+  当前活动搜索命中的范围投影视图
 
 ## 当前已知限制
 

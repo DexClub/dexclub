@@ -36,6 +36,7 @@
 
 - [design/layout-viewport.md](design/layout-viewport.md)
 - [design/viewer-rendering.md](design/viewer-rendering.md)
+- [design/in-page-search.md](design/in-page-search.md)
 - [design/selection-caret.md](design/selection-caret.md)
 - [design/editor-input-ime.md](design/editor-input-ime.md)
 - [design/context-actions.md](design/context-actions.md)
@@ -63,6 +64,12 @@
 - 设计与进度分离，不再在同一篇文档中混写
 - 一份文档只回答一类问题
 - 新增主题时优先判断应归入现有哪一册，而不是直接新增根目录文档
+- 每次新的 `code-view` 会话，第一步先查看 [status.md](status.md)；如存在进行中主题或可能中断的迹象，必要时同步检查当前工作区
+- 每次会话结束前都应回看 [status.md](status.md) 并更新当前状态，避免留下未记录的半完成状态
+- 任何主题发生状态扭转时，都必须立即更新 [status.md](status.md)，不能只在对话或提交信息里说明
+- 将主题标记为 `已完成` 前，应确认当前阶段目标、对应文档更新和必要验证都已落地
+- 将主题标记为 `阻塞` 时，应同步记录阻塞原因、当前停点和解除条件
+- 每次涉及实现、修复或回归的会话结束前，都应回写本次验证情况
 - 状态变化优先更新 [status.md](status.md)
 - 设计决议变化优先更新对应 `design/` 文档
 - 行为契约变化优先更新 `spec/behavior-spec.md`

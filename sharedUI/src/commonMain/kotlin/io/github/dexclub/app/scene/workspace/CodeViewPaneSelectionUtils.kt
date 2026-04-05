@@ -70,7 +70,7 @@ internal fun clampSelection(
     )
 }
 
-private fun splitCodeViewLines(
+internal fun splitCodeViewLines(
     text: String,
 ): List<String> {
     if (text.isEmpty()) return listOf("")
