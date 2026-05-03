@@ -59,6 +59,22 @@ If `method_handle not found` or `class_handle not found`:
 - reacquire the object through `find_*` or `inspect_*`
 - do not invent or reconstruct handles manually
 
+If analysis is being resumed after:
+
+- restoring a chat
+- restarting Codex
+- restarting the dexclub MCP server
+
+then do not assume the previous `session_id` is still valid.
+
+First confirm runtime state through:
+
+- `get_target_session`
+- `list_target_sessions`
+- `diagnose_target_sessions`
+
+Only continue using previous handles when the session is confirmed to still exist. Otherwise, rebuild the session on the MCP path instead of drifting into `workdir` fallback for deep analysis.
+
 ## Entry Strategy
 
 In black-box analysis, use this default priority:
@@ -81,6 +97,23 @@ Do not simultaneously expand:
 - multiple `export_*`
 
 If the current entry path is weak, then backtrack and switch to the next path.
+
+If the current path has already accumulated `2~3` broad searches without producing stronger evidence, stop extending that same branch unless the next query clearly introduces:
+
+- a new string, resource, or manifest clue
+- a new caller / callee / annotation / field fact
+- a concrete hypothesis to validate
+- a materially smaller candidate set
+
+Do not keep broadening the same branch only by swapping near-synonym keywords, nearby class-name fragments, or vague method-name variations.
+
+After `2~3` consecutive narrowing steps inside the same branch, stop for an internal checkpoint before continuing. At that checkpoint, restate:
+
+- what the current branch already established
+- what is still unknown
+- why the next query is expected to add a new fact
+
+If that explanation cannot be made clearly, backtrack instead of continuing the branch.
 
 ## Parameter Discipline
 
@@ -124,7 +157,39 @@ Skill v1 default limits:
 - export no more than `1~2` methods in one round
 - export no more than `1` class in one round
 
+These are default budgets, not absolute bans.
+
 If there are still too many candidates, continue narrowing first.
+
+If you exceed the default export budget, have an explicit reason. Valid reasons include:
+
+- Java export is incomplete and smali evidence is required
+- the new export directly tests a key branch hypothesis
+- `inspect_*` only provides one-layer facts and cannot answer the question
+- the new export introduces a new evidence type rather than repeating the same kind of implementation
+
+When method exports in the same analysis round are about to move beyond the default budget, especially from the third method export onward, stop and reassess.
+
+At that checkpoint, first state:
+
+- the current working conclusion
+- what each exported object already proved
+- what exact uncertainty still remains
+
+Only continue exporting if the next export is tightly targeted at that remaining uncertainty.
+
+Do not keep exporting sibling methods or nearby helpers merely because they look related.
+
+When deciding between Java and smali:
+
+- prefer Java first for quick semantic understanding
+- switch to smali only when Java is incomplete, misleading, or insufficient for control-flow proof
+- do not export both Java and smali for the same method unless there is a concrete reason
+
+When several candidate methods already point to the same owner class:
+
+- prefer one class export over many more sibling method exports
+- but do not export the class unless class-level context is likely to answer the remaining question
 
 ## Error Recovery
 
