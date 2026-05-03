@@ -64,6 +64,37 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
+internal fun fakeWorkspaceContext(): WorkspaceContext =
+    WorkspaceContext(
+        workdir = "D:/tmp/workspace",
+        dexclubDir = "D:/tmp/workspace/.dexclub",
+        workspaceId = "ws-1",
+        activeTargetId = "target-1",
+        activeTarget = TargetHandle(
+            targetId = "target-1",
+            inputType = InputType.File,
+            inputPath = "sample.apk",
+        ),
+        snapshot = TargetSnapshotSummary(
+            kind = WorkspaceKind.Apk,
+            inventoryFingerprint = "inv-1",
+            contentFingerprint = "content-1",
+            capabilities = CapabilitySet(
+                inspect = true,
+                findClass = true,
+                findMethod = true,
+                exportSmali = true,
+            ),
+            inventoryCounts = InventoryCounts(
+                apkCount = 1,
+                dexCount = 2,
+                manifestCount = 1,
+                arscCount = 1,
+                binaryXmlCount = 3,
+            ),
+        ),
+    )
+
 class McpAppTest {
     @Test
     fun openTargetSessionDelegatesToWorkspaceInitializeAndCachesSession() {
@@ -996,39 +1027,9 @@ class McpAppTest {
         assertEquals("beta", result.items.single().name)
     }
 
-    private fun fakeWorkspaceContext(): WorkspaceContext =
-        WorkspaceContext(
-            workdir = "D:/tmp/workspace",
-            dexclubDir = "D:/tmp/workspace/.dexclub",
-            workspaceId = "ws-1",
-            activeTargetId = "target-1",
-            activeTarget = TargetHandle(
-                targetId = "target-1",
-                inputType = InputType.File,
-                inputPath = "sample.apk",
-            ),
-            snapshot = TargetSnapshotSummary(
-                kind = WorkspaceKind.Apk,
-                inventoryFingerprint = "inv-1",
-                contentFingerprint = "content-1",
-                capabilities = CapabilitySet(
-                    inspect = true,
-                    findClass = true,
-                    findMethod = true,
-                    exportSmali = true,
-                ),
-                inventoryCounts = InventoryCounts(
-                    apkCount = 1,
-                    dexCount = 2,
-                    manifestCount = 1,
-                    arscCount = 1,
-                    binaryXmlCount = 3,
-                ),
-            ),
-        )
 }
 
-private class FakeWorkspaceService(
+internal class FakeWorkspaceService(
     private val workspace: WorkspaceContext,
 ) : WorkspaceService {
     var initializedInput: String? = null
@@ -1075,7 +1076,7 @@ private class FakeWorkspaceService(
         )
 }
 
-private class FakeDexAnalysisService(
+internal class FakeDexAnalysisService(
     private val detail: MethodDetail = MethodDetail(
         method = MethodHit(
             className = "Lsample/Test;",
@@ -1174,7 +1175,7 @@ private class FakeDexAnalysisService(
     }
 }
 
-private class FakeResourceService : ResourceService {
+internal class FakeResourceService : ResourceService {
     var lastWorkspace: WorkspaceContext? = null
     var lastInspectManifestRequest: InspectManifestRequest? = null
     var lastResolveResourceRequest: ResolveResourceRequest? = null

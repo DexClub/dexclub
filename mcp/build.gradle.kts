@@ -24,6 +24,9 @@ dependencies {
 
     testImplementation(kotlin("test"))
     testImplementation(project(":dexkit"))
+    testImplementation(libs.ktor.client.content.negotiation)
+    testImplementation(libs.ktor.client.cio)
+    testImplementation(libs.ktor.serialization.kotlinx.json)
 }
 
 tasks.test {

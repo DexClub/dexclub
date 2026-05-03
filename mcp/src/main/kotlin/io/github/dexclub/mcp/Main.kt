@@ -7,6 +7,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.install
+import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
@@ -32,6 +33,15 @@ fun main() {
             "(stateless streamable HTTP, debugHttp=${config.debugHttp})",
     )
 
+    createHttpServer(config, app, server)
+        .start(wait = true)
+}
+
+internal fun createHttpServer(
+    config: HttpServerConfig,
+    app: McpApp,
+    server: io.modelcontextprotocol.kotlin.sdk.server.Server = app.createServer(),
+): EmbeddedServer<*, *> =
     embeddedServer(Netty, host = config.host, port = config.port) {
         if (config.debugHttp) {
             installHttpDebugLogging()
@@ -48,10 +58,9 @@ fun main() {
                 transport.handlePostRequest(session = null, call = CompatibleAcceptingCall(call))
             }
         }
-    }.start(wait = true)
-}
+    }
 
-private data class HttpServerConfig(
+internal data class HttpServerConfig(
     val host: String,
     val port: Int,
     val path: String,
