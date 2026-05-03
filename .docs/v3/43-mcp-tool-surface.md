@@ -368,6 +368,20 @@ P0 不建议一开始就暴露复杂 DexKit 风格查询对象。
 - `sourceEntry`
 - `methodHandle`
 
+补充约定：
+
+- P0 当前可先落最小短参数形态：
+  - `class_name_contains`
+  - `method_name_contains`
+  - `descriptor_contains`
+- 其中：
+  - `class_name_contains`
+  - `method_name_contains`
+  - 应优先下沉为底层查询条件
+- `descriptor_contains`
+  - 可以在 MCP 层作为附加过滤
+  - 不要求 P0 一开始就扩展 `core` 的查询对象模型
+
 ### `find_classes_using_strings`
 
 目标：

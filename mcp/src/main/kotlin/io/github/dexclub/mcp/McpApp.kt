@@ -269,6 +269,51 @@ internal class McpApp(
         }
 
         server.addTool(
+            name = "find_methods",
+            description = "按类名、方法名或 descriptor 片段定位方法候选。",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("session_id", buildJsonObject { put("type", "string") })
+                    put("class_name_contains", buildJsonObject { put("type", "string") })
+                    put("method_name_contains", buildJsonObject { put("type", "string") })
+                    put("descriptor_contains", buildJsonObject { put("type", "string") })
+                    put("offset", buildJsonObject { put("type", "integer") })
+                    put("limit", buildJsonObject { put("type", "integer") })
+                },
+                required = listOf("session_id"),
+            ),
+        ) { request ->
+            val session = resolveRequiredSession(request) ?: return@addTool missingSessionResult(request)
+            val classNameContains = request.optionalStringArgument("class_name_contains")
+            val methodNameContains = request.optionalStringArgument("method_name_contains")
+            val descriptorContains = request.optionalStringArgument("descriptor_contains")
+            val offset = request.intArgument("offset")
+            val limit = request.intArgument("limit")
+            val hits = try {
+                findMethods(
+                    session = session,
+                    classNameContains = classNameContains,
+                    methodNameContains = methodNameContains,
+                    descriptorContains = descriptorContains,
+                    offset = offset,
+                    limit = limit,
+                )
+            } catch (cause: IllegalArgumentException) {
+                return@addTool errorResult(cause.message.orEmpty())
+            }
+            CallToolResult(
+                content = listOf(
+                    TextContent(
+                        json.encodeToString(
+                            FindMethodsResult.serializer(),
+                            session.toFindMethodsResult(hits),
+                        ),
+                    ),
+                ),
+            )
+        }
+
+        server.addTool(
             name = "find_classes_using_strings",
             description = "使用字符串锚点定位类候选。",
             inputSchema = ToolSchema(
@@ -743,7 +788,7 @@ internal class McpApp(
             .asSequence()
             .filter { normalizedType == null || it.type == normalizedType }
             .toList()
-        return applyWindow(filtered, offset, limit)
+        return applyResourceEntryWindow(filtered, offset, limit)
     }
 
     internal fun findResourceValues(
@@ -766,7 +811,7 @@ internal class McpApp(
                 ignoreCase = ignoreCase,
             ),
         )
-        return applyWindow(hits, offset, limit)
+        return applyResourceValueWindow(hits, offset, limit)
     }
 
     internal fun exportClassSmaliText(
@@ -851,7 +896,7 @@ internal class McpApp(
             ),
         )
 
-        return applyWindow(
+        return applyClassWindow(
             items = combined,
             offset = offset,
             limit = limit,
@@ -908,8 +953,45 @@ internal class McpApp(
             ),
         )
 
-        return applyWindow(
+        return applyMethodWindow(
             items = combined,
+            offset = offset,
+            limit = limit,
+        )
+    }
+
+    internal fun findMethods(
+        session: TargetSession,
+        classNameContains: String? = null,
+        methodNameContains: String? = null,
+        descriptorContains: String? = null,
+        offset: Int? = null,
+        limit: Int? = null,
+    ): WindowedMethodHits {
+        val normalizedDescriptor = descriptorContains?.trim()?.ifEmpty { null }
+        val request = buildFindMethodsRequest(
+            classNameContains = classNameContains,
+            methodNameContains = methodNameContains,
+        )
+        val baseHits = services.dex.findMethods(
+            workspace = session.workspace,
+            request = request,
+        )
+        val filtered = if (normalizedDescriptor == null) {
+            baseHits
+        } else {
+            baseHits.filter { it.descriptor.contains(normalizedDescriptor, ignoreCase = false) }
+        }.sortedWith(
+            compareBy<MethodHit>(
+                { it.className },
+                { it.methodName },
+                { it.descriptor },
+                { it.sourcePath.orEmpty() },
+                { it.sourceEntry.orEmpty() },
+            ),
+        )
+        return applyMethodWindow(
+            items = filtered,
             offset = offset,
             limit = limit,
         )

@@ -2,6 +2,7 @@ package io.github.dexclub.mcp
 
 import io.github.dexclub.core.api.dex.ClassHit
 import io.github.dexclub.core.api.dex.FindClassesUsingStringsRequest
+import io.github.dexclub.core.api.dex.FindMethodsRequest
 import io.github.dexclub.core.api.dex.FindMethodsUsingStringsRequest
 import io.github.dexclub.core.api.dex.FieldHit
 import io.github.dexclub.core.api.dex.FieldUsageType
@@ -33,6 +34,9 @@ import io.github.dexclub.core.api.workspace.TargetSnapshotSummary
 import io.github.dexclub.core.api.workspace.WorkspaceContext
 import io.github.dexclub.dexkit.query.BatchFindClassUsingStrings
 import io.github.dexclub.dexkit.query.BatchFindMethodUsingStrings
+import io.github.dexclub.dexkit.query.ClassMatcher
+import io.github.dexclub.dexkit.query.FindMethod
+import io.github.dexclub.dexkit.query.MethodMatcher
 import io.github.dexclub.dexkit.query.StringMatchType
 import io.github.dexclub.dexkit.query.StringMatcher
 import kotlinx.serialization.Serializable
@@ -63,6 +67,9 @@ internal data class ManifestDecodeResult(
 internal data class FindClassesUsingStringsResult(
     val sessionId: String,
     val total: Int,
+    val offset: Int,
+    val limit: Int,
+    val hasMore: Boolean,
     val items: List<ClassHitView>,
 )
 
@@ -78,6 +85,19 @@ internal data class ExportTextResult(
 internal data class FindMethodsUsingStringsResult(
     val sessionId: String,
     val total: Int,
+    val offset: Int,
+    val limit: Int,
+    val hasMore: Boolean,
+    val items: List<MethodHitView>,
+)
+
+@Serializable
+internal data class FindMethodsResult(
+    val sessionId: String,
+    val total: Int,
+    val offset: Int,
+    val limit: Int,
+    val hasMore: Boolean,
     val items: List<MethodHitView>,
 )
 
@@ -91,6 +111,9 @@ internal data class ResolveResourceResult(
 internal data class ListResourcesResult(
     val sessionId: String,
     val total: Int,
+    val offset: Int,
+    val limit: Int,
+    val hasMore: Boolean,
     val items: List<ResourceEntryView>,
 )
 
@@ -98,28 +121,24 @@ internal data class ListResourcesResult(
 internal data class FindResourcesResult(
     val sessionId: String,
     val total: Int,
+    val offset: Int,
+    val limit: Int,
+    val hasMore: Boolean,
     val items: List<ResourceEntryValueHitView>,
 )
 
-internal data class WindowedClassHits(
+internal data class WindowedItems<T>(
     val total: Int,
-    val items: List<ClassHit>,
+    val offset: Int,
+    val limit: Int,
+    val hasMore: Boolean,
+    val items: List<T>,
 )
 
-internal data class WindowedMethodHits(
-    val total: Int,
-    val items: List<MethodHit>,
-)
-
-internal data class WindowedResourceEntries(
-    val total: Int,
-    val items: List<ResourceEntry>,
-)
-
-internal data class WindowedResourceValueHits(
-    val total: Int,
-    val items: List<ResourceEntryValueHit>,
-)
+internal typealias WindowedClassHits = WindowedItems<ClassHit>
+internal typealias WindowedMethodHits = WindowedItems<MethodHit>
+internal typealias WindowedResourceEntries = WindowedItems<ResourceEntry>
+internal typealias WindowedResourceValueHits = WindowedItems<ResourceEntryValueHit>
 
 @Serializable
 internal data class WorkspaceContextView(
@@ -424,6 +443,9 @@ internal fun TargetSession.toFindClassesUsingStringsResult(result: WindowedClass
     FindClassesUsingStringsResult(
         sessionId = sessionId,
         total = result.total,
+        offset = result.offset,
+        limit = result.limit,
+        hasMore = result.hasMore,
         items = result.items.map(ClassHit::toView),
     )
 
@@ -442,6 +464,19 @@ internal fun TargetSession.toFindMethodsUsingStringsResult(result: WindowedMetho
     FindMethodsUsingStringsResult(
         sessionId = sessionId,
         total = result.total,
+        offset = result.offset,
+        limit = result.limit,
+        hasMore = result.hasMore,
+        items = result.items.map(MethodHit::toView),
+    )
+
+internal fun TargetSession.toFindMethodsResult(result: WindowedMethodHits): FindMethodsResult =
+    FindMethodsResult(
+        sessionId = sessionId,
+        total = result.total,
+        offset = result.offset,
+        limit = result.limit,
+        hasMore = result.hasMore,
         items = result.items.map(MethodHit::toView),
     )
 
@@ -455,6 +490,9 @@ internal fun TargetSession.toListResourcesResult(result: WindowedResourceEntries
     ListResourcesResult(
         sessionId = sessionId,
         total = result.total,
+        offset = result.offset,
+        limit = result.limit,
+        hasMore = result.hasMore,
         items = result.items.map(ResourceEntryView::from),
     )
 
@@ -462,6 +500,9 @@ internal fun TargetSession.toFindResourcesResult(result: WindowedResourceValueHi
     FindResourcesResult(
         sessionId = sessionId,
         total = result.total,
+        offset = result.offset,
+        limit = result.limit,
+        hasMore = result.hasMore,
         items = result.items.map(ResourceEntryValueHitView::from),
     )
 
@@ -659,6 +700,36 @@ internal fun buildFindMethodsUsingStringsRequest(
         window = PageWindow(),
     )
 
+internal fun buildFindMethodsRequest(
+    classNameContains: String? = null,
+    methodNameContains: String? = null,
+): FindMethodsRequest {
+    val normalizedClassName = classNameContains?.trim()?.ifEmpty { null }
+    val normalizedMethodName = methodNameContains?.trim()?.ifEmpty { null }
+    require(normalizedClassName != null || normalizedMethodName != null) {
+        "At least one of class_name_contains or method_name_contains is required"
+    }
+
+    val matcher = MethodMatcher().apply {
+        if (normalizedMethodName != null) {
+            name = containsMatcher(normalizedMethodName)
+        }
+        if (normalizedClassName != null) {
+            declaredClass = ClassMatcher(
+                className = containsMatcher(normalizedClassName),
+            )
+        }
+    }
+
+    return FindMethodsRequest(
+        queryText = Json.encodeToString(
+            FindMethod.serializer(),
+            FindMethod(matcher = matcher),
+        ),
+        window = PageWindow(),
+    )
+}
+
 internal fun buildFindClassesUsingStringsRequest(
     strings: List<String>,
     requireAll: Boolean,
@@ -727,28 +798,52 @@ private fun populateStringMatcherGroups(
 private fun containsMatcher(value: String): StringMatcher =
     StringMatcher(value = value, matchType = StringMatchType.Contains)
 
-internal fun applyWindow(items: List<ClassHit>, offset: Int? = null, limit: Int? = null): WindowedClassHits =
+internal fun applyClassWindow(items: List<ClassHit>, offset: Int? = null, limit: Int? = null): WindowedClassHits =
     applyWindowSlice(items, offset, limit) { total, slice ->
-        WindowedClassHits(total = total, items = slice)
+        WindowedItems(
+            total = total.total,
+            offset = total.offset,
+            limit = total.limit,
+            hasMore = total.hasMore,
+            items = slice,
+        )
     }
 
-internal fun applyWindow(items: List<MethodHit>, offset: Int? = null, limit: Int? = null): WindowedMethodHits =
+internal fun applyMethodWindow(items: List<MethodHit>, offset: Int? = null, limit: Int? = null): WindowedMethodHits =
     applyWindowSlice(items, offset, limit) { total, slice ->
-        WindowedMethodHits(total = total, items = slice)
+        WindowedItems(
+            total = total.total,
+            offset = total.offset,
+            limit = total.limit,
+            hasMore = total.hasMore,
+            items = slice,
+        )
     }
 
-internal fun applyWindow(items: List<ResourceEntry>, offset: Int? = null, limit: Int? = null): WindowedResourceEntries =
+internal fun applyResourceEntryWindow(items: List<ResourceEntry>, offset: Int? = null, limit: Int? = null): WindowedResourceEntries =
     applyWindowSlice(items, offset, limit) { total, slice ->
-        WindowedResourceEntries(total = total, items = slice)
+        WindowedItems(
+            total = total.total,
+            offset = total.offset,
+            limit = total.limit,
+            hasMore = total.hasMore,
+            items = slice,
+        )
     }
 
-internal fun applyWindow(
+internal fun applyResourceValueWindow(
     items: List<ResourceEntryValueHit>,
     offset: Int? = null,
     limit: Int? = null,
 ): WindowedResourceValueHits =
     applyWindowSlice(items, offset, limit) { total, slice ->
-        WindowedResourceValueHits(total = total, items = slice)
+        WindowedItems(
+            total = total.total,
+            offset = total.offset,
+            limit = total.limit,
+            hasMore = total.hasMore,
+            items = slice,
+        )
     }
 
 private fun ResourceResolution.toMcpValue(): String =
@@ -758,18 +853,43 @@ private fun ResourceResolution.toMcpValue(): String =
         ResourceResolution.Unresolved -> "unresolved"
     }
 
+private data class WindowSliceMeta(
+    val total: Int,
+    val offset: Int,
+    val limit: Int,
+    val hasMore: Boolean,
+)
+
 private fun <T, R> applyWindowSlice(
     items: List<T>,
     offset: Int?,
     limit: Int?,
-    builder: (Int, List<T>) -> R,
+    builder: (WindowSliceMeta, List<T>) -> R,
 ): R {
     val normalizedOffset = offset ?: 0
     require(normalizedOffset >= 0) { "offset must be non-negative" }
     require(limit == null || limit > 0) { "limit must be positive when specified" }
     if (normalizedOffset >= items.size) {
-        return builder(items.size, emptyList())
+        val effectiveLimit = limit ?: 0
+        return builder(
+            WindowSliceMeta(
+                total = items.size,
+                offset = normalizedOffset,
+                limit = effectiveLimit,
+                hasMore = false,
+            ),
+            emptyList(),
+        )
     }
     val toIndex = if (limit == null) items.size else minOf(items.size, normalizedOffset + limit)
-    return builder(items.size, items.subList(normalizedOffset, toIndex))
+    val slice = items.subList(normalizedOffset, toIndex)
+    return builder(
+        WindowSliceMeta(
+            total = items.size,
+            offset = normalizedOffset,
+            limit = limit ?: slice.size,
+            hasMore = toIndex < items.size,
+        ),
+        slice,
+    )
 }

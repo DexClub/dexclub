@@ -281,7 +281,81 @@ class McpAppTest {
         assertEquals(1, allQuery["all"]!!.jsonArray.size)
         assertEquals("must-have", allQuery["all"]!!.jsonArray[0].jsonObject["value"]!!.jsonPrimitive.content)
         assertEquals(1, hits.total)
+        assertEquals(1, hits.offset)
+        assertEquals(5, hits.limit)
+        assertEquals(false, hits.hasMore)
         assertTrue(hits.items.isEmpty())
+    }
+
+    @Test
+    fun findMethodsUsesSessionWorkspaceAndMapsShortInputs() {
+        val workspace = fakeWorkspaceContext()
+        val workspaceService = FakeWorkspaceService(workspace)
+        val dexService = FakeDexAnalysisService(
+            findMethodsResponse = listOf(
+                MethodHit(
+                    className = "fixture.samples.SampleSearchTarget",
+                    methodName = "exposeNeedle",
+                    descriptor = "Lfixture/samples/SampleSearchTarget;->exposeNeedle()Ljava/lang/String;",
+                    sourcePath = "fixture.dex",
+                    sourceEntry = null,
+                ),
+                MethodHit(
+                    className = "fixture.samples.SampleSearchTarget",
+                    methodName = "secondary",
+                    descriptor = "Lfixture/samples/SampleSearchTarget;->secondary()V",
+                    sourcePath = "fixture.dex",
+                    sourceEntry = null,
+                ),
+            ),
+        )
+        val app = McpApp(
+            services = Services(
+                workspace = workspaceService,
+                dex = dexService,
+                resource = FakeResourceService(),
+            ),
+            sessionStore = McpSessionStore(),
+        )
+        val session = app.openTargetSession("sample.apk")
+
+        val hits = app.findMethods(
+            session = session,
+            classNameContains = "SampleSearch",
+            methodNameContains = "expose",
+            descriptorContains = "Needle",
+            offset = 0,
+            limit = 10,
+        )
+
+        assertEquals(workspace, dexService.lastWorkspace)
+        val query = Json.parseToJsonElement(dexService.lastFindMethodsRequest!!.queryText).jsonObject
+        val matcher = query["matcher"]!!.jsonObject
+        assertEquals(
+            "SampleSearch",
+            matcher["declaredClass"]!!.jsonObject["className"]!!.jsonObject["value"]!!.jsonPrimitive.content,
+        )
+        assertEquals(
+            "expose",
+            matcher["name"]!!.jsonObject["value"]!!.jsonPrimitive.content,
+        )
+        assertEquals(1, hits.total)
+        assertEquals(0, hits.offset)
+        assertEquals(10, hits.limit)
+        assertEquals(false, hits.hasMore)
+        assertEquals("Lfixture/samples/SampleSearchTarget;->exposeNeedle()Ljava/lang/String;", hits.items.single().descriptor)
+    }
+
+    @Test
+    fun buildFindMethodsRequestRejectsEmptyFilters() {
+        val error = kotlin.test.assertFailsWith<IllegalArgumentException> {
+            buildFindMethodsRequest(
+                classNameContains = null,
+                methodNameContains = null,
+            )
+        }
+
+        assertEquals("At least one of class_name_contains or method_name_contains is required", error.message)
     }
 
     @Test
@@ -351,6 +425,9 @@ class McpAppTest {
         assertEquals(1, allQuery["all"]!!.jsonArray.size)
         assertEquals("must-have", allQuery["all"]!!.jsonArray[0].jsonObject["value"]!!.jsonPrimitive.content)
         assertEquals(1, hits.total)
+        assertEquals(1, hits.offset)
+        assertEquals(5, hits.limit)
+        assertEquals(false, hits.hasMore)
         assertTrue(hits.items.isEmpty())
     }
 
@@ -587,6 +664,9 @@ class McpAppTest {
 
         assertEquals(workspace, resourceService.lastWorkspace)
         assertEquals(2, result.total)
+        assertEquals(1, result.offset)
+        assertEquals(1, result.limit)
+        assertEquals(false, result.hasMore)
         assertEquals(1, result.items.size)
         assertEquals("beta", result.items.single().name)
     }
@@ -641,6 +721,9 @@ class McpAppTest {
         assertEquals(true, query["contains"]!!.jsonPrimitive.content.toBoolean())
         assertEquals(true, query["ignoreCase"]!!.jsonPrimitive.content.toBoolean())
         assertEquals(2, result.total)
+        assertEquals(1, result.offset)
+        assertEquals(1, result.limit)
+        assertEquals(false, result.hasMore)
         assertEquals(1, result.items.size)
         assertEquals("beta", result.items.single().name)
     }
@@ -728,11 +811,13 @@ private class FakeDexAnalysisService(
             descriptor = "Lsample/Test;->foo()V",
         ),
     ),
+    private val findMethodsResponse: List<MethodHit> = emptyList(),
     private val findClassesUsingStringsResponses: List<List<ClassHit>> = emptyList(),
     private val findMethodsUsingStringsResponses: List<List<MethodHit>> = emptyList(),
 ) : DexAnalysisService {
     var lastWorkspace: WorkspaceContext? = null
     var lastInspectRequest: InspectMethodRequest? = null
+    var lastFindMethodsRequest: FindMethodsRequest? = null
     var lastFindClassesUsingStringsRequest: FindClassesUsingStringsRequest? = null
     var lastFindMethodsUsingStringsRequest: FindMethodsUsingStringsRequest? = null
     var lastExportClassSmaliRequest: ExportClassSmaliRequest? = null
@@ -744,7 +829,11 @@ private class FakeDexAnalysisService(
 
     override fun findClasses(workspace: WorkspaceContext, request: FindClassesRequest): List<ClassHit> = emptyList()
 
-    override fun findMethods(workspace: WorkspaceContext, request: FindMethodsRequest): List<MethodHit> = emptyList()
+    override fun findMethods(workspace: WorkspaceContext, request: FindMethodsRequest): List<MethodHit> {
+        lastWorkspace = workspace
+        lastFindMethodsRequest = request
+        return findMethodsResponse
+    }
 
     override fun findFields(workspace: WorkspaceContext, request: FindFieldsRequest): List<FieldHit> = emptyList()
 
