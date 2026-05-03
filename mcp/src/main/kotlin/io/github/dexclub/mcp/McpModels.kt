@@ -14,6 +14,15 @@ import io.github.dexclub.core.api.shared.InputType
 import io.github.dexclub.core.api.shared.InventoryCounts
 import io.github.dexclub.core.api.shared.PageWindow
 import io.github.dexclub.core.api.shared.WorkspaceKind
+import io.github.dexclub.core.api.resource.ManifestApplicationInfo
+import io.github.dexclub.core.api.resource.ManifestComponentInfo
+import io.github.dexclub.core.api.resource.ManifestInspectionResult
+import io.github.dexclub.core.api.resource.ManifestInspectionSection
+import io.github.dexclub.core.api.resource.ManifestIntentData
+import io.github.dexclub.core.api.resource.ManifestIntentFilter
+import io.github.dexclub.core.api.resource.ManifestMetaData
+import io.github.dexclub.core.api.resource.ManifestUsesFeature
+import io.github.dexclub.core.api.resource.ManifestUsesSdk
 import io.github.dexclub.core.api.workspace.TargetHandle
 import io.github.dexclub.core.api.workspace.TargetSnapshotSummary
 import io.github.dexclub.core.api.workspace.WorkspaceContext
@@ -35,6 +44,12 @@ internal data class OpenTargetSessionResult(
 internal data class InspectMethodResult(
     val sessionId: String,
     val detail: MethodDetailView,
+)
+
+@Serializable
+internal data class ManifestDecodeResult(
+    val sessionId: String,
+    val manifest: ManifestInspectionView,
 )
 
 @Serializable
@@ -160,6 +175,97 @@ internal data class MethodFieldUsageView(
     val field: FieldHitView,
 )
 
+@Serializable
+internal data class ManifestInspectionView(
+    val sourcePath: String? = null,
+    val sourceEntry: String? = null,
+    val packageName: String,
+    val versionCode: String? = null,
+    val versionName: String? = null,
+    val sharedUserId: String? = null,
+    val usesSdk: ManifestUsesSdkView? = null,
+    val application: ManifestApplicationView? = null,
+    val usesPermissions: List<String>? = null,
+    val definedPermissions: List<String>? = null,
+    val usesFeatures: List<ManifestUsesFeatureView>? = null,
+    val queriesPackages: List<String>? = null,
+    val queriesProviders: List<String>? = null,
+    val queriesIntents: List<ManifestIntentFilterView>? = null,
+    val activities: List<ManifestComponentView>? = null,
+    val activityAliases: List<ManifestComponentView>? = null,
+    val services: List<ManifestComponentView>? = null,
+    val receivers: List<ManifestComponentView>? = null,
+    val providers: List<ManifestComponentView>? = null,
+    val text: String? = null,
+)
+
+@Serializable
+internal data class ManifestUsesSdkView(
+    val minSdkVersion: String? = null,
+    val targetSdkVersion: String? = null,
+    val maxSdkVersion: String? = null,
+)
+
+@Serializable
+internal data class ManifestApplicationView(
+    val name: String? = null,
+    val rawName: String? = null,
+    val label: String? = null,
+    val icon: String? = null,
+    val debuggable: Boolean? = null,
+    val allowBackup: Boolean? = null,
+    val usesCleartextTraffic: Boolean? = null,
+    val networkSecurityConfig: String? = null,
+    val metaData: List<ManifestMetaDataView> = emptyList(),
+)
+
+@Serializable
+internal data class ManifestComponentView(
+    val name: String,
+    val rawName: String? = null,
+    val exported: Boolean? = null,
+    val enabled: Boolean? = null,
+    val permission: String? = null,
+    val process: String? = null,
+    val authorities: String? = null,
+    val targetActivity: String? = null,
+    val intentFilters: List<ManifestIntentFilterView> = emptyList(),
+    val metaData: List<ManifestMetaDataView> = emptyList(),
+)
+
+@Serializable
+internal data class ManifestIntentFilterView(
+    val actions: List<String> = emptyList(),
+    val categories: List<String> = emptyList(),
+    val data: List<ManifestIntentDataView> = emptyList(),
+)
+
+@Serializable
+internal data class ManifestIntentDataView(
+    val scheme: String? = null,
+    val host: String? = null,
+    val port: String? = null,
+    val path: String? = null,
+    val pathPrefix: String? = null,
+    val pathPattern: String? = null,
+    val pathSuffix: String? = null,
+    val mimeType: String? = null,
+)
+
+@Serializable
+internal data class ManifestMetaDataView(
+    val name: String,
+    val value: String? = null,
+    val resource: String? = null,
+)
+
+@Serializable
+internal data class ManifestUsesFeatureView(
+    val name: String? = null,
+    val required: Boolean? = null,
+    val glEsVersion: String? = null,
+)
+
 internal fun parseMethodDetailSections(rawValues: List<String>?): Set<MethodDetailSection> {
     if (rawValues.isNullOrEmpty()) return MethodDetailSection.entries.toSet()
     return rawValues.map { raw ->
@@ -169,6 +275,26 @@ internal fun parseMethodDetailSections(rawValues: List<String>?): Set<MethodDeta
             "invokes" -> MethodDetailSection.Invokes
             "strings" -> MethodDetailSection.Strings
             "annotations" -> MethodDetailSection.Annotations
+            else -> throw IllegalArgumentException("Unsupported include section: $raw")
+        }
+    }.toSet()
+}
+
+internal fun parseManifestInspectionSections(rawValues: List<String>?): Set<ManifestInspectionSection> {
+    if (rawValues.isNullOrEmpty()) return ManifestInspectionSection.entries.toSet()
+    return rawValues.map { raw ->
+        when (raw.trim()) {
+            "uses-sdk" -> ManifestInspectionSection.UsesSdk
+            "application" -> ManifestInspectionSection.Application
+            "uses-permissions" -> ManifestInspectionSection.UsesPermissions
+            "defined-permissions" -> ManifestInspectionSection.DefinedPermissions
+            "uses-features" -> ManifestInspectionSection.UsesFeatures
+            "queries" -> ManifestInspectionSection.Queries
+            "activities" -> ManifestInspectionSection.Activities
+            "activity-aliases" -> ManifestInspectionSection.ActivityAliases
+            "services" -> ManifestInspectionSection.Services
+            "receivers" -> ManifestInspectionSection.Receivers
+            "providers" -> ManifestInspectionSection.Providers
             else -> throw IllegalArgumentException("Unsupported include section: $raw")
         }
     }.toSet()
@@ -185,6 +311,12 @@ internal fun TargetSession.toInspectMethodResult(detail: MethodDetail): InspectM
     InspectMethodResult(
         sessionId = sessionId,
         detail = detail.toView(),
+    )
+
+internal fun TargetSession.toManifestDecodeResult(result: ManifestInspectionResult): ManifestDecodeResult =
+    ManifestDecodeResult(
+        sessionId = sessionId,
+        manifest = result.toView(),
     )
 
 internal fun TargetSession.toFindClassesUsingStringsResult(result: WindowedClassHits): FindClassesUsingStringsResult =
@@ -301,6 +433,97 @@ internal fun MethodFieldUsage.toView(): MethodFieldUsageView =
     MethodFieldUsageView(
         usingType = usingType,
         field = field.toView(),
+    )
+
+internal fun ManifestInspectionResult.toView(): ManifestInspectionView =
+    ManifestInspectionView(
+        sourcePath = sourcePath,
+        sourceEntry = sourceEntry,
+        packageName = packageName,
+        versionCode = versionCode,
+        versionName = versionName,
+        sharedUserId = sharedUserId,
+        usesSdk = usesSdk?.toView(),
+        application = application?.toView(),
+        usesPermissions = usesPermissions,
+        definedPermissions = definedPermissions,
+        usesFeatures = usesFeatures?.map(ManifestUsesFeature::toView),
+        queriesPackages = queriesPackages,
+        queriesProviders = queriesProviders,
+        queriesIntents = queriesIntents?.map(ManifestIntentFilter::toView),
+        activities = activities?.map(ManifestComponentInfo::toView),
+        activityAliases = activityAliases?.map(ManifestComponentInfo::toView),
+        services = services?.map(ManifestComponentInfo::toView),
+        receivers = receivers?.map(ManifestComponentInfo::toView),
+        providers = providers?.map(ManifestComponentInfo::toView),
+        text = text,
+    )
+
+internal fun ManifestUsesSdk.toView(): ManifestUsesSdkView =
+    ManifestUsesSdkView(
+        minSdkVersion = minSdkVersion,
+        targetSdkVersion = targetSdkVersion,
+        maxSdkVersion = maxSdkVersion,
+    )
+
+internal fun ManifestApplicationInfo.toView(): ManifestApplicationView =
+    ManifestApplicationView(
+        name = name,
+        rawName = rawName,
+        label = label,
+        icon = icon,
+        debuggable = debuggable,
+        allowBackup = allowBackup,
+        usesCleartextTraffic = usesCleartextTraffic,
+        networkSecurityConfig = networkSecurityConfig,
+        metaData = metaData.map(ManifestMetaData::toView),
+    )
+
+internal fun ManifestComponentInfo.toView(): ManifestComponentView =
+    ManifestComponentView(
+        name = name,
+        rawName = rawName,
+        exported = exported,
+        enabled = enabled,
+        permission = permission,
+        process = process,
+        authorities = authorities,
+        targetActivity = targetActivity,
+        intentFilters = intentFilters.map(ManifestIntentFilter::toView),
+        metaData = metaData.map(ManifestMetaData::toView),
+    )
+
+internal fun ManifestIntentFilter.toView(): ManifestIntentFilterView =
+    ManifestIntentFilterView(
+        actions = actions,
+        categories = categories,
+        data = data.map(ManifestIntentData::toView),
+    )
+
+internal fun ManifestIntentData.toView(): ManifestIntentDataView =
+    ManifestIntentDataView(
+        scheme = scheme,
+        host = host,
+        port = port,
+        path = path,
+        pathPrefix = pathPrefix,
+        pathPattern = pathPattern,
+        pathSuffix = pathSuffix,
+        mimeType = mimeType,
+    )
+
+internal fun ManifestMetaData.toView(): ManifestMetaDataView =
+    ManifestMetaDataView(
+        name = name,
+        value = value,
+        resource = resource,
+    )
+
+internal fun ManifestUsesFeature.toView(): ManifestUsesFeatureView =
+    ManifestUsesFeatureView(
+        name = name,
+        required = required,
+        glEsVersion = glEsVersion,
     )
 
 internal fun buildFindMethodsUsingStringsRequest(

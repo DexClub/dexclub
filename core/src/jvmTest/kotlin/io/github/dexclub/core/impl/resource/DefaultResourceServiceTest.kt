@@ -8,6 +8,7 @@ import io.github.dexclub.core.api.resource.ResourceDecodeErrorReason
 import io.github.dexclub.core.api.resource.ResourceResolution
 import io.github.dexclub.core.api.resource.DecodeXmlRequest
 import io.github.dexclub.core.api.resource.FindResourcesRequest
+import io.github.dexclub.core.api.resource.InspectManifestRequest
 import io.github.dexclub.core.api.resource.ResolveResourceRequest
 import io.github.dexclub.core.api.workspace.WorkspaceRef
 import io.github.dexclub.core.api.shared.PageWindow
@@ -135,6 +136,124 @@ class DefaultResourceServiceTest {
         val refreshed = Json.parseToJsonElement(cacheFile.readText()).jsonObject
         assertTrue(refreshed.getValue("toolVersion").jsonPrimitive.content != "stale-tool")
         assertTrue(refreshed.getValue("sourceFingerprint").jsonPrimitive.content != "stale-fingerprint")
+    }
+
+    @Test
+    fun inspectManifestReturnsStructuredHighValueFields() {
+        val workdir = createTempDirectory("dexclub-resource-manifest-inspect")
+        val manifestFile = workdir.resolve("AndroidManifest.xml")
+        manifestFile.writeText(
+            """
+                <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+                    package="fixture.inspect"
+                    android:versionCode="42"
+                    android:versionName="1.2.3">
+                    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="35" />
+                    <uses-permission android:name="android.permission.INTERNET" />
+                    <permission android:name="fixture.inspect.permission.SYNC" />
+                    <application
+                        android:name=".FixtureApp"
+                        android:label="@string/app_name"
+                        android:debuggable="true">
+                        <meta-data android:name="feature_toggle" android:value="on" />
+                        <activity
+                            android:name=".MainActivity"
+                            android:exported="true">
+                            <intent-filter>
+                                <action android:name="android.intent.action.MAIN" />
+                                <category android:name="android.intent.category.LAUNCHER" />
+                                <data android:scheme="fixture" android:host="home" />
+                            </intent-filter>
+                        </activity>
+                        <service android:name="fixture.inspect.SyncService" android:enabled="false" />
+                        <receiver android:name="ReceiverEntry" />
+                        <provider
+                            android:name=".FixtureProvider"
+                            android:authorities="fixture.inspect.provider" />
+                    </application>
+                    <queries>
+                        <package android:name="com.example.market" />
+                        <provider android:authorities="fixture.remote.provider" />
+                        <intent>
+                            <action android:name="android.intent.action.VIEW" />
+                            <data android:scheme="https" android:host="example.com" />
+                        </intent>
+                    </queries>
+                </manifest>
+            """.trimIndent(),
+        )
+
+        val services = createDefaultServices()
+        services.workspace.initialize(manifestFile.toString())
+        val workspace = services.workspace.open(WorkspaceRef(workdir.toString()))
+
+        val result = services.resource.inspectManifest(
+            workspace,
+            InspectManifestRequest(includeText = true),
+        )
+
+        assertEquals("fixture.inspect", result.packageName)
+        assertEquals("42", result.versionCode)
+        assertEquals("1.2.3", result.versionName)
+        assertEquals("24", result.usesSdk?.minSdkVersion)
+        assertEquals("35", result.usesSdk?.targetSdkVersion)
+        assertEquals("fixture.inspect.FixtureApp", result.application?.name)
+        assertEquals("feature_toggle", result.application?.metaData?.single()?.name)
+        assertEquals(listOf("android.permission.INTERNET"), result.usesPermissions)
+        assertEquals(listOf("fixture.inspect.permission.SYNC"), result.definedPermissions)
+        assertEquals("fixture.inspect.MainActivity", result.activities?.single()?.name)
+        assertEquals(true, result.activities?.single()?.exported)
+        assertEquals("android.intent.action.MAIN", result.activities?.single()?.intentFilters?.single()?.actions?.single())
+        assertEquals("fixture", result.activities?.single()?.intentFilters?.single()?.data?.single()?.scheme)
+        assertEquals("fixture.inspect.SyncService", result.services?.single()?.name)
+        assertEquals(false, result.services?.single()?.enabled)
+        assertEquals("fixture.inspect.ReceiverEntry", result.receivers?.single()?.name)
+        assertEquals("fixture.inspect.FixtureProvider", result.providers?.single()?.name)
+        assertEquals("com.example.market", result.queriesPackages?.single())
+        assertEquals("fixture.remote.provider", result.queriesProviders?.single())
+        assertEquals("android.intent.action.VIEW", result.queriesIntents?.single()?.actions?.single())
+        assertEquals("https", result.queriesIntents?.single()?.data?.single()?.scheme)
+        assertTrue(result.text?.contains("""package="fixture.inspect"""") == true)
+    }
+
+    @Test
+    fun inspectManifestCanLimitReturnedSections() {
+        val workdir = createTempDirectory("dexclub-resource-manifest-inspect-sections")
+        val manifestFile = workdir.resolve("AndroidManifest.xml")
+        manifestFile.writeText(
+            """
+                <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+                    package="fixture.sections">
+                    <application android:name=".FixtureApp">
+                        <activity android:name=".MainActivity" />
+                        <activity-alias android:name=".AliasActivity" android:targetActivity=".MainActivity" />
+                        <service android:name=".SyncService" />
+                    </application>
+                </manifest>
+            """.trimIndent(),
+        )
+
+        val services = createDefaultServices()
+        services.workspace.initialize(manifestFile.toString())
+        val workspace = services.workspace.open(WorkspaceRef(workdir.toString()))
+
+        val result = services.resource.inspectManifest(
+            workspace,
+            InspectManifestRequest(
+                includes = setOf(
+                    io.github.dexclub.core.api.resource.ManifestInspectionSection.Activities,
+                    io.github.dexclub.core.api.resource.ManifestInspectionSection.ActivityAliases,
+                ),
+            ),
+        )
+
+        assertEquals("fixture.sections", result.packageName)
+        assertEquals("fixture.sections.MainActivity", result.activities?.single()?.name)
+        assertEquals("fixture.sections.AliasActivity", result.activityAliases?.single()?.name)
+        assertEquals("fixture.sections.MainActivity", result.activityAliases?.single()?.targetActivity)
+        assertEquals(null, result.application)
+        assertEquals(null, result.services)
+        assertEquals(null, result.text)
     }
 
     @Test

@@ -400,6 +400,8 @@ P0 不建议一开始就暴露复杂 DexKit 风格查询对象。
 建议输入：
 
 - `session` 或 `workdir`
+- 可选 `include`
+- 可选 `include_text`
 
 建议输出：
 
@@ -408,10 +410,25 @@ P0 不建议一开始就暴露复杂 DexKit 风格查询对象。
 P0 应至少允许 skill 拿到：
 
 - package 名
+- versionCode / versionName / sharedUserId
+- uses-sdk
 - application 信息
+- uses-permission / permission
+- uses-feature
 - activity / service / receiver / provider
+- queries
 - intent-filter
 - metadata
+
+补充约定：
+
+- `manifest` 默认应返回结构化主视图
+- `include=["activities","activity-aliases"]`
+  - 表示只返回指定 section
+- 基础识别字段
+  - 如 `packageName / versionCode / versionName / sharedUserId`
+  - 不应被 `include` 裁掉
+- `include_text=true` 时，允许附带原始 manifest XML 作为取证兜底
 
 ### `find_res`
 

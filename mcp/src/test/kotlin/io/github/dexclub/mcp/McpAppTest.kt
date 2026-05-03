@@ -32,7 +32,15 @@ import io.github.dexclub.core.api.shared.WorkspaceState
 import io.github.dexclub.core.api.resource.DecodeXmlRequest
 import io.github.dexclub.core.api.resource.DecodedXmlResult
 import io.github.dexclub.core.api.resource.FindResourcesRequest
+import io.github.dexclub.core.api.resource.InspectManifestRequest
+import io.github.dexclub.core.api.resource.ManifestApplicationInfo
+import io.github.dexclub.core.api.resource.ManifestComponentInfo
+import io.github.dexclub.core.api.resource.ManifestInspectionResult
+import io.github.dexclub.core.api.resource.ManifestInspectionSection
+import io.github.dexclub.core.api.resource.ManifestIntentFilter
+import io.github.dexclub.core.api.resource.ManifestMetaData
 import io.github.dexclub.core.api.resource.ManifestResult
+import io.github.dexclub.core.api.resource.ManifestUsesSdk
 import io.github.dexclub.core.api.resource.ResourceEntry
 import io.github.dexclub.core.api.resource.ResourceEntryValueHit
 import io.github.dexclub.core.api.resource.ResourceService
@@ -116,6 +124,77 @@ class McpAppTest {
         assertEquals(setOf(MethodDetailSection.Strings, MethodDetailSection.Annotations), dexService.lastInspectRequest?.includes)
         assertEquals(listOf("alpha"), detail.strings)
         assertEquals(listOf("Lsample/Anno;"), detail.annotations)
+    }
+
+    @Test
+    fun inspectManifestUsesSessionWorkspaceAndCarriesStructuredResult() {
+        val workspace = fakeWorkspaceContext()
+        val resourceService = FakeResourceService()
+        val app = McpApp(
+            services = Services(
+                workspace = FakeWorkspaceService(workspace),
+                dex = FakeDexAnalysisService(),
+                resource = resourceService,
+            ),
+            sessionStore = McpSessionStore(),
+        )
+        val session = app.openTargetSession("sample.apk")
+
+        val manifest = app.inspectManifest(
+            session,
+            includes = ManifestInspectionSection.entries.toSet(),
+            includeText = true,
+        )
+
+        assertEquals(workspace, resourceService.lastWorkspace)
+        assertEquals(ManifestInspectionSection.entries.toSet(), resourceService.lastInspectManifestRequest?.includes)
+        assertEquals(true, resourceService.lastInspectManifestRequest?.includeText)
+        assertEquals("fixture.sample", manifest.packageName)
+        assertEquals("fixture.sample.MainActivity", manifest.activities?.single()?.name)
+        assertEquals("<manifest package=\"fixture.sample\"/>", manifest.text)
+    }
+
+    @Test
+    fun parseManifestInspectionSectionsSupportsMcpNames() {
+        val sections = parseManifestInspectionSections(
+            listOf(
+                "uses-sdk",
+                "application",
+                "uses-permissions",
+                "defined-permissions",
+                "uses-features",
+                "queries",
+                "activities",
+                "activity-aliases",
+                "services",
+                "receivers",
+                "providers",
+            ),
+        )
+
+        assertEquals(
+            setOf(
+                ManifestInspectionSection.UsesSdk,
+                ManifestInspectionSection.Application,
+                ManifestInspectionSection.UsesPermissions,
+                ManifestInspectionSection.DefinedPermissions,
+                ManifestInspectionSection.UsesFeatures,
+                ManifestInspectionSection.Queries,
+                ManifestInspectionSection.Activities,
+                ManifestInspectionSection.ActivityAliases,
+                ManifestInspectionSection.Services,
+                ManifestInspectionSection.Receivers,
+                ManifestInspectionSection.Providers,
+            ),
+            sections,
+        )
+    }
+
+    @Test
+    fun parseManifestInspectionSectionsFallsBackToAllWhenMissing() {
+        val sections = parseManifestInspectionSections(null)
+
+        assertEquals(ManifestInspectionSection.entries.toSet(), sections)
     }
 
     @Test
@@ -571,8 +650,46 @@ private class FakeDexAnalysisService(
 }
 
 private class FakeResourceService : ResourceService {
-    override fun decodeManifest(workspace: WorkspaceContext): ManifestResult =
-        ManifestResult(text = "<manifest/>")
+    var lastWorkspace: WorkspaceContext? = null
+    var lastInspectManifestRequest: InspectManifestRequest? = null
+
+    override fun decodeManifest(workspace: WorkspaceContext): ManifestResult {
+        lastWorkspace = workspace
+        return ManifestResult(
+            sourcePath = "sample.apk",
+            sourceEntry = "AndroidManifest.xml",
+            text = "<manifest package=\"fixture.sample\"/>",
+        )
+    }
+
+    override fun inspectManifest(
+        workspace: WorkspaceContext,
+        request: InspectManifestRequest,
+    ): ManifestInspectionResult {
+        lastWorkspace = workspace
+        lastInspectManifestRequest = request
+        return ManifestInspectionResult(
+            sourcePath = "sample.apk",
+            sourceEntry = "AndroidManifest.xml",
+            packageName = "fixture.sample",
+            versionName = "1.0",
+            usesSdk = ManifestUsesSdk(minSdkVersion = "21", targetSdkVersion = "34"),
+            application = ManifestApplicationInfo(
+                name = "fixture.sample.App",
+                metaData = listOf(ManifestMetaData(name = "feature", value = "enabled")),
+            ),
+            activities = listOf(
+                ManifestComponentInfo(
+                    name = "fixture.sample.MainActivity",
+                    exported = true,
+                    intentFilters = listOf(
+                        ManifestIntentFilter(actions = listOf("android.intent.action.MAIN")),
+                    ),
+                ),
+            ),
+            text = "<manifest package=\"fixture.sample\"/>".takeIf { request.includeText },
+        )
+    }
 
     override fun dumpResourceTable(workspace: WorkspaceContext): ResourceTableResult =
         ResourceTableResult(packageCount = 0, typeCount = 0, entryCount = 0)

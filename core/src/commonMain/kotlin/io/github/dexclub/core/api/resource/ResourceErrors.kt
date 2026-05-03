@@ -6,6 +6,7 @@ enum class ResourceDecodeErrorReason {
     ManifestEntryMissing,
     ManifestTextInvalid,
     ManifestDecodeFailed,
+    ManifestInspectFailed,
     ResourceTableSourceMissing,
     AmbiguousResourceTableSource,
     ResourceTableEntryMissing,

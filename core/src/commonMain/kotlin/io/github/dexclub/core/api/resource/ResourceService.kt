@@ -5,6 +5,11 @@ import io.github.dexclub.core.api.workspace.WorkspaceContext
 interface ResourceService {
     fun decodeManifest(workspace: WorkspaceContext): ManifestResult
 
+    fun inspectManifest(
+        workspace: WorkspaceContext,
+        request: InspectManifestRequest = InspectManifestRequest(),
+    ): ManifestInspectionResult
+
     fun dumpResourceTable(workspace: WorkspaceContext): ResourceTableResult
 
     fun decodeXml(workspace: WorkspaceContext, request: DecodeXmlRequest): DecodedXmlResult

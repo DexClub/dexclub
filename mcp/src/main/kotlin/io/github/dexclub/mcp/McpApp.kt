@@ -7,6 +7,7 @@ import io.github.dexclub.core.api.dex.ExportMethodJavaRequest
 import io.github.dexclub.core.api.dex.ExportMethodSmaliRequest
 import io.github.dexclub.core.api.dex.InspectMethodRequest
 import io.github.dexclub.core.api.dex.MethodHit
+import io.github.dexclub.core.api.resource.InspectManifestRequest
 import io.github.dexclub.core.api.shared.MethodSmaliMode
 import io.github.dexclub.core.api.shared.SourceLocator
 import io.github.dexclub.core.api.shared.Services
@@ -135,6 +136,51 @@ internal class McpApp(
                         json.encodeToString(
                             InspectMethodResult.serializer(),
                             session.toInspectMethodResult(detail),
+                        ),
+                    ),
+                ),
+            )
+        }
+
+        server.addTool(
+            name = "manifest",
+            description = "返回当前 target 的结构化 manifest 视图，可按需附带原始 XML。",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("session_id", buildJsonObject { put("type", "string") })
+                    put(
+                        "include",
+                        buildJsonObject {
+                            put("type", "array")
+                            put("items", buildJsonObject { put("type", "string") })
+                        },
+                    )
+                    put("include_text", buildJsonObject { put("type", "boolean") })
+                },
+                required = listOf("session_id"),
+            ),
+        ) { request ->
+            val session = resolveRequiredSession(request) ?: return@addTool missingSessionResult(request)
+            val includes = try {
+                parseManifestInspectionSections(
+                    (request.arguments?.get("include") as? JsonArray)
+                        ?.jsonArray
+                        ?.map { it.jsonPrimitive.content },
+                )
+            } catch (cause: IllegalArgumentException) {
+                return@addTool CallToolResult(
+                    content = listOf(TextContent("""{"error":"${cause.message}"}""")),
+                    isError = true,
+                )
+            }
+            val includeText = request.arguments?.get("include_text")?.jsonPrimitive?.content?.toBooleanStrictOrNull() ?: false
+            val manifest = inspectManifest(session, includes, includeText)
+            CallToolResult(
+                content = listOf(
+                    TextContent(
+                        json.encodeToString(
+                            ManifestDecodeResult.serializer(),
+                            session.toManifestDecodeResult(manifest),
                         ),
                     ),
                 ),
@@ -463,6 +509,18 @@ internal class McpApp(
         request = InspectMethodRequest(
             descriptor = descriptor,
             includes = includes,
+        ),
+    )
+
+    internal fun inspectManifest(
+        session: TargetSession,
+        includes: Set<io.github.dexclub.core.api.resource.ManifestInspectionSection>,
+        includeText: Boolean = false,
+    ) = services.resource.inspectManifest(
+        workspace = session.workspace,
+        request = InspectManifestRequest(
+            includes = includes,
+            includeText = includeText,
         ),
     )
 
