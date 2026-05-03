@@ -1,0 +1,4 @@
+interface:
+  display_name: "DexClub Analysis"
+  short_description: "Analyze APKs and Dex samples through dexclub MCP."
+  default_prompt: "Use $dexclub-analysis to analyze an APK or Dex sample through dexclub MCP tools."
