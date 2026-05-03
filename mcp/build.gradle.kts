@@ -19,6 +19,7 @@ dependencies {
     implementation(libs.mcp.kotlin.sdk.server)
     implementation(libs.ktor.server.netty)
     implementation(libs.ktor.server.content.negotiation)
+    implementation(libs.ktor.server.double.receive)
     implementation(libs.ktor.serialization.kotlinx.json)
     runtimeOnly(libs.slf4j.simple)
 

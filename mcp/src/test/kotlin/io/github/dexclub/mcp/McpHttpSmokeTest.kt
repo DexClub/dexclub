@@ -37,6 +37,15 @@ class McpHttpSmokeTest {
 
     @Test
     fun httpServerSupportsInitializeToolsListAndOpenTargetSession() = runBlocking {
+        smoke(debugHttp = false)
+    }
+
+    @Test
+    fun httpServerSupportsInitializeToolsListAndOpenTargetSessionWithDebugEnabled() = runBlocking {
+        smoke(debugHttp = true)
+    }
+
+    private suspend fun smoke(debugHttp: Boolean) {
         val app = McpApp(
             services = Services(
                 workspace = FakeWorkspaceService(fakeWorkspaceContext()),
@@ -52,7 +61,7 @@ class McpHttpSmokeTest {
                 host = "127.0.0.1",
                 port = port,
                 path = "/mcp",
-                debugHttp = false,
+                debugHttp = debugHttp,
             ),
             app = app,
             server = server,
