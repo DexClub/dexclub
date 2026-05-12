@@ -40,6 +40,8 @@ Use the following default order unless the current task clearly justifies a devi
 
 Keep the workflow recoverable and iterative. Do not implement it as a rigid state machine.
 
+If the user already provides a high-specificity anchor, prefer the shortest path that can test it before falling back to the full default route.
+
 ## Session Rules
 
 Always prefer `session-first`.
@@ -146,6 +148,8 @@ Default order:
 
 `export_*` is a heavy step. Do not use it as the default first move.
 
+Before another export, another broad search, or a switch to a different major branch, identify the concrete uncertainty that step is intended to resolve.
+
 Before exporting, make sure:
 
 - the candidate set is already small enough
@@ -219,6 +223,8 @@ When answering the user, distinguish:
 - conclusions
 
 Do not promote a single hit directly into a final conclusion.
+
+If the user is only asking for the likely implementation location or entry owner, answer once the evidence is sufficient for that narrower question, and state any remaining uncertainty instead of defaulting to a full implementation trace.
 
 Prefer ending each analysis round with:
 
