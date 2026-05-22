@@ -7,6 +7,7 @@ import io.github.dexclub.core.api.dex.ExportMethodJavaRequest
 import io.github.dexclub.core.api.dex.ExportMethodSmaliRequest
 import io.github.dexclub.core.api.dex.InspectMethodRequest
 import io.github.dexclub.core.api.dex.MethodHit
+import io.github.dexclub.core.api.resource.DecodeXmlRequest
 import io.github.dexclub.core.api.resource.InspectManifestRequest
 import io.github.dexclub.core.api.resource.ResolveResourceRequest
 import io.github.dexclub.core.api.shared.MethodSmaliMode
@@ -685,6 +686,39 @@ internal class McpApp(
             )
         }
 
+        server.addLoggedTool(
+            name = "decode_xml",
+            description = "解码当前 target 中的二进制或文本 XML。常用于读取 APK 内的 res/layout、res/xml 等安装包布局与资源 XML。",
+            inputSchema = ToolSchema(
+                properties = buildJsonObject {
+                    put("session_id", buildJsonObject { put("type", "string") })
+                    put("workdir", buildJsonObject { put("type", "string") })
+                    put("path", buildJsonObject { put("type", "string") })
+                },
+                required = listOf("path"),
+            ),
+        ) { request ->
+            val context = resolveExecutionContext(request) ?: return@addLoggedTool missingSessionOrWorkdirResult()
+            val path = request.requiredStringArgument("path")
+            if (path.isEmpty()) {
+                return@addLoggedTool errorResult("path is required")
+            }
+            val xml = decodeXml(
+                workspace = context.workspace,
+                path = path,
+            )
+            CallToolResult(
+                content = listOf(
+                    TextContent(
+                        json.encodeToString(
+                            DecodeXmlResult.serializer(),
+                            context.toDecodeXmlResult(xml),
+                        ),
+                    ),
+                ),
+            )
+        }
+
         return server
     }
 
@@ -1030,6 +1064,14 @@ internal class McpApp(
             type = type,
             name = name,
         ),
+    )
+
+    internal fun decodeXml(
+        workspace: WorkspaceContext,
+        path: String,
+    ) = services.resource.decodeXml(
+        workspace = workspace,
+        request = DecodeXmlRequest(path = path),
     )
 
     internal fun exportMethodJavaText(

@@ -1119,6 +1119,32 @@ class McpAppTest {
         assertEquals("beta", result.items.single().name)
     }
 
+    @Test
+    fun decodeXmlUsesSessionWorkspaceAndPath() {
+        val workspace = fakeWorkspaceContext()
+        val resourceService = FakeResourceService()
+        val app = McpApp(
+            services = Services(
+                workspace = FakeWorkspaceService(workspace),
+                dex = FakeDexAnalysisService(),
+                resource = resourceService,
+            ),
+            sessionStore = McpSessionStore(),
+        )
+        val session = app.openTargetSession("sample.apk")
+
+        val result = app.decodeXml(
+            workspace = session.workspace,
+            path = "res/layout/main.xml",
+        )
+
+        assertEquals(workspace, resourceService.lastWorkspace)
+        assertEquals("res/layout/main.xml", resourceService.lastDecodeXmlRequest?.path)
+        assertEquals("sample.apk", result.sourcePath)
+        assertEquals("res/layout/main.xml", result.sourceEntry)
+        assertEquals("<LinearLayout/>", result.text)
+    }
+
 }
 
 internal class FakeWorkspaceService(
@@ -1270,6 +1296,7 @@ internal class FakeDexAnalysisService(
 internal class FakeResourceService : ResourceService {
     var lastWorkspace: WorkspaceContext? = null
     var lastInspectManifestRequest: InspectManifestRequest? = null
+    var lastDecodeXmlRequest: DecodeXmlRequest? = null
     var lastResolveResourceRequest: ResolveResourceRequest? = null
     var lastFindResourcesRequest: FindResourcesRequest? = null
     private val resourceEntries: List<ResourceEntry>
@@ -1324,8 +1351,15 @@ internal class FakeResourceService : ResourceService {
     override fun dumpResourceTable(workspace: WorkspaceContext): ResourceTableResult =
         ResourceTableResult(packageCount = 0, typeCount = 0, entryCount = 0)
 
-    override fun decodeXml(workspace: WorkspaceContext, request: DecodeXmlRequest): DecodedXmlResult =
-        DecodedXmlResult(text = "<xml/>")
+    override fun decodeXml(workspace: WorkspaceContext, request: DecodeXmlRequest): DecodedXmlResult {
+        lastWorkspace = workspace
+        lastDecodeXmlRequest = request
+        return DecodedXmlResult(
+            sourcePath = "sample.apk",
+            sourceEntry = request.path,
+            text = "<LinearLayout/>",
+        )
+    }
 
     override fun listResourceEntries(workspace: WorkspaceContext): List<ResourceEntry> =
         resourceEntries.also {
