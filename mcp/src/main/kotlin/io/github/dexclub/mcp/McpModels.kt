@@ -16,6 +16,7 @@ import io.github.dexclub.core.api.shared.InventoryCounts
 import io.github.dexclub.core.api.shared.PageWindow
 import io.github.dexclub.core.api.shared.WorkspaceKind
 import io.github.dexclub.core.api.resource.FindResourcesRequest
+import io.github.dexclub.core.api.resource.DecodedXmlResult
 import io.github.dexclub.core.api.resource.ManifestApplicationInfo
 import io.github.dexclub.core.api.resource.ManifestComponentInfo
 import io.github.dexclub.core.api.resource.ManifestInspectionResult
@@ -165,6 +166,12 @@ internal data class FindResourcesResult(
     val limit: Int,
     val hasMore: Boolean,
     val items: List<JsonObject>,
+)
+
+@Serializable
+internal data class DecodeXmlResult(
+    val sessionId: String? = null,
+    val xml: DecodedXmlView,
 )
 
 internal data class WindowedItems<T>(
@@ -356,6 +363,22 @@ internal data class ResourceEntryValueHitView(
                 value = hit.value,
                 sourcePath = hit.sourcePath,
                 sourceEntry = hit.sourceEntry,
+            )
+    }
+}
+
+@Serializable
+internal data class DecodedXmlView(
+    val sourcePath: String? = null,
+    val sourceEntry: String? = null,
+    val text: String,
+) {
+    companion object {
+        fun from(result: DecodedXmlResult): DecodedXmlView =
+            DecodedXmlView(
+                sourcePath = result.sourcePath,
+                sourceEntry = result.sourceEntry,
+                text = result.text,
             )
     }
 }
@@ -620,6 +643,12 @@ internal fun ExecutionContext.toFindResourcesResult(
         limit = result.limit,
         hasMore = result.hasMore,
         items = result.items.map { it.toProjectedJson(effectiveResourceValueFields(fields, brief)) },
+    )
+
+internal fun ExecutionContext.toDecodeXmlResult(result: DecodedXmlResult): DecodeXmlResult =
+    DecodeXmlResult(
+        sessionId = session?.sessionIdOrNull(),
+        xml = DecodedXmlView.from(result),
     )
 
 internal fun WorkspaceContext.toView(): WorkspaceContextView =
