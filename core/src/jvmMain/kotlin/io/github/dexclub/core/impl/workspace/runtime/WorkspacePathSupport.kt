@@ -123,3 +123,20 @@ internal fun sha256Hex(bytes: ByteArray): String =
     MessageDigest.getInstance("SHA-256")
         .digest(bytes)
         .joinToString(separator = "") { "%02x".format(it) }
+
+internal fun sha256Hex(path: Path): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    Files.newInputStream(path).use { input ->
+        val buffer = ByteArray(STREAMING_SHA256_BUFFER_SIZE)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            if (read > 0) {
+                digest.update(buffer, 0, read)
+            }
+        }
+    }
+    return digest.digest().joinToString(separator = "") { "%02x".format(it) }
+}
+
+private const val STREAMING_SHA256_BUFFER_SIZE = 64 * 1024

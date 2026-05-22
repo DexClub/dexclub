@@ -77,13 +77,13 @@ internal class SnapshotBuilder(
                         val relative = path.relativize(file).toString().replace('\\', '/')
                         digest.update(relative.toByteArray(StandardCharsets.UTF_8))
                         digest.update(0)
-                        digest.update(sha256Hex(Files.readAllBytes(file)).toByteArray(StandardCharsets.UTF_8))
+                        digest.update(sha256Hex(file).toByteArray(StandardCharsets.UTF_8))
                         digest.update(0)
                     }
             }
             digest.digest().joinToString(separator = "") { "%02x".format(it) }
         } else {
-            sha256Hex(Files.readAllBytes(path))
+            sha256Hex(path)
         }
 
     private fun inventoryEntries(inventory: MaterialInventory): List<Pair<String, String>> =

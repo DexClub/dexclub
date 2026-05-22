@@ -6,10 +6,12 @@ import io.github.dexclub.core.api.workspace.WorkspaceRef
 import io.github.dexclub.core.api.workspace.WorkspaceResolveError
 import io.github.dexclub.core.api.workspace.WorkspaceResolveErrorReason
 import io.github.dexclub.core.impl.workspace.store.DefaultWorkspaceStore
+import kotlin.io.path.createFile
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.deleteExisting
 import kotlin.io.path.exists
+import kotlin.io.path.outputStream
 import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -139,6 +141,27 @@ class WorkspaceRuntimeResolverTest {
         assertTrue(!indexFile.exists())
     }
 
+    @Test
+    fun openCanRefreshSnapshotForLargeDexWithoutMaterializingWholeFile() {
+        val workspaceDir = createTempDirectory("dexclub-core-large-open")
+        val dexFile = workspaceDir.resolve("large.dex")
+        dexFile.createFile()
+        dexFile.outputStream().use { output ->
+            val chunk = ByteArray(1024 * 1024) { (it % 251).toByte() }
+            repeat(24) { output.write(chunk) }
+        }
+
+        val env = testEnvironment()
+        val prepared = env.bootstrapper.prepare(dexFile.toString())
+        env.store.initialize(prepared.ref.workdir, prepared.workspace, prepared.target, prepared.snapshot)
+
+        val context = env.runtimeResolver.open(WorkspaceRef(workspaceDir.toString()))
+
+        assertEquals(WorkspaceKind.Dex, context.snapshot.kind)
+        assertEquals(1, context.snapshot.inventoryCounts.dexCount)
+        assertEquals(prepared.snapshot.contentFingerprint, context.snapshot.contentFingerprint)
+    }
+
     private fun testEnvironment(
         bootstrapToolVersion: String = "test",
         runtimeToolVersion: String = bootstrapToolVersion,
@@ -174,4 +197,3 @@ class WorkspaceRuntimeResolverTest {
         val runtimeResolver: DefaultWorkspaceRuntimeResolver,
     )
 }
-
