@@ -47,6 +47,20 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+internal val manifestInspectionSectionNames = setOf(
+    "uses-sdk",
+    "application",
+    "uses-permissions",
+    "defined-permissions",
+    "uses-features",
+    "queries",
+    "activities",
+    "activity-aliases",
+    "services",
+    "receivers",
+    "providers",
+)
+
 @Serializable
 internal data class OpenTargetSessionResult(
     val sessionId: String,
@@ -505,7 +519,9 @@ internal fun parseManifestInspectionSections(rawValues: List<String>?): Set<Mani
             "services" -> ManifestInspectionSection.Services
             "receivers" -> ManifestInspectionSection.Receivers
             "providers" -> ManifestInspectionSection.Providers
-            else -> throw IllegalArgumentException("Unsupported include section: $raw")
+            else -> throw IllegalArgumentException(
+                "Unsupported include section: $raw. Supported sections: ${manifestInspectionSectionNames.joinToString(", ")}",
+            )
         }
     }.toSet()
 }

@@ -116,7 +116,11 @@ class McpAppTest {
 
         assertEquals("sample.apk", workspaceService.initializedInput)
         assertEquals(workspace.workdir, session.workspace.workdir)
-        assertEquals(session, app.getTargetSession(session.sessionId))
+        val cached = app.getTargetSession(session.sessionId)
+        assertNotNull(cached)
+        assertEquals(session.sessionId, cached.sessionId)
+        assertEquals(session.workspace, cached.workspace)
+        assertEquals(session.createdAt, cached.createdAt)
     }
 
     @Test
@@ -428,6 +432,18 @@ class McpAppTest {
         val sections = parseManifestInspectionSections(null)
 
         assertEquals(ManifestInspectionSection.entries.toSet(), sections)
+    }
+
+    @Test
+    fun parseManifestInspectionSectionsExplainsSupportedValues() {
+        val error = kotlin.test.assertFailsWith<IllegalArgumentException> {
+            parseManifestInspectionSections(listOf("permissions"))
+        }
+
+        assertEquals(
+            "Unsupported include section: permissions. Supported sections: uses-sdk, application, uses-permissions, defined-permissions, uses-features, queries, activities, activity-aliases, services, receivers, providers",
+            error.message,
+        )
     }
 
     @Test
@@ -785,6 +801,18 @@ class McpAppTest {
     }
 
     @Test
+    fun parseRequestedFieldsRejectsUnsupportedResourceFields() {
+        val error = kotlin.test.assertFailsWith<IllegalArgumentException> {
+            parseRequestedFields(
+                rawValues = listOf("resourceId", "filePath"),
+                supported = resourceValueFieldNames,
+            )
+        }
+
+        assertEquals("Unsupported fields: filePath", error.message)
+    }
+
+    @Test
     fun sessionStoreCanReuseMethodHandleAcrossInspectAndExport() {
         val store = McpSessionStore()
         val session = store.openTargetSession(fakeWorkspaceContext())
@@ -952,6 +980,30 @@ class McpAppTest {
                 .contains("/.dexclub/targets/${workspace.activeTargetId}/cache/exports/tmp/"),
         )
         assertEquals("method-smali:Lsample/Test;->foo()V:class", text)
+    }
+
+    @Test
+    fun exportMethodSmaliTextExplainsSupportedModes() {
+        val workspace = fakeWorkspaceContext()
+        val app = McpApp(
+            services = Services(
+                workspace = FakeWorkspaceService(workspace),
+                dex = FakeDexAnalysisService(),
+                resource = FakeResourceService(),
+            ),
+            sessionStore = McpSessionStore(),
+        )
+        val session = app.openTargetSession("sample.apk")
+
+        val error = kotlin.test.assertFailsWith<IllegalArgumentException> {
+            app.exportMethodSmaliText(
+                workspace = session.workspace,
+                descriptor = "Lsample/Test;->foo()V",
+                mode = "full",
+            )
+        }
+
+        assertEquals("Unsupported smali mode: full. Supported modes: snippet, class", error.message)
     }
 
     @Test

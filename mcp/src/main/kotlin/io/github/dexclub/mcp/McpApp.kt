@@ -42,7 +42,7 @@ internal class McpApp(
     private val services: Services = createDefaultServices(),
     private val sessionStore: McpSessionStore = McpSessionStore(),
 ) {
-    private val methodFieldsSchema = buildJsonObject {
+    private fun enumStringArraySchema(values: Set<String>) = buildJsonObject {
         put("type", "array")
         put(
             "items",
@@ -51,8 +51,8 @@ internal class McpApp(
                 put(
                     "enum",
                     JsonArray(
-                        methodFieldNamesWithHandle.sorted().map { field ->
-                            kotlinx.serialization.json.JsonPrimitive(field)
+                        values.sorted().map { value ->
+                            kotlinx.serialization.json.JsonPrimitive(value)
                         },
                     ),
                 )
@@ -60,21 +60,41 @@ internal class McpApp(
         )
     }
 
+    private val methodFieldsSchema = buildJsonObject {
+        put("type", "array")
+        put("items", enumStringArraySchema(methodFieldNamesWithHandle).getValue("items"))
+    }
+
     private val classFieldsSchema = buildJsonObject {
         put("type", "array")
+        put("items", enumStringArraySchema(classFieldNamesWithHandle).getValue("items"))
+    }
+
+    private val resourceEntryFieldsSchema = buildJsonObject {
+        put("type", "array")
+        put("items", enumStringArraySchema(resourceEntryFieldNames).getValue("items"))
+    }
+
+    private val resourceValueFieldsSchema = buildJsonObject {
+        put("type", "array")
+        put("items", enumStringArraySchema(resourceValueFieldNames).getValue("items"))
+    }
+
+    private val manifestIncludeSchema = buildJsonObject {
+        val schema = enumStringArraySchema(manifestInspectionSectionNames)
+        put("type", schema.getValue("type"))
+        put("items", schema.getValue("items"))
+    }
+
+    private val smaliModeSchema = buildJsonObject {
+        put("type", "string")
         put(
-            "items",
-            buildJsonObject {
-                put("type", "string")
-                put(
-                    "enum",
-                    JsonArray(
-                        classFieldNamesWithHandle.sorted().map { field ->
-                            kotlinx.serialization.json.JsonPrimitive(field)
-                        },
-                    ),
-                )
-            },
+            "enum",
+            JsonArray(
+                listOf("snippet", "class").map { value ->
+                    kotlinx.serialization.json.JsonPrimitive(value)
+                },
+            ),
         )
     }
 
@@ -293,10 +313,7 @@ internal class McpApp(
                     put("workdir", buildJsonObject { put("type", "string") })
                     put(
                         "include",
-                        buildJsonObject {
-                            put("type", "array")
-                            put("items", buildJsonObject { put("type", "string") })
-                        },
+                        manifestIncludeSchema,
                     )
                     put("include_text", buildJsonObject { put("type", "boolean") })
                 },
@@ -361,7 +378,7 @@ internal class McpApp(
                     put("descriptor", buildJsonObject { put("type", "string") })
                     put("source_path", buildJsonObject { put("type", "string") })
                     put("source_entry", buildJsonObject { put("type", "string") })
-                    put("mode", buildJsonObject { put("type", "string") })
+                    put("mode", smaliModeSchema)
                 },
             ),
         ) { request ->
@@ -555,10 +572,7 @@ internal class McpApp(
                     put("limit", buildJsonObject { put("type", "integer") })
                     put(
                         "fields",
-                        buildJsonObject {
-                            put("type", "array")
-                            put("items", buildJsonObject { put("type", "string") })
-                        },
+                        resourceEntryFieldsSchema,
                     )
                     put("brief", buildJsonObject { put("type", "boolean") })
                 },
@@ -614,14 +628,11 @@ internal class McpApp(
                     put("limit", buildJsonObject { put("type", "integer") })
                     put(
                         "fields",
-                        buildJsonObject {
-                            put("type", "array")
-                            put("items", buildJsonObject { put("type", "string") })
-                        },
+                        resourceValueFieldsSchema,
                     )
                     put("brief", buildJsonObject { put("type", "boolean") })
                 },
-                required = listOf("session_id", "type", "value"),
+                required = listOf("type", "value"),
             ),
         ) { request ->
             val context = resolveExecutionContext(request) ?: return@addLoggedTool missingSessionOrWorkdirResult()
@@ -1124,7 +1135,7 @@ internal class McpApp(
         val smaliMode = when (mode?.trim()?.lowercase()) {
             null, "", "snippet" -> MethodSmaliMode.Snippet
             "class" -> MethodSmaliMode.Class
-            else -> throw IllegalArgumentException("Unsupported smali mode: $mode")
+            else -> throw IllegalArgumentException("Unsupported smali mode: $mode. Supported modes: snippet, class")
         }
         return exportTextFile(workspace) {
             services.dex.exportMethodSmali(

@@ -174,6 +174,18 @@ Default to structured manifest inspection.
 - do not set `include_text=true` by default
 - only request manifest raw XML when direct XML evidence is needed
 - if only certain sections matter, constrain `include`
+- if you do specify `include`, use only these exact section names:
+  - `uses-sdk`
+  - `application`
+  - `uses-permissions`
+  - `defined-permissions`
+  - `uses-features`
+  - `queries`
+  - `activities`
+  - `activity-aliases`
+  - `services`
+  - `receivers`
+  - `providers`
 
 ## Inspect and Export Rules
 
@@ -218,6 +230,26 @@ At that checkpoint, first state:
 - what exact uncertainty still remains
 
 Only continue exporting if the next export is tightly targeted at that remaining uncertainty.
+
+For resource and smali MCP calls, do not guess optional parameters.
+
+- `find_resource_values` fields:
+  - `resourceId`
+  - `type`
+  - `name`
+  - `value`
+  - `sourcePath`
+  - `sourceEntry`
+- `list_res` fields:
+  - `resourceId`
+  - `type`
+  - `name`
+  - `filePath`
+  - `sourcePath`
+  - `sourceEntry`
+  - `resolution`
+- for `export_method_smali`, omit `mode` unless you explicitly need `class`
+  - supported values are only `snippet` and `class`
 
 Do not keep exporting sibling methods or nearby helpers merely because they look related.
 
