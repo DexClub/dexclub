@@ -702,6 +702,38 @@ class McpAppTest {
     }
 
     @Test
+    fun findMethodsResultDefaultsToMethodHandleInBriefSessionMode() {
+        val session = McpSessionStore().openTargetSession(fakeWorkspaceContext())
+        val result = session.sessionContext().toFindMethodsResult(
+            result = WindowedItems(
+                total = 1,
+                offset = 0,
+                limit = 1,
+                hasMore = false,
+                items = listOf(
+                    MethodHit(
+                        className = "fixture.samples.SampleSearchTarget",
+                        methodName = "exposeNeedle",
+                        descriptor = "Lfixture/samples/SampleSearchTarget;->exposeNeedle()Ljava/lang/String;",
+                        sourcePath = "fixture.dex",
+                        sourceEntry = "classes.dex",
+                    ),
+                ),
+            ),
+            handleProvider = { "method-handle-1" },
+            fields = null,
+            brief = true,
+        )
+
+        val item = result.items.single()
+        assertEquals(
+            setOf("descriptor", "sourcePath", "sourceEntry", "methodHandle"),
+            item.keys,
+        )
+        assertEquals("method-handle-1", item["methodHandle"]!!.jsonPrimitive.content)
+    }
+
+    @Test
     fun findClassesUsingStringsResultCanProjectClassHandle() {
         val session = McpSessionStore().openTargetSession(fakeWorkspaceContext())
         val result = session.sessionContext().toFindClassesUsingStringsResult(
@@ -721,6 +753,35 @@ class McpAppTest {
         )
 
         assertEquals("class-handle-1", result.items.single()["classHandle"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun parseRequestedFieldsRejectsGuessedMethodAliases() {
+        val error = kotlin.test.assertFailsWith<IllegalArgumentException> {
+            parseRequestedFields(
+                rawValues = listOf("handle", "descriptor", "name"),
+                supported = methodFieldNamesWithHandle,
+            )
+        }
+
+        assertEquals("Unsupported fields: handle,name", error.message)
+    }
+
+    @Test
+    fun parseRequestedFieldsExplainsThatHandlesNeedSession() {
+        val error = kotlin.test.assertFailsWith<IllegalArgumentException> {
+            parseRequestedFields(
+                rawValues = listOf("descriptor", "methodHandle"),
+                supported = methodFieldNames,
+                sessionRequiredFields = setOf("methodHandle"),
+                hasSession = false,
+            )
+        }
+
+        assertEquals(
+            "Fields require session_id: methodHandle. Open a target session first, or omit those fields when using workdir",
+            error.message,
+        )
     }
 
     @Test

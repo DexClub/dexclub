@@ -42,6 +42,42 @@ internal class McpApp(
     private val services: Services = createDefaultServices(),
     private val sessionStore: McpSessionStore = McpSessionStore(),
 ) {
+    private val methodFieldsSchema = buildJsonObject {
+        put("type", "array")
+        put(
+            "items",
+            buildJsonObject {
+                put("type", "string")
+                put(
+                    "enum",
+                    JsonArray(
+                        methodFieldNamesWithHandle.sorted().map { field ->
+                            kotlinx.serialization.json.JsonPrimitive(field)
+                        },
+                    ),
+                )
+            },
+        )
+    }
+
+    private val classFieldsSchema = buildJsonObject {
+        put("type", "array")
+        put(
+            "items",
+            buildJsonObject {
+                put("type", "string")
+                put(
+                    "enum",
+                    JsonArray(
+                        classFieldNamesWithHandle.sorted().map { field ->
+                            kotlinx.serialization.json.JsonPrimitive(field)
+                        },
+                    ),
+                )
+            },
+        )
+    }
+
     private val sessionIdOnlySchema = ToolSchema(
         properties = buildJsonObject {
             put("session_id", buildJsonObject { put("type", "string") })
@@ -380,7 +416,7 @@ internal class McpApp(
 
         server.addLoggedTool(
             name = "find_methods",
-            description = "按类名、方法名或 descriptor 片段定位方法候选。建议配合 brief=true 和 fields 收窄返回，再继续 inspect 或 export。",
+            description = "按类名、方法名或 descriptor 片段定位方法候选。建议配合 brief=true 和 fields 收窄返回，再继续 inspect 或 export。仅在 session_id 存在时支持请求 methodHandle。",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     put("session_id", buildJsonObject { put("type", "string") })
@@ -390,13 +426,7 @@ internal class McpApp(
                     put("descriptor_contains", buildJsonObject { put("type", "string") })
                     put("offset", buildJsonObject { put("type", "integer") })
                     put("limit", buildJsonObject { put("type", "integer") })
-                    put(
-                        "fields",
-                        buildJsonObject {
-                            put("type", "array")
-                            put("items", buildJsonObject { put("type", "string") })
-                        },
-                    )
+                    put("fields", methodFieldsSchema)
                     put("brief", buildJsonObject { put("type", "boolean") })
                 },
             ),
@@ -412,6 +442,8 @@ internal class McpApp(
                 parseRequestedFields(
                     request.stringArrayArgument("fields"),
                     supported = if (context.session != null) methodFieldNamesWithHandle else methodFieldNames,
+                    sessionRequiredFields = setOf("methodHandle"),
+                    hasSession = context.session != null,
                 )
             } catch (cause: IllegalArgumentException) {
                 return@addLoggedTool errorResult(cause.message.orEmpty())
@@ -451,7 +483,7 @@ internal class McpApp(
 
         server.addLoggedTool(
             name = "find_classes_using_strings",
-            description = "使用字符串锚点定位类候选。建议优先用 brief=true 和 fields 收窄候选，再继续 export_class_* 或 find_methods。",
+            description = "使用字符串锚点定位类候选。建议优先用 brief=true 和 fields 收窄候选，再继续 export_class_* 或 find_methods。仅在 session_id 存在时支持请求 classHandle。",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     put("session_id", buildJsonObject { put("type", "string") })
@@ -472,13 +504,7 @@ internal class McpApp(
                     )
                     put("offset", buildJsonObject { put("type", "integer") })
                     put("limit", buildJsonObject { put("type", "integer") })
-                    put(
-                        "fields",
-                        buildJsonObject {
-                            put("type", "array")
-                            put("items", buildJsonObject { put("type", "string") })
-                        },
-                    )
+                    put("fields", classFieldsSchema)
                     put("brief", buildJsonObject { put("type", "boolean") })
                 },
             ),
@@ -488,7 +514,7 @@ internal class McpApp(
 
         server.addLoggedTool(
             name = "find_methods_using_strings",
-            description = "使用字符串锚点定位方法候选。建议优先用 brief=true 和 fields 收窄候选，再继续 inspect_method 或 export_method_*。",
+            description = "使用字符串锚点定位方法候选。建议优先用 brief=true 和 fields 收窄候选，再继续 inspect_method 或 export_method_*。仅在 session_id 存在时支持请求 methodHandle。",
             inputSchema = ToolSchema(
                 properties = buildJsonObject {
                     put("session_id", buildJsonObject { put("type", "string") })
@@ -509,13 +535,7 @@ internal class McpApp(
                     )
                     put("offset", buildJsonObject { put("type", "integer") })
                     put("limit", buildJsonObject { put("type", "integer") })
-                    put(
-                        "fields",
-                        buildJsonObject {
-                            put("type", "array")
-                            put("items", buildJsonObject { put("type", "string") })
-                        },
-                    )
+                    put("fields", methodFieldsSchema)
                     put("brief", buildJsonObject { put("type", "boolean") })
                 },
             ),
@@ -916,6 +936,8 @@ internal class McpApp(
             parseRequestedFields(
                 request.stringArrayArgument("fields"),
                 supported = if (session != null) supportedFields else supportedFields - setOf("methodHandle", "classHandle"),
+                sessionRequiredFields = supportedFields.intersect(setOf("methodHandle", "classHandle")),
+                hasSession = session != null,
             )
         } catch (cause: IllegalArgumentException) {
             return errorResult(cause.message.orEmpty())

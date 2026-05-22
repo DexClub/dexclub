@@ -956,11 +956,24 @@ private fun populateStringMatcherGroups(
 private fun containsMatcher(value: String): StringMatcher =
     StringMatcher(value = value, matchType = StringMatchType.Contains)
 
-internal fun parseRequestedFields(rawValues: List<String>?, supported: Set<String>): Set<String>? {
+internal fun parseRequestedFields(
+    rawValues: List<String>?,
+    supported: Set<String>,
+    sessionRequiredFields: Set<String> = emptySet(),
+    hasSession: Boolean = true,
+): Set<String>? {
     if (rawValues.isNullOrEmpty()) return null
     val normalized = rawValues.map { it.trim() }
     if (normalized.any { it.isEmpty() }) {
         throw IllegalArgumentException("fields must not contain blank entries")
+    }
+    if (!hasSession) {
+        val requiresSession = normalized.filter { it in sessionRequiredFields }
+        if (requiresSession.isNotEmpty()) {
+            throw IllegalArgumentException(
+                "Fields require session_id: ${requiresSession.joinToString(",")}. Open a target session first, or omit those fields when using workdir",
+            )
+        }
     }
     val unsupported = normalized.filter { it !in supported }
     if (unsupported.isNotEmpty()) {

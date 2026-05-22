@@ -42,6 +42,14 @@ Keep the workflow recoverable and iterative. Do not implement it as a rigid stat
 
 If the user already provides a high-specificity anchor, prefer the shortest path that can test it before falling back to the full default route.
 
+If the user already provides a full method descriptor such as `Lpkg/Class;->name(args)Ret`, do not start with `find_methods`.
+
+- open a target session
+- go directly to `inspect_method` with `descriptor`
+- use `export_method_java` or `export_method_smali` with `descriptor` only when implementation text is needed
+
+Treat a full descriptor as a direct object reference, not as a search hint.
+
 ## Session Rules
 
 Always prefer `session-first`.
@@ -50,6 +58,10 @@ Always prefer `session-first`.
 - after obtaining `session_id`, keep using it
 - do not keep redundantly passing `workdir` once `session_id` exists
 - prefer `method_handle` and `class_handle` after they are returned by dexclub
+- distinguish tool input names from projected result field names:
+  - tool inputs use `method_handle` / `class_handle`
+  - result fields use `methodHandle` / `classHandle`
+- never invent a bare `handle` field name in `fields`
 
 If `session_id not found`:
 
@@ -127,6 +139,31 @@ Default rules:
 - use the smallest useful `fields`
 - do not send irrelevant `include`, `fields`, or `include_text`
 - once a handle exists, do not keep repeating full descriptor and source constraints unless disambiguation is needed
+- if you do not have `session_id`, do not request `methodHandle` or `classHandle` in `fields`
+
+For dexclub MCP `find_*` calls, do not guess field aliases. Use only exact field names supported by the tool.
+
+- never request `handle` or `name`
+  - method results use `methodHandle`, not `handle`
+  - class results use `classHandle`, not `handle`
+  - method name uses `methodName`, not `name`
+  - class name uses `className`, not `name`
+- when you do specify `fields`, use only these exact names:
+  - `find_methods` / `find_methods_using_strings`:
+    - `descriptor`
+    - `sourcePath`
+    - `sourceEntry`
+    - `methodHandle`
+    - only when needed: `className`, `methodName`
+  - `find_classes_using_strings`:
+    - `className`
+    - `sourcePath`
+    - `sourceEntry`
+    - `classHandle`
+- when the first session-based `find_*` call is only used to get a compact next-step identifier, omitting `fields` under `brief=true` is acceptable
+  - current MCP brief defaults already return compact useful identifiers
+  - this can reduce projection mistakes
+- if you do need to specify `fields`, choose them from the exact supported names above and keep them minimal for the current step
 
 The goal is not merely token savings; it is to reduce drift and keep the analysis path controlled.
 
@@ -203,6 +240,7 @@ Treat the following as recoverable, not terminal:
 - `method_handle not found`
 - `class_handle not found`
 - unsupported `include` sections
+- unsupported `fields`
 
 Recovery order:
 
@@ -210,6 +248,11 @@ Recovery order:
 2. rebuild session or reacquire handles for context loss
 3. narrow `include` / `fields` / parameters for parameter errors
 4. retry on the MCP path
+
+If the error mentions unsupported `fields`, first check for guessed aliases such as:
+
+- `handle` instead of `methodHandle` / `classHandle`
+- `name` instead of `methodName` / `className`
 
 Do not immediately fall back to shell or source-code reading because of these errors.
 
