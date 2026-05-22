@@ -80,6 +80,7 @@ data class FindMethodsUsingStringsRequest(
 
 data class InspectMethodRequest(
     val descriptor: String,
+    val source: SourceLocator = SourceLocator(),
     val includes: Set<MethodDetailSection> = MethodDetailSection.entries.toSet(),
 )
 

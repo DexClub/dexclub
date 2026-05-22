@@ -72,7 +72,7 @@ Copy-Item -Recurse -Force .\skills\dexclub-analysis C:\Users\<user>\.codex\skill
 
 - 使用 `mcp__dexclub__`
 - 先 `open_target_session`
-- 先 `brief + fields`
+- 首轮优先 `brief=true`，只有确有必要再显式 `fields`
 - 先 `inspect` 后 `export`
 
 ## 相关文件

@@ -18,6 +18,13 @@ When the current path becomes expensive too early, prefer this reset:
 
 1. keep the current `session_id`
 2. go back to the strongest clue
-3. rerun the smallest `find_*` call with `brief + fields`
+3. rerun the smallest `find_*` call with `brief=true`, and only add `fields` when the next step truly needs explicit projection
 4. inspect one likely method
 5. export only if that method still needs evidence text
+
+Practical guardrails:
+
+- on the first recovery search, prefer `brief=true` without explicit `fields`
+- use dotted class-name fragments for `class_name_contains`
+- do not treat `descriptor_contains` as a substitute for a concrete method descriptor
+- reacquire exact descriptors from MCP results before export; do not hand-write them from decompiled text

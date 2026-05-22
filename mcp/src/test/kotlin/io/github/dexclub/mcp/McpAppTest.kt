@@ -263,6 +263,23 @@ class McpAppTest {
     }
 
     @Test
+    fun staleSessionMessageExplainsHowToRecover() {
+        val message = McpApp(
+            services = Services(
+                workspace = FakeWorkspaceService(fakeWorkspaceContext()),
+                dex = FakeDexAnalysisService(),
+                resource = FakeResourceService(),
+            ),
+            sessionStore = McpSessionStore(),
+        ).staleSessionMessage("dead-session")
+
+        assertEquals(
+            "session_id not found: dead-session. The MCP process may have restarted, the session may have expired, or the chat may have been restored. Reopen the target with open_target_session, or switch to workdir for stateless calls",
+            message,
+        )
+    }
+
+    @Test
     fun findMethodsSupportsWorkdirFallbackWithoutSession() {
         val workspace = fakeWorkspaceContext()
         val workspaceService = FakeWorkspaceService(workspace)
@@ -353,11 +370,14 @@ class McpAppTest {
         val detail = app.inspectMethod(
             workspace = session.workspace,
             descriptor = "Lsample/Test;->foo()V",
+            source = SourceLocator(sourcePath = "sample.apk", sourceEntry = "classes.dex"),
             includes = setOf(MethodDetailSection.Strings, MethodDetailSection.Annotations),
         )
 
         assertEquals(workspace, dexService.lastWorkspace)
         assertEquals("Lsample/Test;->foo()V", dexService.lastInspectRequest?.descriptor)
+        assertEquals("sample.apk", dexService.lastInspectRequest?.source?.sourcePath)
+        assertEquals("classes.dex", dexService.lastInspectRequest?.source?.sourceEntry)
         assertEquals(setOf(MethodDetailSection.Strings, MethodDetailSection.Annotations), dexService.lastInspectRequest?.includes)
         assertEquals(listOf("alpha"), detail.strings)
         assertEquals(listOf("Lsample/Anno;"), detail.annotations)

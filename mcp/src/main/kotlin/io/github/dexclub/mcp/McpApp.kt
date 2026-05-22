@@ -183,7 +183,7 @@ internal class McpApp(
                 return@addLoggedTool errorResult("session_id is required")
             }
             val session = getTargetSession(sessionId)
-                ?: return@addLoggedTool errorResult("session_id not found")
+                ?: return@addLoggedTool missingSessionResult(sessionId)
             CallToolResult(
                 content = listOf(
                     TextContent(
@@ -261,7 +261,10 @@ internal class McpApp(
                 },
             ),
         ) { request ->
-            val context = resolveExecutionContext(request) ?: return@addLoggedTool missingSessionOrWorkdirResult()
+            val context = when (val resolution = executionContextOrFailureResult(request)) {
+                is ExecutionContextResolution.Ready -> resolution.context
+                is ExecutionContextResolution.Failed -> return@addLoggedTool resolution.result
+            }
             val session = context.session
             val methodRef = try {
                 resolveMethodReference(request, session)
@@ -290,6 +293,7 @@ internal class McpApp(
             val detail = inspectMethod(
                 workspace = context.workspace,
                 descriptor = methodRef!!.descriptor,
+                source = request.toSourceLocator(methodRef),
                 includes = includes,
             )
             CallToolResult(
@@ -319,7 +323,10 @@ internal class McpApp(
                 },
             ),
         ) { request ->
-            val context = resolveExecutionContext(request) ?: return@addLoggedTool missingSessionOrWorkdirResult()
+            val context = when (val resolution = executionContextOrFailureResult(request)) {
+                is ExecutionContextResolution.Ready -> resolution.context
+                is ExecutionContextResolution.Failed -> return@addLoggedTool resolution.result
+            }
             val includes = try {
                 parseManifestInspectionSections(
                     (request.arguments?.get("include") as? JsonArray)
@@ -448,7 +455,10 @@ internal class McpApp(
                 },
             ),
         ) { request ->
-            val context = resolveExecutionContext(request) ?: return@addLoggedTool missingSessionOrWorkdirResult()
+            val context = when (val resolution = executionContextOrFailureResult(request)) {
+                is ExecutionContextResolution.Ready -> resolution.context
+                is ExecutionContextResolution.Failed -> return@addLoggedTool resolution.result
+            }
             val classNameContains = request.optionalStringArgument("class_name_contains")
             val methodNameContains = request.optionalStringArgument("method_name_contains")
             val descriptorContains = request.optionalStringArgument("descriptor_contains")
@@ -578,7 +588,10 @@ internal class McpApp(
                 },
             ),
         ) { request ->
-            val context = resolveExecutionContext(request) ?: return@addLoggedTool missingSessionOrWorkdirResult()
+            val context = when (val resolution = executionContextOrFailureResult(request)) {
+                is ExecutionContextResolution.Ready -> resolution.context
+                is ExecutionContextResolution.Failed -> return@addLoggedTool resolution.result
+            }
             val type = request.optionalStringArgument("type")
             val offset = request.intArgument("offset")
             val limit = request.intArgument("limit")
@@ -635,7 +648,10 @@ internal class McpApp(
                 required = listOf("type", "value"),
             ),
         ) { request ->
-            val context = resolveExecutionContext(request) ?: return@addLoggedTool missingSessionOrWorkdirResult()
+            val context = when (val resolution = executionContextOrFailureResult(request)) {
+                is ExecutionContextResolution.Ready -> resolution.context
+                is ExecutionContextResolution.Failed -> return@addLoggedTool resolution.result
+            }
             val type = request.requiredStringArgument("type")
             val value = request.requiredStringArgument("value")
             if (type.isEmpty() || value.isEmpty()) {
@@ -692,7 +708,10 @@ internal class McpApp(
                 },
             ),
         ) { request ->
-            val context = resolveExecutionContext(request) ?: return@addLoggedTool missingSessionOrWorkdirResult()
+            val context = when (val resolution = executionContextOrFailureResult(request)) {
+                is ExecutionContextResolution.Ready -> resolution.context
+                is ExecutionContextResolution.Failed -> return@addLoggedTool resolution.result
+            }
             val resourceId = request.optionalStringArgument("resource_id")
             val type = request.optionalStringArgument("type")
             val name = request.optionalStringArgument("name")
@@ -729,7 +748,10 @@ internal class McpApp(
                 required = listOf("path"),
             ),
         ) { request ->
-            val context = resolveExecutionContext(request) ?: return@addLoggedTool missingSessionOrWorkdirResult()
+            val context = when (val resolution = executionContextOrFailureResult(request)) {
+                is ExecutionContextResolution.Ready -> resolution.context
+                is ExecutionContextResolution.Failed -> return@addLoggedTool resolution.result
+            }
             val path = request.requiredStringArgument("path")
             if (path.isEmpty()) {
                 return@addLoggedTool errorResult("path is required")
@@ -820,7 +842,10 @@ internal class McpApp(
         view: String,
         exporter: (WorkspaceContext, String, SourceLocator, String?) -> String,
     ): CallToolResult {
-        val context = resolveExecutionContext(request) ?: return missingSessionOrWorkdirResult()
+        val context = when (val resolution = executionContextOrFailureResult(request)) {
+            is ExecutionContextResolution.Ready -> resolution.context
+            is ExecutionContextResolution.Failed -> return resolution.result
+        }
         val session = context.session
         val methodRef = try {
             resolveMethodReference(request, session)
@@ -859,7 +884,10 @@ internal class McpApp(
         view: String,
         exporter: (WorkspaceContext, String, SourceLocator) -> String,
     ): CallToolResult {
-        val context = resolveExecutionContext(request) ?: return missingSessionOrWorkdirResult()
+        val context = when (val resolution = executionContextOrFailureResult(request)) {
+            is ExecutionContextResolution.Ready -> resolution.context
+            is ExecutionContextResolution.Failed -> return resolution.result
+        }
         val session = context.session
         val classRef = try {
             resolveClassReference(request, session)
@@ -936,7 +964,10 @@ internal class McpApp(
         supportedFields: Set<String>,
         renderer: (ExecutionContext, T, Set<String>?, Boolean) -> Pair<kotlinx.serialization.KSerializer<S>, S>,
     ): CallToolResult {
-        val context = resolveExecutionContext(request) ?: return missingSessionOrWorkdirResult()
+        val context = when (val resolution = executionContextOrFailureResult(request)) {
+            is ExecutionContextResolution.Ready -> resolution.context
+            is ExecutionContextResolution.Failed -> return resolution.result
+        }
         val session = context.session
         val containsAnyStrings = request.stringArrayArgument("contains_any_strings")
         val containsAllStrings = request.stringArrayArgument("contains_all_strings")
@@ -968,19 +999,33 @@ internal class McpApp(
 
     private fun resolveExecutionContext(
         request: CallToolRequest,
-    ): ExecutionContext? {
+    ): ExecutionContextLookup {
         val sessionId = request.optionalStringArgument("session_id")
         if (sessionId != null) {
-            val session = sessionStore.getTargetSession(sessionId) ?: return null
-            return ExecutionContext(session = session, workspace = session.workspace)
+            val session = sessionStore.getTargetSession(sessionId)
+                ?: return ExecutionContextLookup.MissingSession(sessionId)
+            return ExecutionContextLookup.Found(ExecutionContext(session = session, workspace = session.workspace))
         }
-        val workdir = request.optionalStringArgument("workdir") ?: return null
+        val workdir = request.optionalStringArgument("workdir") ?: return ExecutionContextLookup.MissingLocator
         val workspace = services.workspace.open(WorkspaceRef(workdir))
-        return ExecutionContext(session = null, workspace = workspace)
+        return ExecutionContextLookup.Found(ExecutionContext(session = null, workspace = workspace))
     }
+
+    private fun executionContextOrFailureResult(request: CallToolRequest): ExecutionContextResolution =
+        when (val lookup = resolveExecutionContext(request)) {
+            is ExecutionContextLookup.Found -> ExecutionContextResolution.Ready(lookup.context)
+            is ExecutionContextLookup.MissingSession -> ExecutionContextResolution.Failed(missingSessionResult(lookup.sessionId))
+            ExecutionContextLookup.MissingLocator -> ExecutionContextResolution.Failed(missingSessionOrWorkdirResult())
+        }
 
     private fun missingSessionOrWorkdirResult(): CallToolResult =
         errorResult("session_id or workdir is required")
+
+    private fun missingSessionResult(sessionId: String): CallToolResult =
+        errorResult(staleSessionMessage(sessionId))
+
+    internal fun staleSessionMessage(sessionId: String): String =
+        "session_id not found: $sessionId. The MCP process may have restarted, the session may have expired, or the chat may have been restored. Reopen the target with open_target_session, or switch to workdir for stateless calls"
 
     private fun errorResult(message: String): CallToolResult =
         CallToolResult(
@@ -1058,11 +1103,13 @@ internal class McpApp(
     internal fun inspectMethod(
         workspace: WorkspaceContext,
         descriptor: String,
+        source: SourceLocator = SourceLocator(),
         includes: Set<io.github.dexclub.core.api.dex.MethodDetailSection>,
     ) = services.dex.inspectMethod(
         workspace = workspace,
         request = InspectMethodRequest(
             descriptor = descriptor,
+            source = source,
             includes = includes,
         ),
     )
@@ -1084,6 +1131,20 @@ internal class McpApp(
     internal fun closeTargetSession(sessionId: String): TargetSession? = sessionStore.closeTargetSession(sessionId)
 
     internal fun diagnoseTargetSessions(): SessionStoreSnapshot = sessionStore.snapshot()
+
+    private sealed interface ExecutionContextLookup {
+        data class Found(val context: ExecutionContext) : ExecutionContextLookup
+
+        data class MissingSession(val sessionId: String) : ExecutionContextLookup
+
+        data object MissingLocator : ExecutionContextLookup
+    }
+
+    private sealed interface ExecutionContextResolution {
+        data class Ready(val context: ExecutionContext) : ExecutionContextResolution
+
+        data class Failed(val result: CallToolResult) : ExecutionContextResolution
+    }
 
     internal fun getResourceValue(
         workspace: WorkspaceContext,

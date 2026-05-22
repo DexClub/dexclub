@@ -10,6 +10,7 @@ import io.github.dexclub.core.api.dex.MethodDetail
 import io.github.dexclub.core.api.dex.MethodDetailSection
 import io.github.dexclub.core.api.dex.MethodFieldUsage
 import io.github.dexclub.core.api.dex.MethodHit
+import io.github.dexclub.core.api.shared.SourceLocator
 import io.github.dexclub.core.api.workspace.WorkspaceContext
 import io.github.dexclub.core.impl.workspace.model.MaterialInventory
 import io.github.dexclub.core.impl.workspace.store.WorkspaceStore
@@ -135,7 +136,7 @@ internal class DefaultDexSearchExecutor(
         validateMethodDescriptor(descriptor)
         val workdirPath = Paths.get(workspace.workdir)
         return withTargetDexContext(workspace, workdirPath, inventory) { context ->
-            val locatedMethod = resolveUniqueLocatedMethod(context, descriptor)
+            val locatedMethod = resolveUniqueLocatedMethod(context, descriptor, request.source)
             val classSourceCache = mutableMapOf<String, MemberSource?>()
             val callers = request.includes.takeIf { MethodDetailSection.Callers in it }?.let {
                 findMethodCallers(context, locatedMethod.method)
@@ -442,18 +443,42 @@ internal class DefaultDexSearchExecutor(
                 ?.let(context::resolveSource)
         }
 
-    private fun resolveUniqueLocatedMethod(context: TargetDexContext, descriptor: String): LocatedMethod {
+    private fun resolveUniqueLocatedMethod(
+        context: TargetDexContext,
+        descriptor: String,
+        source: SourceLocator = SourceLocator(),
+    ): LocatedMethod {
         val matches = context.bridge.findMethod(buildExactDescriptorMethodQuery(descriptor))
             .map { method -> LocatedMethod(method = method, source = context.requireSource(method.dexId)) }
+            .filter { located ->
+                (source.sourcePath == null || located.source.sourcePath == source.sourcePath) &&
+                    (source.sourceEntry == null || located.source.sourceEntry == source.sourceEntry)
+            }
         return when (matches.size) {
             1 -> matches.single()
             0 -> throw DexInspectError(
                 reason = DexInspectErrorReason.MethodNotFound,
-                message = "method not found: $descriptor",
+                message = buildString {
+                    append("method not found: ")
+                    append(descriptor)
+                    source.describe()?.let {
+                        append(" (")
+                        append(it)
+                        append(')')
+                    }
+                },
             )
             else -> throw DexInspectError(
                 reason = DexInspectErrorReason.AmbiguousMethod,
-                message = "method resolves to multiple dex sources and inspect-method requires a unique descriptor within the workspace: $descriptor",
+                message = buildString {
+                    append("method resolves to multiple dex sources and inspect-method requires a unique descriptor within the workspace: ")
+                    append(descriptor)
+                    source.describe()?.let {
+                        append(" (")
+                        append(it)
+                        append(')')
+                    }
+                },
             )
         }
     }
@@ -726,3 +751,11 @@ internal class DefaultDexSearchExecutor(
         val sourceEntry: String?,
     )
 }
+
+private fun SourceLocator.describe(): String? =
+    when {
+        sourcePath != null && sourceEntry != null -> "source_path=$sourcePath, source_entry=$sourceEntry"
+        sourcePath != null -> "source_path=$sourcePath"
+        sourceEntry != null -> "source_entry=$sourceEntry"
+        else -> null
+    }

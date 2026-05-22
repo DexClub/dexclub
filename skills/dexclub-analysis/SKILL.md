@@ -33,7 +33,7 @@ Use the following default order unless the current task clearly justifies a devi
 
 1. `open_target_session`
 2. choose one lowest-cost entry path
-3. use `brief + fields` to shrink candidates
+3. use `brief=true` first, and add `fields` only when the next step truly needs explicit projection
 4. use `inspect_method` to read one-layer facts
 5. use `export_*` only when evidence text is actually needed
 6. summarize conclusion, evidence, and remaining uncertainty
@@ -136,6 +136,9 @@ Keep arguments minimal.
 Default rules:
 
 - use `brief=true` for `find_*`, `list_res`, and `find_resource_values` unless more detail is required
+- for the first session-based narrowing call, prefer `brief=true` without explicit `fields`
+  - current MCP brief defaults already return compact identifiers
+  - only add `fields` when the next step truly depends on specific projected keys
 - use the smallest useful `fields`
 - do not send irrelevant `include`, `fields`, or `include_text`
 - once a handle exists, do not keep repeating full descriptor and source constraints unless disambiguation is needed
@@ -164,6 +167,14 @@ For dexclub MCP `find_*` calls, do not guess field aliases. Use only exact field
   - current MCP brief defaults already return compact useful identifiers
   - this can reduce projection mistakes
 - if you do need to specify `fields`, choose them from the exact supported names above and keep them minimal for the current step
+- for `class_name_contains`, use normal dotted class-name fragments such as `com.foo.Bar` or `foo.Bar`
+  - do not use descriptor form like `Lcom/foo/Bar;`
+  - do not use slash-form fragments like `com/foo/Bar`
+- treat `descriptor_contains` as a raw substring filter, not as a direct object reference
+  - do not switch to `descriptor_contains=Lpkg/Class;->` when you already intend to target one concrete method or one concrete owner
+  - if you already have a full method descriptor, go straight to `inspect_method` or `export_method_*`
+- do not synthesize or rewrite method descriptors from class exports, Java text, or obfuscated guesses before export
+  - if an exact method needs to be exported, reacquire the concrete descriptor from MCP search or handle-backed results first
 
 The goal is not merely token savings; it is to reduce drift and keep the analysis path controlled.
 

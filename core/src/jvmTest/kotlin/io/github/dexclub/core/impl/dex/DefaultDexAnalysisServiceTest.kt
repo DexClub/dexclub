@@ -239,6 +239,26 @@ class DefaultDexAnalysisServiceTest {
     }
 
     @Test
+    fun inspectMethodCanBeNarrowedBySourcePathOnAmbiguousApk() {
+        val fixture = DexAnalysisFixture.generated()
+        val services = createDefaultServices()
+        services.workspace.initialize(fixture.ambiguousApkFile.absolutePath)
+        val workspace = services.workspace.open(WorkspaceRef(fixture.ambiguousWorkspaceDir.absolutePath))
+
+        val detail = services.dex.inspectMethod(
+            workspace = workspace,
+            request = io.github.dexclub.core.api.dex.InspectMethodRequest(
+                descriptor = "Lfixture/samples/SampleSearchTarget;->exposeNeedle()Ljava/lang/String;",
+                source = SourceLocator(sourcePath = "fixture.apk", sourceEntry = "classes2.dex"),
+            ),
+        )
+
+        assertEquals("fixture.apk", detail.method.sourcePath)
+        assertEquals("classes2.dex", detail.method.sourceEntry)
+        assertEquals("Lfixture/samples/SampleSearchTarget;->exposeNeedle()Ljava/lang/String;", detail.method.descriptor)
+    }
+
+    @Test
     fun findClassRequiresDexCapability() {
         val workdir = Files.createTempDirectory("dexclub-core-manifest").toFile()
         val manifest = workdir.toPath().resolve("AndroidManifest.xml")
@@ -915,4 +935,3 @@ private const val QUERY_METHOD_USING_STRINGS_SINGLE_GROUP =
 
 private const val QUERY_METHOD_USING_STRINGS_DUP_GROUPS =
     """{"groups":{"needle-a":[{"value":"dexclub-needle-string","matchType":"Equals"}],"needle-b":[{"value":"dexclub-needle-string","matchType":"Equals"}]}}"""
-
