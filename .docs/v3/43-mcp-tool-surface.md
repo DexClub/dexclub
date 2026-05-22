@@ -107,6 +107,8 @@ skill 再基于这些对象形成结论。
 
 - 终端默认保留最小运行日志
 - 详细 HTTP / tool 轨迹默认写入 `logs/mcp.log`
+- `logs/mcp.log` 始终表示当前 MCP 进程日志
+- 每次启动会先把旧的 `mcp.log` 归档到 `logs/archive/mcp_<启动时间>.log`
 - `DEXCLUB_MCP_TRACE=false` 时，可显式关闭详细轨迹文件
 - 启动日志会明确打印最终监听的 `host:port/path`
 

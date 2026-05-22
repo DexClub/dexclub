@@ -193,7 +193,7 @@ $env:DEXCLUB_MCP_PORT="8787"
 
 - `mcp` 是面向 Codex / agent 的工具服务，不是交互式 CLI
 - 终端默认保留最小运行日志（启动、tool failure、未捕获异常、shutdown）
-- 详细轨迹默认写入 `logs/mcp.log`，并按大小轮转；可通过 `DEXCLUB_MCP_TRACE=false` 显式关闭
+- 详细轨迹默认写入 `logs/mcp.log`；每次启动会先把旧的 `mcp.log` 归档到 `logs/archive/mcp_<启动时间>.log`，可通过 `DEXCLUB_MCP_TRACE=false` 显式关闭
 - `mcp` 默认依赖 DexKit native 动态库位于分发目录的 `lib/` 下
 
 ## Skills

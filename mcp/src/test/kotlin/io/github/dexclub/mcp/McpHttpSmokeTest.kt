@@ -20,6 +20,10 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.net.ServerSocket
+import kotlin.io.path.createTempDirectory
+import kotlin.io.path.listDirectoryEntries
+import kotlin.io.path.readText
+import kotlin.io.path.writeText
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -45,6 +49,30 @@ class McpHttpSmokeTest {
         smoke(traceEnabled = true)
     }
 
+    @Test
+    fun traceLogArchivesPreviousProcessLogOnInstall() {
+        val traceDir = createTempDirectory("mcp-trace-archive-test")
+        val traceLog = traceDir.resolve("mcp.log")
+        traceLog.writeText("previous process log\n")
+
+        McpRuntimeDiagnostics.install(
+            HttpServerConfig(
+                host = "127.0.0.1",
+                port = 0,
+                path = "/mcp",
+                traceEnabled = true,
+                traceLogFile = traceLog,
+            ),
+        )
+
+        val archived = traceDir.resolve("archive").listDirectoryEntries("mcp_*.log")
+        assertEquals(1, archived.size)
+        assertEquals("previous process log\n", archived.single().readText())
+        val currentLog = traceLog.readText()
+        assertTrue(currentLog.contains("PROCESS START: DexClub MCP process started"))
+        assertTrue(!currentLog.contains("previous process log"))
+    }
+
     private suspend fun smoke(traceEnabled: Boolean) {
         val app = McpApp(
             services = Services(
@@ -62,7 +90,7 @@ class McpHttpSmokeTest {
                 port = port,
                 path = "/mcp",
                 traceEnabled = traceEnabled,
-                traceLogFile = if (traceEnabled) kotlin.io.path.createTempDirectory("mcp-trace-test").resolve("mcp.log") else null,
+                traceLogFile = if (traceEnabled) createTempDirectory("mcp-trace-test").resolve("mcp.log") else null,
             ),
             server = server,
         ).also { it.start(wait = false) }

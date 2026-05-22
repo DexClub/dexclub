@@ -187,20 +187,21 @@ internal data class TraceRequestInfo(
     }
 }
 
-private class RollingTraceLogger(
+private class StartupArchivingTraceLogger(
     private val logFile: Path,
-    private val maxFileSizeBytes: Long,
-    private val maxHistoryFiles: Int,
 ) {
     private val lock = Any()
+    private val archiveTimestampFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
+        .withZone(ZoneId.systemDefault())
+
+    init {
+        archiveExistingLog()
+    }
 
     fun append(event: String) {
         synchronized(lock) {
             val normalizedEvent = ensureTrailingLineBreak(event)
-            val parent = logFile.parent
-            if (parent != null) {
-                parent.createDirectories()
-            }
+            createLogDirectory()
             Files.writeString(
                 logFile,
                 normalizedEvent,
@@ -208,27 +209,42 @@ private class RollingTraceLogger(
                 java.nio.file.StandardOpenOption.CREATE,
                 java.nio.file.StandardOpenOption.APPEND,
             )
-            rotateIfNeeded()
         }
     }
 
-    private fun rotateIfNeeded() {
-        if (!Files.exists(logFile)) return
-        if (Files.size(logFile) <= maxFileSizeBytes) return
+    private fun archiveExistingLog() {
+        synchronized(lock) {
+            if (!Files.exists(logFile)) return
+            if (Files.size(logFile) == 0L) return
 
-        val oldest = rotatedFile(maxHistoryFiles)
-        Files.deleteIfExists(oldest)
-        for (index in maxHistoryFiles - 1 downTo 1) {
-            val source = rotatedFile(index)
-            if (Files.exists(source)) {
-                Files.move(source, rotatedFile(index + 1))
-            }
+            createLogDirectory()
+            val archiveDir = archiveDir()
+            archiveDir.createDirectories()
+            Files.move(logFile, nextArchiveFile(archiveDir))
         }
-        Files.move(logFile, rotatedFile(1))
     }
 
-    private fun rotatedFile(index: Int): Path =
-        logFile.resolveSibling("${logFile.fileName}.$index")
+    private fun nextArchiveFile(archiveDir: Path): Path {
+        val baseName = logFile.fileName.toString().substringBeforeLast('.', logFile.fileName.toString())
+        val extension = logFile.fileName.toString().substringAfterLast('.', "").let {
+            if (it.isEmpty() || it == logFile.fileName.toString()) "" else ".$it"
+        }
+        val timestamp = archiveTimestampFormatter.format(Instant.now())
+        var candidate = archiveDir.resolve("${baseName}_$timestamp$extension")
+        var suffix = 1
+        while (Files.exists(candidate)) {
+            candidate = archiveDir.resolve("${baseName}_${timestamp}_$suffix$extension")
+            suffix += 1
+        }
+        return candidate
+    }
+
+    private fun createLogDirectory() {
+        logFile.parent?.createDirectories()
+    }
+
+    private fun archiveDir(): Path =
+        logFile.parent?.resolve("archive") ?: Paths.get("archive")
 
     private fun ensureTrailingLineBreak(event: String): String =
         if (event.endsWith(System.lineSeparator())) event else event + System.lineSeparator()
@@ -236,17 +252,15 @@ private class RollingTraceLogger(
 
 internal object McpRuntimeDiagnostics {
     private val currentOperation = AtomicReference<String?>(null)
-    private val traceLogger = AtomicReference<RollingTraceLogger?>(null)
+    private val traceLogger = AtomicReference<StartupArchivingTraceLogger?>(null)
     private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
         .withZone(ZoneId.systemDefault())
 
     fun install(config: HttpServerConfig) {
         traceLogger.set(
             config.traceLogFile?.let {
-                RollingTraceLogger(
+                StartupArchivingTraceLogger(
                     logFile = it,
-                    maxFileSizeBytes = 10L * 1024 * 1024,
-                    maxHistoryFiles = 5,
                 )
             },
         )
