@@ -1,5 +1,6 @@
 package io.github.dexclub.core.impl.dex
 
+import jadx.api.CommentsLevel
 import jadx.api.JadxArgs
 import jadx.api.JadxDecompiler
 import jadx.api.impl.NoOpCodeCache
@@ -72,14 +73,15 @@ internal class JadxDecompilerService {
             codeCache = NoOpCodeCache()
             usageInfoCache = EmptyUsageInfoCache()
             codeWriterProvider = Function(::SimpleCodeWriter)
-            setUseDxInput(true)
+            isUseDxInput = true
             pluginLoader = this@JadxDecompilerService.pluginLoader
             isRenameValid = true
             isRenameCaseSensitive = true
-            isShowInconsistentCode = false
             isDebugInfo = false
             isMoveInnerClasses = false
             isInlineAnonymousClasses = false
+            isShowInconsistentCode = true
+            commentsLevel = CommentsLevel.DEBUG
         }
         JadxDecompiler(args).use { decompiler ->
             decompiler.load()
