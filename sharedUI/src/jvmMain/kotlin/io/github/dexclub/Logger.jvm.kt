@@ -1,8 +1,10 @@
 package io.github.dexclub
 
 import java.io.File
+import java.io.FileDescriptor
 import java.io.FileOutputStream
 import java.io.OutputStream
+import java.io.PrintStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -24,6 +26,8 @@ internal actual object LogPlatform {
     private val timestampFormatterLocal = ThreadLocal<SimpleDateFormat>()
     private val logFileDateFormatterLocal = ThreadLocal<SimpleDateFormat>()
     private val exportNameFormatterLocal = ThreadLocal<SimpleDateFormat>()
+    private val utf8Stdout = PrintStream(FileOutputStream(FileDescriptor.out), true, Charsets.UTF_8)
+    private val utf8Stderr = PrintStream(FileOutputStream(FileDescriptor.err), true, Charsets.UTF_8)
 
     private var lastCleanupDateKey: String? = null
 
@@ -37,8 +41,8 @@ internal actual object LogPlatform {
 
     actual fun writeConsole(level: LogLevel, tag: String, text: String) {
         when (level) {
-            LogLevel.DEBUG, LogLevel.INFO -> System.out.println(text)
-            LogLevel.WARN, LogLevel.ERROR -> System.err.println(text)
+            LogLevel.DEBUG, LogLevel.INFO -> utf8Stdout.println(text)
+            LogLevel.WARN, LogLevel.ERROR -> utf8Stderr.println(text)
         }
     }
 
