@@ -12,6 +12,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -20,6 +21,7 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalClipboard
 import io.github.dexclub.app.model.OpenTabUiModel
 import io.github.dexclub.codeview.compose.CodeContentOptions
 import io.github.dexclub.codeview.compose.CodeDecorationOptions
@@ -39,6 +41,8 @@ import io.github.dexclub.core.editor.EditorInPageSearchSource
 import io.github.dexclub.core.editor.EditorInPageSearchState
 import io.github.dexclub.core.navigation.NavigateRequestContext
 import io.github.shadcn.ui.compose.ShadcnTheme
+import io.github.shadcn.ui.compose.copyText
+import kotlinx.coroutines.launch
 
 private val WORKSPACE_CODE_GUTTER_OPTIONS: CodeGutterOptions = CodeGutterOptions()
 private val WORKSPACE_CODE_CONTENT_OPTIONS: CodeContentOptions = CodeContentOptions()
@@ -69,6 +73,8 @@ internal fun CodeViewPane(
     modifier: Modifier = Modifier,
     paddingValues: PaddingValues = PaddingValues.Zero,
 ) {
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     val editorState = paneState.editorState
     val inPageSearchState = editorState.inPageSearchState
     val addons = rememberCodeAddons {
@@ -385,6 +391,10 @@ internal fun CodeViewPane(
     ): Boolean {
         if (!isSelectedTab || keyEvent.type != KeyEventType.KeyDown) {
             return false
+        }
+        if (isCodeCopyShortcut(keyEvent) && selectedText.isNotEmpty()) {
+            scope.launch { clipboard.copyText(selectedText, label = "code_selection") }
+            return true
         }
         if (isInPageSearchShortcut(keyEvent)) {
             openSearchBar()

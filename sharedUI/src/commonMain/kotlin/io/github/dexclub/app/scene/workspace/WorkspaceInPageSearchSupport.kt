@@ -86,3 +86,10 @@ internal fun isInPageSearchShortcut(
     return keyEvent.key == Key.F &&
             (keyEvent.isCtrlPressed || keyEvent.isMetaPressed)
 }
+
+internal fun isCodeCopyShortcut(
+    keyEvent: KeyEvent,
+): Boolean {
+    return keyEvent.key == Key.C &&
+            (keyEvent.isCtrlPressed || keyEvent.isMetaPressed)
+}
