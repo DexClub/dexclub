@@ -26,6 +26,7 @@ internal fun Modifier.codeEditorKeyInput(
     preferredColumn: Int?,
     onPreferredColumnChange: (Int?) -> Unit,
     onInterruptInputAnchor: () -> Unit,
+    onFindRequested: (String) -> Unit,
     onFieldValueChange: (TextFieldValue) -> Unit,
 ): Modifier {
     return onKeyEvent { keyEvent ->
@@ -68,6 +69,11 @@ internal fun Modifier.codeEditorKeyInput(
                     onPreferredColumnChange(null)
                     onFieldValueChange(fieldValue.replaceSelection(pastedText))
                 }
+                return@onKeyEvent true
+            }
+
+            modifierHeld && keyEvent.key == Key.F -> {
+                onFindRequested(fieldValue.selectedText())
                 return@onKeyEvent true
             }
 
@@ -149,6 +155,7 @@ internal fun Modifier.codeEditorCommandKeyInput(
     preferredColumn: Int?,
     onPreferredColumnChange: (Int?) -> Unit,
     onInterruptInputAnchor: () -> Unit,
+    onFindRequested: (String) -> Unit,
     onFieldValueChange: (TextFieldValue) -> Unit,
 ): Modifier {
     return onPreviewKeyEvent { keyEvent ->
@@ -191,6 +198,11 @@ internal fun Modifier.codeEditorCommandKeyInput(
                     onPreferredColumnChange(null)
                     onFieldValueChange(fieldValue.replaceSelection(pastedText))
                 }
+                true
+            }
+
+            modifierHeld && keyEvent.key == Key.F -> {
+                onFindRequested(fieldValue.selectedText())
                 true
             }
 

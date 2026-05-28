@@ -68,6 +68,7 @@ internal fun CodeEditorContent(
     decorationOptions: CodeDecorationOptions,
     followCursorToken: Long?,
     fieldValue: TextFieldValue,
+    onFindRequested: (String) -> Unit,
     onFieldValueChange: (TextFieldValue) -> Unit,
 ) {
     val clipboard = LocalClipboard.current
@@ -204,6 +205,7 @@ internal fun CodeEditorContent(
                 onInterruptInputAnchor = ::interruptInputAnchor,
                 textStyle = textStyle,
                 focusRequester = imeFocusRequester,
+                onFindRequested = onFindRequested,
                 onFieldValueChange = onFieldValueChange,
             )
         }
@@ -255,6 +257,7 @@ internal fun CodeEditorContent(
                         onRequestImeFocus = ::requestImeFocus,
                         isSoftwareKeyboardVisible = platformEditorBridge::isSoftwareKeyboardVisible,
                         onInterruptInputAnchor = ::interruptInputAnchor,
+                        onFindRequested = onFindRequested,
                         onAnyPointerEditing = ::resetPreferredColumn,
                         scrollController = scrollController,
                         onTapInsideSelection = ::requestSelectionToolbar,
@@ -291,6 +294,7 @@ internal fun CodeEditorContent(
                         onInterruptInputAnchor = ::interruptInputAnchor,
                         textStyle = textStyle,
                         focusRequester = imeFocusRequester,
+                        onFindRequested = onFindRequested,
                         onFieldValueChange = onFieldValueChange,
                     )
                 }

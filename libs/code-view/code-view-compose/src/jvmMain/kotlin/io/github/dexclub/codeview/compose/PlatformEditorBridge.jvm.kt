@@ -44,6 +44,7 @@ private object JvmPlatformEditorBridge : PlatformEditorBridge {
         preferredColumn: Int?,
         onPreferredColumnChange: (Int?) -> Unit,
         onInterruptInputAnchor: () -> Unit,
+        onFindRequested: (String) -> Unit,
         onFieldValueChange: (TextFieldValue) -> Unit,
     ): Modifier {
         return codeEditorCommandKeyInput(
@@ -54,6 +55,7 @@ private object JvmPlatformEditorBridge : PlatformEditorBridge {
             preferredColumn = preferredColumn,
             onPreferredColumnChange = onPreferredColumnChange,
             onInterruptInputAnchor = onInterruptInputAnchor,
+            onFindRequested = onFindRequested,
             onFieldValueChange = onFieldValueChange,
         )
     }
@@ -76,6 +78,7 @@ private object JvmPlatformEditorBridge : PlatformEditorBridge {
         onInterruptInputAnchor: () -> Unit,
         textStyle: TextStyle,
         focusRequester: FocusRequester,
+        onFindRequested: (String) -> Unit,
         onFieldValueChange: (TextFieldValue) -> Unit,
     ) {
         val inputHost = remember { DesktopInputHostComponent() }
@@ -103,6 +106,7 @@ private object JvmPlatformEditorBridge : PlatformEditorBridge {
                 preferredColumn = preferredColumn,
                 onPreferredColumnChange = onPreferredColumnChange,
                 onInterruptInputAnchor = onInterruptInputAnchor,
+                onFindRequested = onFindRequested,
                 onFieldValueChange = onFieldValueChange,
             )
             inputHost.updateWindowBounds(boundsInWindow)

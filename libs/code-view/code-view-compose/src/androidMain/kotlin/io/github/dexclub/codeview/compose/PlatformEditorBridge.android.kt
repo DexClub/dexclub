@@ -38,6 +38,7 @@ private object AndroidPlatformEditorBridge : PlatformEditorBridge {
         preferredColumn: Int?,
         onPreferredColumnChange: (Int?) -> Unit,
         onInterruptInputAnchor: () -> Unit,
+        onFindRequested: (String) -> Unit,
         onFieldValueChange: (TextFieldValue) -> Unit,
     ): Modifier = this
 
@@ -66,6 +67,7 @@ private object AndroidPlatformEditorBridge : PlatformEditorBridge {
         onInterruptInputAnchor: () -> Unit,
         textStyle: TextStyle,
         focusRequester: FocusRequester,
+        onFindRequested: (String) -> Unit,
         onFieldValueChange: (TextFieldValue) -> Unit,
     ) {
         val context = LocalContext.current
@@ -99,6 +101,7 @@ private object AndroidPlatformEditorBridge : PlatformEditorBridge {
                     preferredColumn = preferredColumn,
                     onPreferredColumnChange = onPreferredColumnChange,
                     onInterruptInputAnchor = onInterruptInputAnchor,
+                    onFindRequested = onFindRequested,
                     onFieldValueChange = onFieldValueChange,
                 )
             },

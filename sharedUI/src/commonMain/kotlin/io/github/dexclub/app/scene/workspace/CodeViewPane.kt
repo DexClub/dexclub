@@ -364,8 +364,35 @@ internal fun CodeViewPane(
         }
     }
 
-    fun openSearchBar() {
+    fun openSearchBar(selectedQueryCandidate: String? = selectedText) {
         callbacks.onActivatePane(tab, paneIndex, kind)
+        val selectedQuery = selectedQueryCandidate?.takeIf { text ->
+            text.isNotBlank() && !text.contains('\n') && !text.contains('\r')
+        }
+        if (selectedQuery != null) {
+            val matches = resolveInPageSearchMatches(
+                text = currentText,
+                query = selectedQuery,
+            )
+            val activeMatchIndex = effectiveSelection?.let { selection ->
+                findInPageSearchMatchIndex(
+                    matches = matches,
+                    selection = selection,
+                )
+            } ?: 0
+
+            pushInPageSearchState(
+                inPageSearchState.copy(
+                    queryText = selectedQuery,
+                    matchQuery = selectedQuery,
+                    source = EditorInPageSearchSource.Manual,
+                    activeMatchIndex = activeMatchIndex.coerceAtLeast(0),
+                    isVisible = true,
+                    requestFocusToken = inPageSearchState.requestFocusToken + 1,
+                ),
+            )
+            return
+        }
         pushInPageSearchState(
             inPageSearchState.copy(
                 isVisible = true,
@@ -397,7 +424,7 @@ internal fun CodeViewPane(
             return true
         }
         if (isInPageSearchShortcut(keyEvent)) {
-            openSearchBar()
+            openSearchBar(selectedText)
             return true
         }
         return false
@@ -478,6 +505,10 @@ internal fun CodeViewPane(
                         activeKind = kind,
                     ) ?: return@CodeEditor
                     callbacks.onNavigateToDefinition(request)
+                },
+                onFindRequested = { selectedText ->
+                    if (!isSelectedTab) return@CodeEditor
+                    openSearchBar(selectedText)
                 },
                 onContextMenu = { hit, offset ->
                     if (!isSelectedTab) return@CodeEditor

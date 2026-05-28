@@ -47,6 +47,7 @@ internal class DesktopInputHostComponent :
     private var preferredColumn: Int? = null
     private var onPreferredColumnChange: ((Int?) -> Unit)? = null
     private var onInterruptInputAnchor: (() -> Unit)? = null
+    private var onFindRequested: ((String) -> Unit)? = null
     private var onFieldValueChange: ((TextFieldValue) -> Unit)? = null
     private var anchorBoundsInWindow: Rect = Rect.Zero
 
@@ -86,6 +87,7 @@ internal class DesktopInputHostComponent :
         preferredColumn: Int?,
         onPreferredColumnChange: (Int?) -> Unit,
         onInterruptInputAnchor: () -> Unit,
+        onFindRequested: (String) -> Unit,
         onFieldValueChange: (TextFieldValue) -> Unit,
     ) {
         this.inputAnchorState = inputAnchorState
@@ -96,6 +98,7 @@ internal class DesktopInputHostComponent :
         this.preferredColumn = preferredColumn
         this.onPreferredColumnChange = onPreferredColumnChange
         this.onInterruptInputAnchor = onInterruptInputAnchor
+        this.onFindRequested = onFindRequested
         this.onFieldValueChange = onFieldValueChange
     }
 
@@ -325,6 +328,11 @@ internal class DesktopInputHostComponent :
                             nextValue = fieldValue.replaceSelection(pastedText),
                         )
                     }
+                    event.consume()
+                }
+
+                modifierHeld && event.keyCode == KeyEvent.VK_F -> {
+                    onFindRequested?.invoke(fieldValue.selectedText())
                     event.consume()
                 }
 

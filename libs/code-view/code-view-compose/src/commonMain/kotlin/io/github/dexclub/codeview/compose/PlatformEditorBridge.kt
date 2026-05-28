@@ -23,6 +23,7 @@ internal interface PlatformEditorBridge {
         preferredColumn: Int?,
         onPreferredColumnChange: (Int?) -> Unit,
         onInterruptInputAnchor: () -> Unit,
+        onFindRequested: (String) -> Unit,
         onFieldValueChange: (TextFieldValue) -> Unit,
     ): Modifier
 
@@ -41,6 +42,7 @@ internal interface PlatformEditorBridge {
         onInterruptInputAnchor: () -> Unit,
         textStyle: TextStyle,
         focusRequester: FocusRequester,
+        onFindRequested: (String) -> Unit,
         onFieldValueChange: (TextFieldValue) -> Unit,
     )
 }

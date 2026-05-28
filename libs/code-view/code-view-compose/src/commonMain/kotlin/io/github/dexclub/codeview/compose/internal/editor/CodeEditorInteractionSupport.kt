@@ -32,6 +32,7 @@ internal fun Modifier.codeEditorInteractionModifier(
     onRequestImeFocus: () -> Unit,
     isSoftwareKeyboardVisible: () -> Boolean,
     onInterruptInputAnchor: () -> Unit,
+    onFindRequested: (String) -> Unit,
     onAnyPointerEditing: () -> Unit,
     scrollController: CodeViewerScrollController,
     onTapInsideSelection: () -> Unit,
@@ -99,6 +100,7 @@ internal fun Modifier.codeEditorInteractionModifier(
             preferredColumn = preferredColumn,
             onPreferredColumnChange = onPreferredColumnChange,
             onInterruptInputAnchor = onInterruptInputAnchor,
+            onFindRequested = onFindRequested,
             onFieldValueChange = onFieldValueChange,
         )
     }

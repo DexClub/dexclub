@@ -54,6 +54,7 @@ public fun CodeEditor(
     onViewportChange: ((firstVisibleLine: Int, lastVisibleLine: Int) -> Unit)? = null,
     onAnnotationHit: ((CodeAnnotationHit) -> Unit)? = null,
     onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)? = null,
+    onFindRequested: ((selectedText: String) -> Unit)? = null,
     textStyle: TextStyle = CodeViewDefaults.CodeTextStyle,
     gutterOptions: CodeGutterOptions = CodeViewDefaults.GutterOptions,
     contentOptions: CodeContentOptions = CodeViewDefaults.ContentOptions,
@@ -96,6 +97,7 @@ public fun CodeEditor(
         onViewportChange = onViewportChange,
         onAnnotationHit = onAnnotationHit,
         onContextMenu = onContextMenu,
+        onFindRequested = onFindRequested,
         gutterOptions = gutterOptions,
         contentOptions = contentOptions,
         decorationOptions = decorationOptions,
@@ -126,6 +128,7 @@ public fun CodeEditor(
     onViewportChange: ((firstVisibleLine: Int, lastVisibleLine: Int) -> Unit)? = null,
     onAnnotationHit: ((CodeAnnotationHit) -> Unit)? = null,
     onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)? = null,
+    onFindRequested: ((selectedText: String) -> Unit)? = null,
     textStyle: TextStyle = CodeViewDefaults.CodeTextStyle,
     gutterOptions: CodeGutterOptions = CodeViewDefaults.GutterOptions,
     contentOptions: CodeContentOptions = CodeViewDefaults.ContentOptions,
@@ -163,6 +166,7 @@ public fun CodeEditor(
         onViewportChange = onViewportChange,
         onAnnotationHit = onAnnotationHit,
         onContextMenu = onContextMenu,
+        onFindRequested = onFindRequested,
         gutterOptions = gutterOptions,
         contentOptions = contentOptions,
         decorationOptions = decorationOptions,
@@ -192,6 +196,7 @@ public fun CodeEditor(
     onViewportChange: ((firstVisibleLine: Int, lastVisibleLine: Int) -> Unit)? = null,
     onAnnotationHit: ((CodeAnnotationHit) -> Unit)? = null,
     onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)? = null,
+    onFindRequested: ((selectedText: String) -> Unit)? = null,
     textStyle: TextStyle = CodeViewDefaults.CodeTextStyle,
     gutterOptions: CodeGutterOptions = CodeViewDefaults.GutterOptions,
     contentOptions: CodeContentOptions = CodeViewDefaults.ContentOptions,
@@ -325,6 +330,9 @@ public fun CodeEditor(
         decorationOptions = decorationOptions,
         followCursorToken = if (readOnly || followCursorToken == 0L) null else followCursorToken,
         fieldValue = fieldValue,
+        onFindRequested = { selectedText ->
+            onFindRequested?.invoke(selectedText)
+        },
         onFieldValueChange = { newValue ->
             if (fieldValue == newValue) return@CodeEditorContent
 

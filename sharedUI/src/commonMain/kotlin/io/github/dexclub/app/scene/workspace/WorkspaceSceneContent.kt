@@ -8,10 +8,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.KeyEvent
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import io.github.dexclub.app.compose.Loading
 import io.github.shadcn.ui.compose.LocalSonner
 import kotlinx.coroutines.flow.collectLatest
@@ -27,19 +23,6 @@ internal fun WorkspaceSceneContent(
 ) {
     val uiState by model.uiState.collectAsState()
     val sonnerState = LocalSonner.current
-
-    fun handleSceneSearchShortcut(
-        keyEvent: KeyEvent,
-    ): Boolean {
-        if (keyEvent.type != KeyEventType.KeyDown) {
-            return false
-        }
-        if (isInPageSearchShortcut(keyEvent)) {
-            model.requestInPageSearchForSelectedPane()
-            return true
-        }
-        return false
-    }
 
     LaunchedEffect(Unit) {
         model.initialize()
@@ -98,8 +81,7 @@ internal fun WorkspaceSceneContent(
 
     BoxWithConstraints(
         modifier = modifier
-            .fillMaxSize()
-            .onPreviewKeyEvent(::handleSceneSearchShortcut),
+            .fillMaxSize(),
     ) {
         when (resolveWorkspaceLayoutMode(maxWidth)) {
             WorkspaceLayoutMode.Compact -> {

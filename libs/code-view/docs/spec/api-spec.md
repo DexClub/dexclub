@@ -240,6 +240,17 @@
 - 当前上下文菜单调用点
 - 命中的 annotation，若存在
 
+### `onFindRequested`
+
+`CodeEditor` 通过 `onFindRequested(selectedText)` 暴露编辑器本地查找快捷键请求。
+
+当前语义：
+
+- 由编辑器输入链路内部处理 `Ctrl/Cmd + F` 时触发。
+- `selectedText` 来自触发快捷键瞬间编辑器内部的当前选区文本。
+- 该回调不拥有完整页内搜索会话；调用方仍负责显示搜索 UI、保存查询词、命中计数、当前命中和 reveal。
+- 如果当前没有活动选区，`selectedText` 为空字符串。
+
 ### `onTextChange`
 
 `onTextChange` 仅存在于 `CodeEditor` 路线。

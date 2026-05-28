@@ -47,6 +47,7 @@ internal class AndroidInputHostView(
     private var preferredColumn: Int? = null
     private var onPreferredColumnChange: ((Int?) -> Unit)? = null
     private var onInterruptInputAnchor: (() -> Unit)? = null
+    private var onFindRequested: ((String) -> Unit)? = null
     private var onFieldValueChange: ((TextFieldValue) -> Unit)? = null
     private var lastPublishedSnapshot: AndroidEditingSnapshot? = null
     private val selectionState = AndroidInputSelectionState()
@@ -71,6 +72,7 @@ internal class AndroidInputHostView(
         preferredColumn: Int?,
         onPreferredColumnChange: (Int?) -> Unit,
         onInterruptInputAnchor: () -> Unit,
+        onFindRequested: (String) -> Unit,
         onFieldValueChange: (TextFieldValue) -> Unit,
     ) {
         val previousFieldValue = this.fieldValue
@@ -82,6 +84,7 @@ internal class AndroidInputHostView(
         this.preferredColumn = preferredColumn
         this.onPreferredColumnChange = onPreferredColumnChange
         this.onInterruptInputAnchor = onInterruptInputAnchor
+        this.onFindRequested = onFindRequested
         this.onFieldValueChange = onFieldValueChange
 
         val textChangedExternally = previousFieldValue.text != fieldValue.text
@@ -195,6 +198,11 @@ internal class AndroidInputHostView(
                         nextValue = fieldValue.replaceSelection(pastedText),
                     )
                 }
+                true
+            }
+
+            modifierHeld && event.keyCode == KeyEvent.KEYCODE_F -> {
+                onFindRequested?.invoke(fieldValue.selectedText())
                 true
             }
 
