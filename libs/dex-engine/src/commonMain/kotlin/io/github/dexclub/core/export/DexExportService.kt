@@ -11,6 +11,7 @@ import io.github.dexclub.core.session.DexSession
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.absolutePath
 import io.github.vinceglb.filekit.write
+import jadx.api.CommentsLevel
 import jadx.api.JadxArgs
 import jadx.api.JadxDecompiler
 import jadx.api.impl.NoOpCodeCache
@@ -119,13 +120,14 @@ internal class DexExportService(
         args.setInputFile(dexFile)
         args.outDir = outDir
         args.codeCache = NoOpCodeCache()
-        args.setUseDxInput(true)
+        args.isUseDxInput = true
         args.isRenameValid = false
         args.isRenameCaseSensitive = true
-        args.isShowInconsistentCode = false
         args.isDebugInfo = false
         args.isMoveInnerClasses = false
         args.isInlineAnonymousClasses = false
+        args.isShowInconsistentCode = true
+        args.commentsLevel = CommentsLevel.DEBUG
 
         JadxDecompiler(args).use { decompiler ->
             decompiler.load()
