@@ -69,6 +69,7 @@ internal fun CodeViewerCanvas(
     selection: LineSelection?,
     cursor: Cursor?,
     searchHighlight: LineSelection?,
+    inactiveSearchHighlights: List<LineSelection> = emptyList(),
     composingOverlay: CodeEditorComposingOverlay? = null,
     cursorTarget: CodeViewerCursorTarget?,
     interactionOptions: CodeViewerInteractionOptions,
@@ -113,6 +114,11 @@ internal fun CodeViewerCanvas(
     }
     val safeSearchHighlight = remember(layoutSnapshot, searchHighlight) {
         layoutSnapshot.clampSelection(searchHighlight)?.normalized()
+    }
+    val safeInactiveSearchHighlights = remember(layoutSnapshot, inactiveSearchHighlights) {
+        inactiveSearchHighlights.mapNotNull { highlight ->
+            layoutSnapshot.clampSelection(highlight)?.normalized()
+        }
     }
     val safeCursor = remember(layoutSnapshot, cursor) {
         layoutSnapshot.clampCursor(cursor)
@@ -560,6 +566,7 @@ internal fun CodeViewerCanvas(
                                         contentEndPaddingPx = contentEndPaddingPx,
                                         selection = safeSelection,
                                         searchHighlight = safeSearchHighlight,
+                                        inactiveSearchHighlights = safeInactiveSearchHighlights,
                                         cursor = safeCursor,
                                         composingOverlay = composingOverlay,
                                         cursorAlpha = cursorAlpha,

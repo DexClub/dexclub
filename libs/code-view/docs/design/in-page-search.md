@@ -20,15 +20,16 @@
 
 - DexKit 搜索结果打开代码页
 - 程序化定位 `cursor / selection / reveal`
-- 单个 `searchHighlight`
+- 当前活动命中 `searchHighlight`
+- 其他命中 `inactiveSearchHighlights`
 
 当前链路的特点是：
 
 - DexKit 搜索弹层状态与代码页状态分离
-- 代码页只持有单值 `searchHighlight`
-- 还没有“页内搜索会话”这一层状态
+- 工作区上层维护页内搜索会话
+- `code-view` 只接收活动命中和其他命中的渲染投影
 
-这意味着当前实现只适合“命中后打一块高亮并跳过去”，不适合直接扩展成完整的 IDE 式页内搜索。
+这意味着当前实现仍由工作区上层拥有搜索真相源，`code-view` 只负责把命中范围稳定画出来。
 
 ## 第一版范围
 
@@ -162,12 +163,11 @@ DexKit 回填不是“跨 pane 混合搜索”，而是：
 - 当前命中使用更强强调色
 - `x / y` 计数与 `activeMatchIndex` 保持一致
 
-当前 `searchHighlight` 单值模型只适合表达“当前命中高亮”，不足以表达完整页内搜索。
+当前 `code-view` 已采用分层搜索高亮输入：
 
-因此实现阶段需要评估：
-
-- 是否在 `sharedUI` 先维护完整命中结果并仅向 `CodeEditor` 投影当前命中
-- 或升级 `code-view` 的公开输入模型，以支持全部命中与当前命中分层渲染
+- `searchHighlight` 表达当前活动命中
+- `inactiveSearchHighlights` 表达其他命中
+- 工作区上层仍负责维护完整命中结果、当前索引、计数和 reveal
 
 ## 编辑后的行为
 

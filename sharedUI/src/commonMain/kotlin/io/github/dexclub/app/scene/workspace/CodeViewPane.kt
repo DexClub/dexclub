@@ -161,6 +161,19 @@ internal fun CodeViewPane(
             editorState.searchHighlight
         }
     }
+    val inactiveSearchHighlights = remember(
+        inPageSearchState.isVisible,
+        inPageSearchMatches,
+        activeSearchMatchIndex,
+    ) {
+        if (!inPageSearchState.isVisible || inPageSearchMatches.isEmpty()) {
+            emptyList()
+        } else {
+            inPageSearchMatches.mapIndexedNotNull { index, match ->
+                if (index == activeSearchMatchIndex) null else match.selection
+            }
+        }
+    }
     val effectiveCursorTarget = navigationCursorTarget ?: pendingSearchRevealTarget
 
     fun requestSearchReveal(
@@ -464,6 +477,7 @@ internal fun CodeViewPane(
                 selection = effectiveSelection,
                 cursor = effectiveCursor,
                 searchHighlight = searchHighlight,
+                inactiveSearchHighlights = inactiveSearchHighlights,
                 cursorTarget = effectiveCursorTarget,
                 interactionOptions = CodeViewerInteractionOptions(
                     annotationTag = NODE_ANNOTATION_TAG,

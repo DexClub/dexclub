@@ -94,6 +94,7 @@ public data class CodeContentOptions(
 public data class CodeDecorationOptions(
     public val selectionColor: Color = Color(0x334096FF),
     public val searchHighlightColor: Color = Color(0x40F4D03F),
+    public val inactiveSearchHighlightColor: Color = Color(0x20F4D03F),
     public val cursorColor: Color = Color(0xFF000000),
 )
 

@@ -154,6 +154,7 @@
 - `selection`
 - `cursor`
 - `searchHighlight`
+- `inactiveSearchHighlights`
 - `cursorTarget`
 - `interactionOptions`
 - `textStyle`
@@ -169,6 +170,8 @@
   当前 caret 投影
 - `searchHighlight`
   当前活动搜索命中范围高亮投影
+- `inactiveSearchHighlights`
+  非活动搜索命中范围高亮投影，颜色应比当前活动命中更浅
 - `cursorTarget`
   一次程序化 reveal 请求
 - `textStyle`
@@ -180,7 +183,8 @@
 
 - 当前完整页内搜索会话并不是 `CodeEditor` 的公开输入模型
 - 上层若需要“搜索框是否显示、查询词、命中计数、上一项 / 下一项”，应在业务层自行维护搜索会话
-- 当前 `searchHighlight` 只负责把“当前活动命中”投影给 `code-view`
+- `searchHighlight` 只负责把“当前活动命中”投影给 `code-view`
+- `inactiveSearchHighlights` 只负责把其他命中投影给 `code-view`，不拥有命中计数、当前索引、reveal 或 cursor 语义
 
 ## 回调语义
 

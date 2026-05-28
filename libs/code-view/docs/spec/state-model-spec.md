@@ -131,7 +131,7 @@ viewport 是显示范围与滚动恢复的真相源。
 页内搜索当前分成两层状态：
 
 - 工作区上层搜索会话状态
-- `CodeViewer / CodeEditor` 的 `searchHighlight` 输入投影
+- `CodeViewer / CodeEditor` 的 `searchHighlight` 与 `inactiveSearchHighlights` 输入投影
 
 当前真相源不在 `code-view` 内部，而在工作区上层按 `tabId#kind` 维护。
 
@@ -147,25 +147,29 @@ viewport 是显示范围与滚动恢复的真相源。
 
 这些状态当前属于代码页工作区集成层，而不是 `CodeDocument` 或 `CodeEditor` 内部真相源。
 
-### `searchHighlight`
+### 搜索高亮投影
 
 `searchHighlight` 当前只表达：
 
 - 当前活动命中的范围投影
 
+`inactiveSearchHighlights` 当前只表达：
+
+- 当前活动命中以外的其他命中范围投影
+
 它不表达：
 
-- 全部命中列表
 - 搜索框是否可见
 - 命中来源
-- 当前命中索引以外的会话语义
+- 当前命中索引、命中计数与上一项 / 下一项等会话语义
 
 ### 当前约束
 
 - mixed 模式下搜索会话必须按 `tabId#kind` 分离维护
 - Java 与 Smali 不能共享同一份页内搜索真相源
 - 编辑后命中重算属于上层搜索会话职责，不属于 `code-view` core 内部状态
-- `searchHighlight` 只是上层活动命中投影到 `code-view` 的单值输入
+- `searchHighlight` 是上层活动命中投影到 `code-view` 的单值输入
+- `inactiveSearchHighlights` 是上层其他命中投影到 `code-view` 的列表输入
 - 活动命中的范围选区和 caret 当前仍由上层工作区同步驱动；`searchHighlight` 不单独拥有 reveal 或 cursor 语义
 
 ## selection

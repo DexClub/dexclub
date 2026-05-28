@@ -30,6 +30,7 @@ internal fun DrawScope.drawCodeViewerContent(
     contentEndPaddingPx: Float,
     selection: LineSelection?,
     searchHighlight: LineSelection?,
+    inactiveSearchHighlights: List<LineSelection>,
     cursor: Cursor?,
     composingOverlay: CodeEditorComposingOverlay?,
     cursorAlpha: Float,
@@ -38,12 +39,32 @@ internal fun DrawScope.drawCodeViewerContent(
 ) {
     val selectionColor = decorationOptions.selectionColor
     val searchHighlightColor = decorationOptions.searchHighlightColor
+    val inactiveSearchHighlightColor = decorationOptions.inactiveSearchHighlightColor
     val cursorColor = decorationOptions.cursorColor
 
     for (lineIndex in visibleLineRange) {
         val line = layoutSnapshot.lineAt(lineIndex)
         val lineTop = lineIndex * lineHeightPx - verticalScrollPx
 
+        inactiveSearchHighlights.forEach { inactiveSearchHighlight ->
+            drawSelectionRange(
+                lineIndex = lineIndex,
+                lineLength = line.length,
+                selection = inactiveSearchHighlight,
+                color = inactiveSearchHighlightColor,
+                lineLayoutCache = lineLayoutCache,
+                lineTop = lineTop,
+                lineHeightPx = lineHeightPx,
+                contentHeightPx = contentHeightPx,
+                contentTopPaddingPx = contentTopPaddingPx,
+                contentStartPaddingPx = contentStartPaddingPx,
+                contentEndPaddingPx = contentEndPaddingPx,
+                extendMultilineToContentRight = false,
+                fillLeadingContentPaddingWhenLineStartsSelected = false,
+                verticalInsetPx = 1.dp.toPx(),
+                cornerRadiusPx = 4.dp.toPx(),
+            )
+        }
         drawSelectionRange(
             lineIndex = lineIndex,
             lineLength = line.length,
