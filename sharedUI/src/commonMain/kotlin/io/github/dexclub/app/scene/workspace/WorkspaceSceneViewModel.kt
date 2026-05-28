@@ -646,20 +646,23 @@ class WorkspaceSceneViewModel internal constructor(
             failureText = "项目初始化失败",
             loadingFailurePrefix = "加载失败",
         ) {
-            val bootstrap = workspaceInitializer.bootstrap(
-                expectedIndexedClassCount = dexEngine.classCount(),
-                indexedClassesProvider = dexEngine::workspaceIndexEntries,
-                currentSelectedTabId = _selectedTabId.value,
-                onProgress = { progress ->
-                    updateLoadingMessage(progress)
-                },
-                onClassIndexMismatch = { actual, expected ->
-                    logInfo("类索引不完整，触发重建: expected=$expected, actual=$actual")
-                },
-                onWarmUpDexKit = {
-                    printDexKitDexNum()
-                },
-            )
+            val currentSelectedTabId = _selectedTabId.value
+            val bootstrap = runIo {
+                workspaceInitializer.bootstrap(
+                    expectedIndexedClassCount = dexEngine.classCount(),
+                    indexedClassesProvider = dexEngine::workspaceIndexEntries,
+                    currentSelectedTabId = currentSelectedTabId,
+                    onProgress = { progress ->
+                        updateLoadingMessage(progress)
+                    },
+                    onClassIndexMismatch = { actual, expected ->
+                        logInfo("类索引不完整，触发重建: expected=$expected, actual=$actual")
+                    },
+                    onWarmUpDexKit = {
+                        printDexKitDexNum()
+                    },
+                )
+            }
 
             restoreSidePanelState(bootstrap.sidePanelSnapshot)
             _classTreeRoot.value = bootstrap.classIndexState.classTreeRoot
