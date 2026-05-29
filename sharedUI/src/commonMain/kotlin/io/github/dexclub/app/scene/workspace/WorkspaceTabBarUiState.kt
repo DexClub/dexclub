@@ -30,17 +30,18 @@ internal fun buildWorkspaceTabBarUiState(
         .takeIf { it >= 0 }
         ?: openTabs.lastIndex
     val selectedTab = selectedOpenTab ?: openTabs.getOrNull(selectedTabIndex)
+    val items = openTabs.mapIndexed { index, tab ->
+        WorkspaceTabBarItemUiState(
+            tab = tab,
+            isSelected = tab.tabId == selectedTab?.tabId,
+            hasOtherTabs = openTabs.size > 1,
+            canCloseLeftTabs = index > 0,
+            canCloseRightTabs = index < openTabs.lastIndex,
+        )
+    }
 
     return WorkspaceTabBarUiState(
-        items = openTabs.mapIndexed { index, tab ->
-            WorkspaceTabBarItemUiState(
-                tab = tab,
-                isSelected = tab.tabId == selectedTab?.tabId,
-                hasOtherTabs = openTabs.size > 1,
-                canCloseLeftTabs = index > 0,
-                canCloseRightTabs = index < openTabs.lastIndex,
-            )
-        },
+        items = items,
         selectedTab = selectedTab,
         selectedTabIndex = selectedTabIndex,
         canShowMixedViewActions = selectedTab?.mode == OpenTabMode.MIXED,

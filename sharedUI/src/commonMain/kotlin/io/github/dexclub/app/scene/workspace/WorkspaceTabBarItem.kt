@@ -70,9 +70,6 @@ internal fun TabBarItem(
     val icon = resolveTabIcon(tab)
 
     fun openContextMenu() {
-        if (!itemState.isSelected) {
-            onToggle(tab)
-        }
         contextMenuExpanded = true
     }
 
@@ -239,6 +236,7 @@ private fun Modifier.tabContextMenuTrigger(
                 while (true) {
                     val event = awaitPointerEvent()
                     if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                        event.changes.forEach { change -> change.consume() }
                         onOpenContextMenu()
                     }
                 }
