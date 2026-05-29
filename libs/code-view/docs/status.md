@@ -89,8 +89,9 @@
 - Android 已稳定在“单击放 caret + 滚动优先 + 长按选词”的路线
 - 工作区代码页顶部搜索框第一版已落地，支持 DexKit 类 / 字符串回填、当前命中导航与命中计数
 - Viewer 已改为虚拟纵向滚动，Desktop 大文件打开不再依赖超高布局节点
+- Viewer / Editor Canvas 已内置可见的纵向与横向滚动条，滚动条直接绑定内部虚拟纵向滚动状态和横向 `ScrollState`
 - Desktop 工作区已完成一轮大文件 / 搜索 / reveal / 滚动主路径回归
-- `code-view-compose` 当前已再次通过 JVM / Android 编译和 `jvmTest`
+- `code-view-compose` 当前已再次通过 JVM / Android 编译和 `jvmTest`；本次验证补充执行 `./gradlew :code-view-compose:compileKotlinJvm :code-view-compose:compileAndroidMain`
 
 ## 主题入口
 

@@ -2,18 +2,30 @@ package io.github.dexclub.codeview.compose.internal.viewer
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.rememberScrollableState
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.withoutVisualEffect
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -22,13 +34,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import kotlin.math.max
@@ -588,10 +605,195 @@ internal fun CodeViewerCanvas(
                     viewportSnapshot,
                     scrollController,
                 )
+                CodeVerticalScrollbar(
+                    state = verticalScrollState,
+                    viewportHeightPx = viewportHeightPx,
+                    maxValuePx = verticalLayout.maxVerticalScrollPx,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(vertical = CODE_SCROLLBAR_EDGE_PADDING, horizontal = 2.dp),
+                )
+                CodeHorizontalScrollbar(
+                    state = horizontalScrollState,
+                    viewportWidthPx = contentViewportWidthPx,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(vertical = 2.dp, horizontal = CODE_SCROLLBAR_EDGE_PADDING),
+                )
             }
         }
     }
 }
+
+@Composable
+private fun CodeVerticalScrollbar(
+    state: CodeViewerVerticalScrollState,
+    viewportHeightPx: Float,
+    maxValuePx: Float,
+    modifier: Modifier = Modifier,
+) {
+    CodeScrollbar(
+        currentValue = state.value,
+        maxValue = maxValuePx,
+        viewportSizePx = viewportHeightPx,
+        isVertical = true,
+        modifier = modifier,
+        onScrollTo = { value ->
+            state.dispatchRawDelta(value - state.value)
+        },
+        onScrollBy = { delta ->
+            state.dispatchRawDelta(delta)
+        },
+    )
+}
+
+@Composable
+private fun CodeHorizontalScrollbar(
+    state: ScrollState,
+    viewportWidthPx: Float,
+    modifier: Modifier = Modifier,
+) {
+    CodeScrollbar(
+        currentValue = state.value.toFloat(),
+        maxValue = state.maxValue.toFloat(),
+        viewportSizePx = viewportWidthPx,
+        isVertical = false,
+        modifier = modifier,
+        onScrollTo = { value ->
+            state.dispatchRawDelta(value - state.value.toFloat())
+        },
+        onScrollBy = { delta ->
+            state.dispatchRawDelta(delta)
+        },
+    )
+}
+
+@Composable
+private fun CodeScrollbar(
+    currentValue: Float,
+    maxValue: Float,
+    viewportSizePx: Float,
+    isVertical: Boolean,
+    modifier: Modifier,
+    onScrollTo: (Float) -> Unit,
+    onScrollBy: (Float) -> Unit,
+) {
+    val normalizedMaxValue = maxValue.coerceAtLeast(0f)
+    val normalizedViewportSizePx = viewportSizePx.coerceAtLeast(0f)
+    val hasContent = normalizedMaxValue > 0f && normalizedViewportSizePx > 0f
+    val trackInteractionSource = remember { MutableInteractionSource() }
+    val thumbInteractionSource = remember { MutableInteractionSource() }
+    val isTrackHovered by trackInteractionSource.collectIsHoveredAsState()
+    val isThumbHovered by thumbInteractionSource.collectIsHoveredAsState()
+    val thumbColor = if (isThumbHovered) {
+        CODE_SCROLLBAR_ACTIVE_COLOR
+    } else {
+        CODE_SCROLLBAR_COLOR
+    }
+
+    Box(
+        modifier = modifier
+            .then(
+                if (isVertical) {
+                    Modifier
+                        .fillMaxHeight()
+                        .width(CODE_SCROLLBAR_THICKNESS)
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .height(CODE_SCROLLBAR_THICKNESS)
+                }
+            )
+            .hoverable(trackInteractionSource),
+    ) {
+        if (!hasContent) {
+            return@Box
+        }
+
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    alpha = if (isTrackHovered || isThumbHovered) 1f else CODE_SCROLLBAR_IDLE_ALPHA
+                }
+                .pointerInput(normalizedMaxValue, isVertical) {
+                    detectTapGestures { offset ->
+                        val trackSizePx = if (isVertical) size.height.toFloat() else size.width.toFloat()
+                        if (trackSizePx <= 0f) return@detectTapGestures
+                        val positionPx = if (isVertical) offset.y else offset.x
+                        val ratio = (positionPx / trackSizePx).coerceIn(0f, 1f)
+                        onScrollTo(normalizedMaxValue * ratio)
+                    }
+                }
+                .pointerInput(normalizedMaxValue, normalizedViewportSizePx, isVertical) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        val trackSizePx = if (isVertical) size.height.toFloat() else size.width.toFloat()
+                        if (trackSizePx <= 0f) return@detectDragGestures
+
+                        val thumbSizePercent = resolveCodeScrollbarThumbSizePercent(
+                            viewportSizePx = normalizedViewportSizePx,
+                            maxValuePx = normalizedMaxValue,
+                        )
+                        val thumbTrackRangePx = trackSizePx * (1f - thumbSizePercent)
+                        if (thumbTrackRangePx <= 0f) return@detectDragGestures
+
+                        val deltaPx = if (isVertical) dragAmount.y else dragAmount.x
+                        onScrollBy(deltaPx * normalizedMaxValue / thumbTrackRangePx)
+                    }
+                },
+        ) {
+            val trackSizePx = if (isVertical) constraints.maxHeight.toFloat() else constraints.maxWidth.toFloat()
+            if (trackSizePx <= 0f) return@BoxWithConstraints
+
+            val thumbSizePercent = resolveCodeScrollbarThumbSizePercent(
+                viewportSizePx = normalizedViewportSizePx,
+                maxValuePx = normalizedMaxValue,
+            )
+            val thumbTrackRangePx = trackSizePx * (1f - thumbSizePercent)
+            val thumbOffsetPx = ((currentValue / normalizedMaxValue).coerceIn(0f, 1f) * thumbTrackRangePx).roundToInt()
+
+            Box(
+                modifier = Modifier
+                    .offset {
+                        if (isVertical) {
+                            IntOffset(0, thumbOffsetPx)
+                        } else {
+                            IntOffset(thumbOffsetPx, 0)
+                        }
+                    }
+                    .then(
+                        if (isVertical) {
+                            Modifier
+                                .fillMaxHeight(thumbSizePercent)
+                                .fillMaxWidth()
+                                .padding(horizontal = 2.dp)
+                        } else {
+                            Modifier
+                                .fillMaxWidth(thumbSizePercent)
+                                .fillMaxHeight()
+                                .padding(vertical = 2.dp)
+                        }
+                    )
+                    .hoverable(thumbInteractionSource)
+                    .background(thumbColor, RoundedCornerShape(CODE_SCROLLBAR_THICKNESS / 2)),
+            )
+        }
+    }
+}
+
+private fun resolveCodeScrollbarThumbSizePercent(
+    viewportSizePx: Float,
+    maxValuePx: Float,
+): Float {
+    return (viewportSizePx / (maxValuePx + viewportSizePx)).coerceIn(0.1f, 1f)
+}
+
+private val CODE_SCROLLBAR_THICKNESS: Dp = 8.dp
+private val CODE_SCROLLBAR_EDGE_PADDING: Dp = 12.dp
+private const val CODE_SCROLLBAR_IDLE_ALPHA: Float = 0.72f
+private val CODE_SCROLLBAR_COLOR: Color = Color.Gray.copy(alpha = 0.3f)
+private val CODE_SCROLLBAR_ACTIVE_COLOR: Color = Color.Gray.copy(alpha = 0.7f)
 
 internal data class CodeViewerCanvasMetrics(
     val charWidthPx: Float,
