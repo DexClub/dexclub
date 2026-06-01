@@ -117,16 +117,135 @@ sealed class ClassTreeNode {
         private fun sortTree(node: ClassTreeNode) {
             if (node is PackageNode) {
                 // 排序逻辑：PackageNode 在前，ClassNode 在后，内部按名称排序
-                node.children.sortWith(compareBy({ it is ClassNode }, {
-                    when (it) {
-                        is PackageNode -> it.name
-                        is ClassNode -> it.className
-                    }
-                }))
+                node.children.sortWith(classTreeNodeComparator)
                 // 递归排序子节点
                 node.children.forEach { sortTree(it) }
             }
         }
+
+        private val classTreeNodeComparator = Comparator<ClassTreeNode> { left, right ->
+            val leftKind = if (left is PackageNode) 0 else 1
+            val rightKind = if (right is PackageNode) 0 else 1
+            if (leftKind != rightKind) {
+                return@Comparator leftKind.compareTo(rightKind)
+            }
+
+            compareAndroidStudioNames(left.sortDisplayName(), right.sortDisplayName())
+        }
+
+        private fun ClassTreeNode.sortDisplayName(): String {
+            return when (this) {
+                is PackageNode -> name
+                is ClassNode -> displayName
+            }
+        }
+
+        private fun compareAndroidStudioNames(
+            left: String,
+            right: String,
+        ): Int {
+            var leftIndex = 0
+            var rightIndex = 0
+            while (leftIndex < left.length && rightIndex < right.length) {
+                val leftChar = left[leftIndex]
+                val rightChar = right[rightIndex]
+                if (leftChar.isDigit() && rightChar.isDigit()) {
+                    val digitCompare = compareNumberRun(
+                        left = left,
+                        leftStart = leftIndex,
+                        right = right,
+                        rightStart = rightIndex,
+                    )
+                    if (digitCompare.result != 0) return digitCompare.result
+                    leftIndex = digitCompare.leftEnd
+                    rightIndex = digitCompare.rightEnd
+                    continue
+                }
+
+                val leftNormalized = leftChar.normalizeForAndroidStudioSort()
+                val rightNormalized = rightChar.normalizeForAndroidStudioSort()
+                val charCompare = leftNormalized.compareTo(rightNormalized)
+                if (charCompare != 0) return charCompare
+
+                val exactCompare = leftChar.compareTo(rightChar)
+                if (exactCompare != 0) return exactCompare
+
+                leftIndex += 1
+                rightIndex += 1
+            }
+
+            return (left.length - leftIndex).compareTo(right.length - rightIndex)
+        }
+
+        private fun Char.normalizeForAndroidStudioSort(): Char {
+            return when (this) {
+                '$' -> Char.MAX_VALUE
+                else -> lowercaseChar()
+            }
+        }
+
+        private fun compareNumberRun(
+            left: String,
+            leftStart: Int,
+            right: String,
+            rightStart: Int,
+        ): NumberRunCompare {
+            val leftEnd = left.findNumberRunEnd(leftStart)
+            val rightEnd = right.findNumberRunEnd(rightStart)
+            val leftTrimmedStart = left.findFirstNonZero(leftStart, leftEnd)
+            val rightTrimmedStart = right.findFirstNonZero(rightStart, rightEnd)
+            val leftTrimmedLength = leftEnd - leftTrimmedStart
+            val rightTrimmedLength = rightEnd - rightTrimmedStart
+            if (leftTrimmedLength != rightTrimmedLength) {
+                return NumberRunCompare(
+                    result = leftTrimmedLength.compareTo(rightTrimmedLength),
+                    leftEnd = leftEnd,
+                    rightEnd = rightEnd,
+                )
+            }
+
+            for (index in 0 until leftTrimmedLength) {
+                val compare = left[leftTrimmedStart + index].compareTo(right[rightTrimmedStart + index])
+                if (compare != 0) {
+                    return NumberRunCompare(
+                        result = compare,
+                        leftEnd = leftEnd,
+                        rightEnd = rightEnd,
+                    )
+                }
+            }
+
+            return NumberRunCompare(
+                result = (leftEnd - leftStart).compareTo(rightEnd - rightStart),
+                leftEnd = leftEnd,
+                rightEnd = rightEnd,
+            )
+        }
+
+        private fun String.findNumberRunEnd(start: Int): Int {
+            var index = start
+            while (index < length && this[index].isDigit()) {
+                index += 1
+            }
+            return index
+        }
+
+        private fun String.findFirstNonZero(
+            start: Int,
+            end: Int,
+        ): Int {
+            var index = start
+            while (index < end - 1 && this[index] == '0') {
+                index += 1
+            }
+            return index
+        }
+
+        private data class NumberRunCompare(
+            val result: Int,
+            val leftEnd: Int,
+            val rightEnd: Int,
+        )
     }
 }
 
