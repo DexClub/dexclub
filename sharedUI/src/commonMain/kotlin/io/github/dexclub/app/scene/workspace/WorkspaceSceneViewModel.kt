@@ -858,6 +858,7 @@ class WorkspaceSceneViewModel internal constructor(
                 ),
                 token = nextNavigationRequestId(),
             )
+            syncSidePanelToClass(result.className)
         }
     }
 
@@ -905,6 +906,43 @@ class WorkspaceSceneViewModel internal constructor(
         if (_sideSelection.value == selection) return
         _sideSelection.value = selection
         scheduleSidePanelStateSave()
+    }
+
+    private fun syncSidePanelToClass(className: String) {
+        val normalizedClassName = navigationService.normalizeTargetClassName(className)
+        if (normalizedClassName.isEmpty()) return
+
+        val packagePaths = packagePathsForClass(normalizedClassName)
+        val selection = WorkspaceSideSelection.Class(normalizedClassName)
+        val expandedPaths = _expandedPaths.value + packagePaths
+        _expandedPaths.value = expandedPaths
+        _sideSelection.value = selection
+
+        val targetItems = _classTreeRoot.value?.flatten(0, expandedPaths).orEmpty()
+        val targetIndex = targetItems.indexOfFirst { flattenedNode ->
+            selection.matches(flattenedNode.node)
+        }
+        if (targetIndex >= 0) {
+            _sidePanelFirstVisibleItemIndex.value = targetIndex
+            _sidePanelFirstVisibleItemScrollOffset.value = 0
+            _sidePanelHorizontalScrollOffset.value = 0
+        }
+
+        scheduleSidePanelStateSave()
+    }
+
+    private fun packagePathsForClass(className: String): Set<String> {
+        val parts = className.replace('/', '.').split('.')
+        if (parts.size <= 1) return emptySet()
+
+        val packagePaths = linkedSetOf<String>()
+        val currentParts = mutableListOf<String>()
+        for (part in parts.dropLast(1)) {
+            if (part.isEmpty()) continue
+            currentParts += part
+            packagePaths += currentParts.joinToString(".")
+        }
+        return packagePaths
     }
 
     internal fun resetSearchDialogState() {
@@ -1124,6 +1162,7 @@ class WorkspaceSceneViewModel internal constructor(
                 ),
                 token = nextNavigationRequestId(),
             )
+            syncSidePanelToClass(result.className)
         }
     }
 
