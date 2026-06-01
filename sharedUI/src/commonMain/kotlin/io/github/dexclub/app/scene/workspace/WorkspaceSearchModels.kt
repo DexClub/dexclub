@@ -20,6 +20,8 @@ data class WorkspaceStringSearchResult(
     val methodDescriptor: String,
     val methodName: String,
     val methodDisplaySignature: String,
+    val matchedString: String,
+    val matchedStrings: List<String> = listOf(matchedString),
 )
 
 fun ClassSearchHit.toWorkspaceClassSearchResult(): WorkspaceClassSearchResult {
@@ -37,5 +39,7 @@ fun StringSearchHit.toWorkspaceStringSearchResult(): WorkspaceStringSearchResult
         methodDescriptor = methodDescriptor,
         methodName = methodName,
         methodDisplaySignature = methodDisplaySignature,
+        matchedString = matchedString,
+        matchedStrings = matchedStrings,
     )
 }

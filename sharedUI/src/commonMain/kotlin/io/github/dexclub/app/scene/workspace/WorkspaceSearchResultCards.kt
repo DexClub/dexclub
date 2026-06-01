@@ -105,6 +105,20 @@ internal fun WorkspaceStringSearchResultCard(
                     style = ShadcnTheme.textStyles.bodySmall,
                 )
 
+                result.matchedStrings
+                    .filter(String::isNotBlank)
+                    .take(3)
+                    .forEach { matchedString ->
+                        Text(
+                            text = matchedString,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = ShadcnTheme.textStyles.bodySmall.copy(
+                                color = ShadcnTheme.colors.primary,
+                            ),
+                        )
+                    }
+
                 Text(
                     text = result.methodDisplaySignature,
                     maxLines = 1,

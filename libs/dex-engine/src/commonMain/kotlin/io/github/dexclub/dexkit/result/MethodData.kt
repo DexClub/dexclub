@@ -9,4 +9,5 @@ data class MethodData(
     val modifiers: Int,
     val isConstructor: Boolean,
     val isStaticInitializer: Boolean,
+    val usingStrings: List<String> = emptyList(),
 )

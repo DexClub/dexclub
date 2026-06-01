@@ -50,6 +50,7 @@ internal fun NativeMethodData.toKmpMethodData(): MethodData =
         modifiers = modifiers,
         isConstructor = isConstructor,
         isStaticInitializer = isStaticInitializer,
+        usingStrings = usingStrings.toList(),
     )
 
 internal fun NativeFieldData.toKmpFieldData(): FieldData =

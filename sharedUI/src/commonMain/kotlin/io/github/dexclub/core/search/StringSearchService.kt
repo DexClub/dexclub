@@ -31,12 +31,17 @@ class StringSearchService(
         return dexKitResults.mapNotNull { methodData ->
             val className = normalizeDexKitClassName(methodData)
             val classInfo = classInfosByName[className] ?: return@mapNotNull null
+            val matchedStrings = methodData.usingStrings
+                .filter { value -> value.contains(normalizedKeyword, ignoreCase = true) }
+                .distinct()
             StringSearchHit(
                 className = classInfo.className,
                 classVisualKind = classInfo.classVisualKind,
                 methodDescriptor = methodData.descriptor,
                 methodName = methodData.name,
                 methodDisplaySignature = buildMethodDisplaySignature(methodData),
+                matchedString = matchedStrings.firstOrNull() ?: normalizedKeyword,
+                matchedStrings = matchedStrings.ifEmpty { listOf(normalizedKeyword) },
             )
         }.distinctBy(StringSearchHit::methodDescriptor)
             .sortedWith(

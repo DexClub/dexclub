@@ -14,4 +14,6 @@ data class StringSearchHit(
     val methodDescriptor: String,
     val methodName: String,
     val methodDisplaySignature: String,
+    val matchedString: String,
+    val matchedStrings: List<String> = listOf(matchedString),
 )
