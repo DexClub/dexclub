@@ -157,7 +157,8 @@ internal fun WorkspaceHeaderActionMenu(
         uiState = uiState.settingsUiState,
         visible = settingsDialogVisible,
         onDismissRequest = { settingsDialogVisible = false },
-        onAutoUnicodeDecodeChange = callbacks.onAutoUnicodeDecodeChange,
+        onSmaliUnicodeDecodeChange = callbacks.onSmaliUnicodeDecodeChange,
+        onJavaUnicodeDecodeChange = callbacks.onJavaUnicodeDecodeChange,
         onCodeScrollPastEndChange = callbacks.onCodeScrollPastEndChange,
     )
 }

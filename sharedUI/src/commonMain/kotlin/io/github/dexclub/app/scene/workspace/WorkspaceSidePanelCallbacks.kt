@@ -10,7 +10,8 @@ internal data class WorkspaceHeaderCallbacks(
     val onSearchDialogRequest: () -> Unit,
     val onOpenClassResult: (WorkspaceClassSearchResult) -> Unit,
     val onOpenStringResult: (WorkspaceStringSearchResult) -> Unit,
-    val onAutoUnicodeDecodeChange: (Boolean) -> Unit,
+    val onSmaliUnicodeDecodeChange: (Boolean) -> Unit,
+    val onJavaUnicodeDecodeChange: (Boolean) -> Unit,
     val onCodeScrollPastEndChange: (Int) -> Unit,
 )
 

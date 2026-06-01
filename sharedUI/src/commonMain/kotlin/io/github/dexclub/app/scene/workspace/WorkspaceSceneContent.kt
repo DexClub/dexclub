@@ -45,7 +45,8 @@ internal fun WorkspaceSceneContent(
             onSearchDialogRequest = model::submitSearchDialog,
             onOpenClassResult = model::onOpenClassSearchResult,
             onOpenStringResult = model::onOpenStringSearchResult,
-            onAutoUnicodeDecodeChange = model::updateAutoUnicodeDecode,
+            onSmaliUnicodeDecodeChange = model::updateSmaliUnicodeDecode,
+            onJavaUnicodeDecodeChange = model::updateJavaUnicodeDecode,
             onCodeScrollPastEndChange = model::updateCodeScrollPastEnd,
         )
     }

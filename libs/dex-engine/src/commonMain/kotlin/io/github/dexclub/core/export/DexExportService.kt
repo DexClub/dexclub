@@ -47,7 +47,7 @@ internal class DexExportService(
     }
 
     suspend fun exportSingleSmali(
-        autoUnicodeDecode: Boolean,
+        smaliUnicodeDecode: Boolean,
         className: String,
         dexPath: String,
         outputPath: String,
@@ -69,7 +69,7 @@ internal class DexExportService(
         }
 
         val stringWriter = StringWriter()
-        val baksmaliWriter = if (autoUnicodeDecode) {
+        val baksmaliWriter = if (smaliUnicodeDecode) {
             UnescapedUnicodeBaksmaliWriter(stringWriter)
         } else {
             BaksmaliWriter(stringWriter)
@@ -85,6 +85,7 @@ internal class DexExportService(
     }
 
     suspend fun exportSingleJavaSource(
+        escapeUnicode: Boolean,
         className: String,
         dexPath: String,
         outputPath: String,
@@ -99,6 +100,7 @@ internal class DexExportService(
                 outputPath = tempDex.absolutePath,
             )
             decompileDexToJavaSource(
+                escapeUnicode = escapeUnicode,
                 dexPath = tempDex.absolutePath,
                 outputPath = outputPath,
             )
@@ -108,6 +110,7 @@ internal class DexExportService(
     }
 
     private fun decompileDexToJavaSource(
+        escapeUnicode: Boolean,
         dexPath: String,
         outputPath: String,
     ): String {
@@ -127,6 +130,7 @@ internal class DexExportService(
         args.isMoveInnerClasses = false
         args.isInlineAnonymousClasses = false
         args.isShowInconsistentCode = true
+        args.isEscapeUnicode = escapeUnicode
         args.commentsLevel = CommentsLevel.DEBUG
 
         JadxDecompiler(args).use { decompiler ->

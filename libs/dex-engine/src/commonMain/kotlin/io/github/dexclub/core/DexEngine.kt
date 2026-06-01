@@ -93,13 +93,13 @@ class DexEngine(
     }
 
     suspend fun exportSingleSmali(
-        autoUnicodeDecode: Boolean,
+        smaliUnicodeDecode: Boolean,
         className: String,
         dexPath: String,
         outputPath: String,
     ): String {
         return dexExportService.exportSingleSmali(
-            autoUnicodeDecode = autoUnicodeDecode,
+            smaliUnicodeDecode = smaliUnicodeDecode,
             className = className,
             dexPath = dexPath,
             outputPath = outputPath,
@@ -107,11 +107,13 @@ class DexEngine(
     }
 
     suspend fun exportSingleJavaSource(
+        escapeUnicode: Boolean,
         className: String,
         dexPath: String,
         outputPath: String,
     ): String {
         return dexExportService.exportSingleJavaSource(
+            escapeUnicode = escapeUnicode,
             className = className,
             dexPath = dexPath,
             outputPath = outputPath,

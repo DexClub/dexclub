@@ -26,7 +26,8 @@ internal fun WorkspaceSettingsDialog(
     uiState: WorkspaceSettingsUiState,
     visible: Boolean,
     onDismissRequest: () -> Unit,
-    onAutoUnicodeDecodeChange: (Boolean) -> Unit,
+    onSmaliUnicodeDecodeChange: (Boolean) -> Unit,
+    onJavaUnicodeDecodeChange: (Boolean) -> Unit,
     onCodeScrollPastEndChange: (Int) -> Unit,
 ) {
     if (!visible) return
@@ -55,17 +56,39 @@ internal fun WorkspaceSettingsDialog(
                     Spacer(modifier = Modifier.height(20.dp))
 
                     Checkbox(
-                        checked = uiState.autoUnicodeDecodeEnabled,
-                        onCheckedChange = onAutoUnicodeDecodeChange,
+                        checked = uiState.smaliUnicodeDecodeEnabled,
+                        onCheckedChange = onSmaliUnicodeDecodeChange,
                         modifier = Modifier.fillMaxWidth(),
                         label = {
                             Column {
                                 Text(
-                                    text = "自动Unicode解码",
+                                    text = "Smali Unicode 解码",
                                     style = ShadcnTheme.textStyles.bodySmall,
                                 )
                                 Text(
                                     text = "导出 Smali 时将 \\uXXXX 转为实际字符",
+                                    style = ShadcnTheme.textStyles.labelMedium.copy(
+                                        color = ShadcnTheme.colors.primary.copy(alpha = 0.6f),
+                                    ),
+                                )
+                            }
+                        },
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Checkbox(
+                        checked = uiState.javaUnicodeDecodeEnabled,
+                        onCheckedChange = onJavaUnicodeDecodeChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = {
+                            Column {
+                                Text(
+                                    text = "Java Unicode 解码",
+                                    style = ShadcnTheme.textStyles.bodySmall,
+                                )
+                                Text(
+                                    text = "导出 Java 时将 \\uXXXX 转为实际字符",
                                     style = ShadcnTheme.textStyles.labelMedium.copy(
                                         color = ShadcnTheme.colors.primary.copy(alpha = 0.6f),
                                     ),

@@ -728,7 +728,7 @@ class WorkspaceSceneViewModel internal constructor(
                 val smaliOutput = workspaceExportDir("smali")
                 val smaliOutFile = PlatformFile(smaliOutput, cls.className)
                 dexEngine.exportSingleSmali(
-                    autoUnicodeDecode = _appSettings.value.autoUnicodeDecode,
+                    smaliUnicodeDecode = _appSettings.value.smaliUnicodeDecode,
                     className = cls.signature,
                     dexPath = cls.dexAbsolutePath,
                     outputPath = smaliOutFile.absolutePath(),
@@ -753,6 +753,7 @@ class WorkspaceSceneViewModel internal constructor(
                 val clsOutputDir = workspaceExportDir("java")
                 val clsOutput = PlatformFile(clsOutputDir, "${cls.className}.java")
                 dexEngine.exportSingleJavaSource(
+                    escapeUnicode = !_appSettings.value.javaUnicodeDecode,
                     className = cls.signature,
                     dexPath = cls.dexAbsolutePath,
                     outputPath = clsOutput.absolutePath(),
@@ -1486,13 +1487,42 @@ class WorkspaceSceneViewModel internal constructor(
         scheduleSidePanelStateSave()
     }
 
-    fun updateAutoUnicodeDecode(enabled: Boolean) {
+    fun updateSmaliUnicodeDecode(enabled: Boolean) {
         val previousSettings = _appSettings.value
-        if (previousSettings.autoUnicodeDecode == enabled) {
+        if (previousSettings.smaliUnicodeDecode == enabled) {
             return
         }
 
-        val updatedSettings = previousSettings.copy(autoUnicodeDecode = enabled)
+        val updatedSettings = previousSettings.copy(smaliUnicodeDecode = enabled)
+        _appSettings.value = updatedSettings
+
+        _appSettingsRevision++
+        val revision = _appSettingsRevision
+        val sendResult = _appSettingsSaveRequests.trySend(
+            AppSettingsSaveRequest(
+                revision = revision,
+                settings = updatedSettings,
+            ),
+        )
+        if (sendResult.isFailure) {
+            _appSettings.value = previousSettings
+            logWarn(
+                text = "提交设置保存任务失败",
+                throwable = sendResult.exceptionOrNull(),
+            )
+            viewModelScope.launch {
+                emitMessageEffect("提交设置保存任务失败")
+            }
+        }
+    }
+
+    fun updateJavaUnicodeDecode(enabled: Boolean) {
+        val previousSettings = _appSettings.value
+        if (previousSettings.javaUnicodeDecode == enabled) {
+            return
+        }
+
+        val updatedSettings = previousSettings.copy(javaUnicodeDecode = enabled)
         _appSettings.value = updatedSettings
 
         _appSettingsRevision++

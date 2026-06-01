@@ -75,13 +75,14 @@ private fun runExportSmali(options: Map<String, String>) = runBlocking {
     val input = requireDexInput(options)
     val className = requireOption(options, "class")
     val output = requireOption(options, "output")
-    val autoUnicodeDecode = options["auto-unicode-decode"]?.toBooleanStrictOrNull() ?: true
+    val smaliUnicodeDecode = options["smali-unicode-decode"]?.toBooleanStrictOrNull()
+        ?: false
     ensureParentDirectory(output)
 
     val dexEngine = DexEngine(listOf(input))
     try {
         val exported = dexEngine.exportSingleSmali(
-            autoUnicodeDecode = autoUnicodeDecode,
+            smaliUnicodeDecode = smaliUnicodeDecode,
             className = className,
             dexPath = input,
             outputPath = output,
@@ -96,11 +97,13 @@ private fun runExportJava(options: Map<String, String>) = runBlocking {
     val input = requireDexInput(options)
     val className = requireOption(options, "class")
     val output = requireOption(options, "output")
+    val escapeUnicode = options["escape-unicode"]?.toBooleanStrictOrNull() ?: true
     ensureParentDirectory(output)
 
     val dexEngine = DexEngine(listOf(input))
     try {
         val exported = dexEngine.exportSingleJavaSource(
+            escapeUnicode = escapeUnicode,
             className = className,
             dexPath = input,
             outputPath = output,
@@ -193,7 +196,7 @@ private fun printUsage() {
           运行要求：Java 21
           inspect --input <apk|dex>
           export-dex --input <dex> --class <类名> --output <输出 dex>
-          export-smali --input <dex> --class <类名> --output <输出 smali> [--auto-unicode-decode true|false]
+          export-smali --input <dex> --class <类名> --output <输出 smali> [--smali-unicode-decode true|false]
           export-java --input <dex> --class <类名> --output <输出 java>
           search-class --input <apk|dex> --keyword <关键词> [--limit 100]
           search-string --input <apk|dex> --keyword <关键词> [--limit 100]
