@@ -7,4 +7,5 @@ data class WorkspaceRecord(
     val displayPath: String,
     val dexsAbsolutePathList: List<String>,
     val validDexs: Int,
+    val lastOpenedAt: Long = 0L,
 )

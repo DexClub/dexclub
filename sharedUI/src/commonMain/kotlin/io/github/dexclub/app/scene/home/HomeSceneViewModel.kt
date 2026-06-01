@@ -8,6 +8,7 @@ import io.github.dexclub.app.model.toWorkspaceSummary
 import io.github.dexclub.compat.deleteCompat
 import io.github.dexclub.core.workspace.WorkspaceCreationResult
 import io.github.dexclub.core.workspace.WorkspaceImporter
+import io.github.dexclub.core.workspace.WorkspaceRecord
 import io.github.dexclub.core.workspace.WorkspaceRepository
 import io.github.dexclub.loggerError
 import io.github.vinceglb.filekit.PlatformFile
@@ -102,6 +103,7 @@ class HomeSceneViewModel(
                     return@launch
                 }
 
+                markWorkspaceOpened(matchedWorkspace.id)
                 emitEffect(
                     HomeUiEffect.EnterWorkspace(
                         matchedWorkspace.toWorkspaceSummary().toRouteArgs()
@@ -147,6 +149,7 @@ class HomeSceneViewModel(
                     }
                 ) {
                     is WorkspaceCreationResult.Success -> {
+                        markWorkspaceOpened(result.workspace.id)
                         refreshWorkspaceItems()
                         _uiState.update {
                             it.copy(
@@ -178,8 +181,30 @@ class HomeSceneViewModel(
     private suspend fun refreshWorkspaceItems() {
         val items = withContext(Dispatchers.IO) {
             workspaceRepository.getAll()
-        }.map { it.toWorkspaceSummary() }
+        }
+            .sortedWith(
+                compareByDescending<WorkspaceRecord> { it.lastOpenedAt }
+                    .thenByDescending { it.id },
+            )
+            .map { it.toWorkspaceSummary() }
         _uiState.update { it.copy(workspaceItems = items) }
+    }
+
+    fun onEnterWorkspace(item: WorkspaceSummary) {
+        viewModelScope.launch {
+            markWorkspaceOpened(item.id)
+            refreshWorkspaceItems()
+            emitEffect(HomeUiEffect.EnterWorkspace(item.toRouteArgs()))
+        }
+    }
+
+    private suspend fun markWorkspaceOpened(workspaceId: Long) {
+        withContext(Dispatchers.IO) {
+            workspaceRepository.updateLastOpenedAt(
+                id = workspaceId,
+                lastOpenedAt = System.currentTimeMillis(),
+            )
+        }
     }
 
     private suspend fun emitEffect(effect: HomeUiEffect) {

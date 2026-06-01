@@ -44,6 +44,21 @@ class DefaultWorkspaceRepository internal constructor(
         }
     }
 
+    override suspend fun updateLastOpenedAt(id: Long, lastOpenedAt: Long) {
+        store.update { snapshot ->
+            val currentSnapshot = snapshot ?: WorkspaceStoreSnapshot()
+            currentSnapshot.copy(
+                workspaces = currentSnapshot.workspaces.map { item ->
+                    if (item.id == id) {
+                        item.copy(lastOpenedAt = lastOpenedAt)
+                    } else {
+                        item
+                    }
+                },
+            )
+        }
+    }
+
     override fun close() {
         store.close()
     }
@@ -60,6 +75,7 @@ class DefaultWorkspaceRepository internal constructor(
             displayPath = displayPath,
             dexsAbsolutePathList = dexsAbsolutePathList,
             validDexs = validDexs,
+            lastOpenedAt = lastOpenedAt,
         )
     }
 
@@ -71,6 +87,7 @@ class DefaultWorkspaceRepository internal constructor(
             displayPath = displayPath,
             dexsAbsolutePathList = dexsAbsolutePathList,
             validDexs = validDexs,
+            lastOpenedAt = lastOpenedAt,
         )
     }
 

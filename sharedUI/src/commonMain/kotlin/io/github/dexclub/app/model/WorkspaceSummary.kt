@@ -10,6 +10,7 @@ data class WorkspaceSummary(
     val displayPath: String,
     val dexsAbsolutePathList: List<String>,
     val validDexs: Int,
+    val lastOpenedAt: Long = 0L,
 )
 
 
@@ -21,6 +22,7 @@ fun WorkspaceRecord.toWorkspaceSummary(): WorkspaceSummary {
         displayPath = displayPath,
         dexsAbsolutePathList = dexsAbsolutePathList,
         validDexs = validDexs,
+        lastOpenedAt = lastOpenedAt,
     )
 }
 

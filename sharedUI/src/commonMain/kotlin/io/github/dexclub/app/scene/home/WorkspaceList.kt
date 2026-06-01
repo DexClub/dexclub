@@ -20,8 +20,6 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import io.github.dexclub.app.compose.EIconButton
 import io.github.dexclub.app.model.WorkspaceSummary
-import io.github.dexclub.app.model.toRouteArgs
-import io.github.dexclub.app.navigation.WorkspaceRouteArgs
 import io.github.dexclub.app.res.StringRes
 import io.github.shadcn.ui.compose.Icon
 import io.github.shadcn.ui.compose.ShadcnTheme
@@ -89,7 +87,7 @@ private fun WorkspaceListItem(
 @Composable
 fun WorkspaceListPart(
     uiState: HomeUiState,
-    onEnterWorkspace: (WorkspaceRouteArgs) -> Unit,
+    onEnterWorkspace: (WorkspaceSummary) -> Unit,
     onDelete: (WorkspaceSummary) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -101,7 +99,7 @@ fun WorkspaceListPart(
             WorkspaceListItem(
                 item = item,
                 onSelect = { summary ->
-                    onEnterWorkspace(summary.toRouteArgs())
+                    onEnterWorkspace(summary)
                 },
                 onDelete = onDelete,
             )

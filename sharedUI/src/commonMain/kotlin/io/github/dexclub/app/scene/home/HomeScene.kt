@@ -221,7 +221,7 @@ fun HomeScreen(
                 )
                 WorkspaceListPart(
                     uiState = uiState,
-                    onEnterWorkspace = onEnterWorkspace,
+                    onEnterWorkspace = model::onEnterWorkspace,
                     onDelete = model::onShowDeleteConfirmDialog,
                     modifier = Modifier
                         .fillMaxWidth()

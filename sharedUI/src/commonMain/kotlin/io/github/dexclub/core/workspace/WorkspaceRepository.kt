@@ -7,6 +7,8 @@ interface WorkspaceRepository {
 
     suspend fun insert(record: WorkspaceRecord): WorkspaceRecord
 
+    suspend fun updateLastOpenedAt(id: Long, lastOpenedAt: Long)
+
     suspend fun deleteById(id: Long)
 
     fun close()
