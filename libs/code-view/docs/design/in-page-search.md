@@ -107,7 +107,8 @@
 
 DexKit 字符串命中打开代码页后：
 
-- 对目标 pane 显示顶部搜索框
+- 定位目标 pane 并高亮当前字符串命中
+- 不自动显示顶部搜索框
 - `source = DexKitString`
 - `queryText = 原始字符串`
 - `matchQuery = 原始字符串`
@@ -116,7 +117,8 @@ DexKit 字符串命中打开代码页后：
 
 DexKit 类命中打开代码页后：
 
-- 对目标 pane 显示顶部搜索框
+- 定位目标 pane 并高亮当前类名命中
+- 不自动显示顶部搜索框
 - `source = DexKitClass`
 - Java 与 Smali 各自独立回填
 

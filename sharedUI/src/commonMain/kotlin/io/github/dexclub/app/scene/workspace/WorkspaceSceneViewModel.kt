@@ -827,7 +827,8 @@ class WorkspaceSceneViewModel internal constructor(
                     matchQuery = query,
                     source = EditorInPageSearchSource.DexKitClass,
                     activeMatchIndex = 0,
-                    requestFocus = kind == destination.kind,
+                    isVisible = false,
+                    requestFocus = false,
                 )
                 if (matches.isNotEmpty()) {
                     val activeMatch = matches.first()
@@ -1097,7 +1098,8 @@ class WorkspaceSceneViewModel internal constructor(
                     matchQuery = normalizedQuery,
                     source = EditorInPageSearchSource.DexKitString,
                     activeMatchIndex = activeMatchIndex,
-                    requestFocus = kind == destination.kind,
+                    isVisible = false,
+                    requestFocus = false,
                 )
                 resolvedKinds += kind
             }
@@ -1178,6 +1180,7 @@ class WorkspaceSceneViewModel internal constructor(
         matchQuery: String,
         source: EditorInPageSearchSource,
         activeMatchIndex: Int,
+        isVisible: Boolean = true,
         requestFocus: Boolean,
     ) {
         val currentState = editorStateRepository.getInPageSearchState(tabId, kind)
@@ -1189,7 +1192,7 @@ class WorkspaceSceneViewModel internal constructor(
                 matchQuery = matchQuery,
                 source = source,
                 activeMatchIndex = activeMatchIndex,
-                isVisible = true,
+                isVisible = isVisible,
                 requestFocusToken = if (requestFocus) {
                     currentState.requestFocusToken + 1
                 } else {
