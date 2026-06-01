@@ -8,7 +8,10 @@ import io.github.dexclub.Env
 import io.github.dexclub.app.App
 import io.github.dexclub.app.LocalComposeWindow
 import io.github.dexclub.app.rememberAppThemeIsDarkState
+import io.github.dexclub.desktop.generated.resources.Res
+import io.github.dexclub.desktop.generated.resources.dexclub_icon
 import io.github.shadcn.ui.compose.ShadcnTheme
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.jewel.intui.window.styling.light
 import org.jetbrains.jewel.window.DecoratedWindow
 import org.jetbrains.jewel.window.styling.DecoratedWindowStyle
@@ -22,9 +25,11 @@ fun main() {
         ShadcnTheme(
             isDarkTheme = themeIsDarkState.value,
         ) {
+            val appIcon = painterResource(Res.drawable.dexclub_icon)
             DecoratedWindow(
                 onCloseRequest = ::exitApplication,
                 title = "DexClub",
+                icon = appIcon,
                 state = rememberWindowState(
                     width = 900.dp,
                     height = 720.dp,

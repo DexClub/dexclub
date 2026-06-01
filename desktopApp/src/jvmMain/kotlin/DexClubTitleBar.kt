@@ -1,6 +1,5 @@
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -34,12 +33,6 @@ fun DecoratedWindowScope.DexClubTitleBar() {
                 .align(Alignment.Start)
                 .padding(start = 24.dp),
         ) {
-            icon?.let { icon ->
-                Icon(
-                    painter = icon,
-                    contentDescription = null,
-                )
-            }
             Text(
                 text = title,
                 style = LocalShadcnTextStyles.current.titleSmall,

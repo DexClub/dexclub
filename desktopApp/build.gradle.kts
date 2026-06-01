@@ -13,6 +13,7 @@ kotlin {
         jvmMain.dependencies {
             implementation(project(":libs:shadcn-ui-compose"))
             implementation(project(":sharedUI"))
+            implementation(libs.compose.resources)
             implementation(libs.jewel.decorated.window)
         }
     }
@@ -39,4 +40,9 @@ compose.desktop {
             }
         }
     }
+}
+
+compose.resources {
+    packageOfResClass = "io.github.dexclub.desktop.generated.resources"
+    generateResClass = always
 }
