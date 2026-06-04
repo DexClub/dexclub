@@ -258,6 +258,13 @@ internal fun CodeViewPane(
         callbacks.onConsumeNavigationRevealTarget(target)
     }
 
+    LaunchedEffect(pendingSearchRevealTarget?.token) {
+        if (pendingSearchRevealTarget == null) return@LaunchedEffect
+
+        withFrameNanos { }
+        pendingSearchRevealTarget = null
+    }
+
     fun pushInPageSearchState(
         nextState: EditorInPageSearchState,
     ) {
@@ -500,10 +507,12 @@ internal fun CodeViewPane(
                 },
                 onSelectionChange = { selection ->
                     if (!isSelectedTab) return@CodeEditor
+                    pendingSearchRevealTarget = null
                     latestSelection = selection
                 },
                 onCursorChange = { nextCursor ->
                     if (!isSelectedTab) return@CodeEditor
+                    pendingSearchRevealTarget = null
                     latestCursor = nextCursor
                     updateCursorSelection(
                         selection = latestSelection,

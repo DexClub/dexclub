@@ -170,6 +170,7 @@ DexKit 回填不是“跨 pane 混合搜索”，而是：
 - `searchHighlight` 表达当前活动命中
 - `inactiveSearchHighlights` 表达其他命中
 - 工作区上层仍负责维护完整命中结果、当前索引、计数和 reveal
+- 搜索 reveal 是一次性程序化定位请求，不应在用户点击或编辑正文后继续持有滚动语义；正文交互产生新的 selection / caret 后，应保留搜索高亮，但不再用旧活动命中把 viewport 拉回去
 
 ## 编辑后的行为
 
