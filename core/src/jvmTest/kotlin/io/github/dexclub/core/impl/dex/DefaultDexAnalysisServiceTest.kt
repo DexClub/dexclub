@@ -259,6 +259,26 @@ class DefaultDexAnalysisServiceTest {
     }
 
     @Test
+    fun inspectMethodMatchesArrayParameterDescriptor() {
+        val fixture = DexAnalysisFixture.generated()
+        val services = createDefaultServices()
+        services.workspace.initialize(fixture.dexFile.absolutePath)
+        val workspace = services.workspace.open(WorkspaceRef(fixture.dexWorkspaceDir.absolutePath))
+
+        val detail = services.dex.inspectMethod(
+            workspace = workspace,
+            request = io.github.dexclub.core.api.dex.InspectMethodRequest(
+                descriptor = "Lfixture/samples/SampleSearchTarget;->acceptObjects([Ljava/lang/Object;)V",
+            ),
+        )
+
+        assertEquals("fixture.samples.SampleSearchTarget", detail.method.className)
+        assertEquals("acceptObjects", detail.method.methodName)
+        assertEquals("Lfixture/samples/SampleSearchTarget;->acceptObjects([Ljava/lang/Object;)V", detail.method.descriptor)
+        assertEquals("fixture.dex", detail.method.sourcePath)
+    }
+
+    @Test
     fun findClassRequiresDexCapability() {
         val workdir = Files.createTempDirectory("dexclub-core-manifest").toFile()
         val manifest = workdir.toPath().resolve("AndroidManifest.xml")
@@ -765,6 +785,8 @@ private class DexAnalysisFixture(
                     package fixture.samples;
                     public class SampleSearchTarget {
                         public static final String NEEDLE = "dexclub-needle-string";
+                        public void acceptObjects(Object[] values) {
+                        }
                         public String exposeNeedle() {
                             return NEEDLE;
                         }
