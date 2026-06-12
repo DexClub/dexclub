@@ -191,11 +191,62 @@ jobs:
           }
 
           $artifactDir = Join-Path $PWD "artifacts"
+          $packageDir = Join-Path $PWD ".ci/package"
+          $extractDir = Join-Path $PWD ".ci/extract/cli"
+          $licensePath = Join-Path $PWD "LICENSE"
+          if (!(Test-Path $licensePath)) {
+            throw "Missing LICENSE file: $licensePath"
+          }
+
+          $commit = "${{ github.sha }}".Trim()
+          if ([string]::IsNullOrWhiteSpace($commit)) {
+            $commit = (git rev-parse HEAD).Trim()
+          }
+          $shortCommit = if ($commit.Length -ge 7) { $commit.Substring(0, 7) } else { $commit }
+
+          $refType = "${{ github.ref_type }}"
+          $refName = "${{ github.ref_name }}"
+          if ($refType -eq "tag") {
+            if ($refName.StartsWith("v")) {
+              $version = $refName.Substring(1)
+            } else {
+              $version = $refName
+            }
+          } else {
+            $version = "dev-$shortCommit"
+          }
+
+          if (Test-Path $packageDir) {
+            Remove-Item -Recurse -Force $packageDir
+          }
+          if (Test-Path $extractDir) {
+            Remove-Item -Recurse -Force $extractDir
+          }
           New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+          New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
+          New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
 
           $targetBaseName = "dexclub-cli-${{ matrix.os_name }}-${{ matrix.arch }}"
           $targetZip = Join-Path $artifactDir "$targetBaseName.zip"
-          Copy-Item $sourceZip $targetZip
+          Expand-Archive -Path $sourceZip -DestinationPath $extractDir -Force
+
+          $rootEntries = Get-ChildItem -Path $extractDir
+          if ($rootEntries.Count -ne 1 -or -not $rootEntries[0].PSIsContainer) {
+            throw "Expected a single root directory inside CLI distribution archive."
+          }
+
+          $sourceRoot = $rootEntries[0].FullName
+          Copy-Item -Path (Join-Path $sourceRoot "*") -Destination $packageDir -Recurse -Force
+          Set-Content -Path (Join-Path $packageDir "VERSION") -Value @(
+            "commit: $commit"
+            "version: $version"
+          ) -Encoding ascii
+          Copy-Item -Path $licensePath -Destination (Join-Path $packageDir "LICENSE") -Force
+
+          if (Test-Path $targetZip) {
+            Remove-Item -Force $targetZip
+          }
+          Compress-Archive -Path (Join-Path $packageDir "*") -DestinationPath $targetZip
 
           $hash = (Get-FileHash -Path $targetZip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $targetBaseName.zip" | Out-File -FilePath (Join-Path $artifactDir "$targetBaseName.sha256") -Encoding ascii

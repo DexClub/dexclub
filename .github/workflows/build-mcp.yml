@@ -188,6 +188,34 @@ jobs:
             throw "Missing MCP install directory: $installDir"
           }
 
+          $skillsDir = Join-Path $PWD "skills"
+          if (!(Test-Path $skillsDir)) {
+            throw "Missing skills directory: $skillsDir"
+          }
+
+          $licensePath = Join-Path $PWD "LICENSE"
+          if (!(Test-Path $licensePath)) {
+            throw "Missing LICENSE file: $licensePath"
+          }
+
+          $commit = "${{ github.sha }}".Trim()
+          if ([string]::IsNullOrWhiteSpace($commit)) {
+            $commit = (git rev-parse HEAD).Trim()
+          }
+          $shortCommit = if ($commit.Length -ge 7) { $commit.Substring(0, 7) } else { $commit }
+
+          $refType = "${{ github.ref_type }}"
+          $refName = "${{ github.ref_name }}"
+          if ($refType -eq "tag") {
+            if ($refName.StartsWith("v")) {
+              $version = $refName.Substring(1)
+            } else {
+              $version = $refName
+            }
+          } else {
+            $version = "dev-$shortCommit"
+          }
+
           $artifactDir = Join-Path $PWD "artifacts"
           $packageDir = Join-Path $PWD ".ci/package"
           if (Test-Path $packageDir) {
@@ -197,17 +225,22 @@ jobs:
           New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
 
           $targetBaseName = "dexclub-mcp-${{ matrix.os_name }}-${{ matrix.arch }}"
-          $targetRoot = Join-Path $packageDir $targetBaseName
-          Copy-Item -Recurse -Force $installDir $targetRoot
+          Copy-Item -Path (Join-Path $installDir "*") -Destination $packageDir -Recurse -Force
 
-          $targetLibDir = Join-Path $targetRoot "lib"
+          $targetLibDir = Join-Path $packageDir "lib"
           Copy-Item $nativePath (Join-Path $targetLibDir "${{ matrix.native_file_name }}")
+          Copy-Item -Path $skillsDir -Destination (Join-Path $packageDir "skills") -Recurse -Force
+          Set-Content -Path (Join-Path $packageDir "VERSION") -Value @(
+            "commit: $commit"
+            "version: $version"
+          ) -Encoding ascii
+          Copy-Item -Path $licensePath -Destination (Join-Path $packageDir "LICENSE") -Force
 
           $targetZip = Join-Path $artifactDir "$targetBaseName.zip"
           if (Test-Path $targetZip) {
             Remove-Item -Force $targetZip
           }
-          Compress-Archive -Path $targetRoot -DestinationPath $targetZip
+          Compress-Archive -Path (Join-Path $packageDir "*") -DestinationPath $targetZip
 
           $hash = (Get-FileHash -Path $targetZip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $targetBaseName.zip" | Out-File -FilePath (Join-Path $artifactDir "$targetBaseName.sha256") -Encoding ascii
