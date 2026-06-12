@@ -395,7 +395,7 @@ internal class DefaultDexSearchExecutor(
 
     private fun descriptorTypeToClassName(typeDescriptor: String): String =
         when {
-            typeDescriptor.startsWith('[') -> typeDescriptor.replace('/', '.')
+            typeDescriptor.startsWith('[') -> descriptorTypeToClassName(typeDescriptor.substring(1)) + "[]"
             typeDescriptor.startsWith('L') && typeDescriptor.endsWith(';') ->
                 typeDescriptor.substring(1, typeDescriptor.length - 1).replace('/', '.')
             else -> when (typeDescriptor) {
