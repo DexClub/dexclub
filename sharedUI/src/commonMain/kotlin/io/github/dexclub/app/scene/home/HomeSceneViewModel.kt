@@ -2,10 +2,12 @@ package io.github.dexclub.app.scene.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.dexclub.Env
 import io.github.dexclub.app.model.WorkspaceSummary
 import io.github.dexclub.app.model.toRouteArgs
 import io.github.dexclub.app.model.toWorkspaceSummary
 import io.github.dexclub.compat.deleteCompat
+import io.github.dexclub.core.settings.AppSettingsRepository
 import io.github.dexclub.core.workspace.WorkspaceCreationResult
 import io.github.dexclub.core.workspace.WorkspaceImporter
 import io.github.dexclub.core.workspace.WorkspaceRecord
@@ -23,6 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class HomeSceneViewModel(
+    private val appSettingsRepository: AppSettingsRepository,
     private val workspaceRepository: WorkspaceRepository,
     private val workspaceImporter: WorkspaceImporter,
 ) : ViewModel() {
@@ -51,6 +54,49 @@ class HomeSceneViewModel(
 
     fun onCloseDeleteConfirmDialog() {
         _uiState.update { it.copy(deleteConfirmDialog = false) }
+    }
+
+    fun selectTab(tab: HomeTab) {
+        _uiState.update { it.copy(selectedTab = tab) }
+    }
+
+    fun chooseProjectCacheDir() {
+        viewModelScope.launch {
+            emitEffect(
+                HomeUiEffect.ChooseProjectCacheDir(
+                    initialPath = currentProjectCacheDir(),
+                )
+            )
+        }
+    }
+
+    fun applyProjectCacheDir(directory: PlatformFile?) {
+        if (directory == null) {
+            return
+        }
+
+        val selectedPath = directory.absolutePath()
+        if (selectedPath.isBlank()) {
+            return
+        }
+
+        viewModelScope.launch {
+            val settings = appSettingsRepository.load()
+            runCatching {
+                appSettingsRepository.save(
+                    settings.copy(projectCacheDir = selectedPath)
+                )
+            }.onSuccess {
+                _uiState.update { state -> state.copy(projectCacheDir = selectedPath) }
+            }.onFailure { throwable ->
+                loggerError(
+                    text = "保存项目缓存路径失败",
+                    throwable = throwable,
+                    tag = TAG,
+                )
+                emitEffect(HomeUiEffect.ShowMessage("保存项目缓存路径失败: ${throwable.message}"))
+            }
+        }
     }
 
     fun onDeleteConfirm() {
@@ -144,6 +190,7 @@ class HomeSceneViewModel(
                     val result = workspaceImporter.importWorkspace(
                         workspaceName = workspaceName,
                         targetFile = actualTargetFile,
+                        workspaceRootPath = currentProjectCacheDir(),
                     ) { progress ->
                         _uiState.update { state -> state.copy(loadingMessage = progress) }
                     }
@@ -152,9 +199,7 @@ class HomeSceneViewModel(
                         markWorkspaceOpened(result.workspace.id)
                         refreshWorkspaceItems()
                         _uiState.update {
-                            it.copy(
-                                newWorkspaceDialog = false,
-                            )
+                            it.copy(newWorkspaceDialog = false)
                         }
                         emitEffect(
                             HomeUiEffect.EnterWorkspace(
@@ -178,6 +223,14 @@ class HomeSceneViewModel(
         }
     }
 
+    fun onEnterWorkspace(item: WorkspaceSummary) {
+        viewModelScope.launch {
+            markWorkspaceOpened(item.id)
+            refreshWorkspaceItems()
+            emitEffect(HomeUiEffect.EnterWorkspace(item.toRouteArgs()))
+        }
+    }
+
     private suspend fun refreshWorkspaceItems() {
         val items = withContext(Dispatchers.IO) {
             workspaceRepository.getAll()
@@ -188,14 +241,6 @@ class HomeSceneViewModel(
             )
             .map { it.toWorkspaceSummary() }
         _uiState.update { it.copy(workspaceItems = items) }
-    }
-
-    fun onEnterWorkspace(item: WorkspaceSummary) {
-        viewModelScope.launch {
-            markWorkspaceOpened(item.id)
-            refreshWorkspaceItems()
-            emitEffect(HomeUiEffect.EnterWorkspace(item.toRouteArgs()))
-        }
     }
 
     private suspend fun markWorkspaceOpened(workspaceId: Long) {
@@ -211,9 +256,31 @@ class HomeSceneViewModel(
         _effects.send(effect)
     }
 
+    private suspend fun loadAppSettings() {
+        val settings = appSettingsRepository.load()
+        _uiState.update {
+            it.copy(
+                projectCacheDir = settings.projectCacheDir.takeIf(String::isNotBlank) ?: Env.workspaceDir,
+                defaultProjectCacheDir = Env.workspaceDir,
+            )
+        }
+    }
+
+    private fun currentProjectCacheDir(): String {
+        return _uiState.value.projectCacheDir.takeIf { it.isNotBlank() } ?: Env.workspaceDir
+    }
+
+    private fun normalizeWorkspacePath(path: String): String {
+        return path
+            .replace('\\', '/')
+            .trimEnd('/')
+            .lowercase()
+    }
+
     init {
         viewModelScope.launch {
             runCatching {
+                loadAppSettings()
                 refreshWorkspaceItems()
             }.onFailure { throwable ->
                 loggerError(
@@ -229,13 +296,6 @@ class HomeSceneViewModel(
     override fun onCleared() {
         super.onCleared()
         workspaceRepository.close()
-    }
-
-    private fun normalizeWorkspacePath(path: String): String {
-        return path
-            .replace('\\', '/')
-            .trimEnd('/')
-            .lowercase()
     }
 
     companion object {

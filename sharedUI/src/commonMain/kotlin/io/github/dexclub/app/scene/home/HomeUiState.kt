@@ -9,4 +9,12 @@ data class HomeUiState(
     val workspaceItems: List<WorkspaceSummary> = emptyList(),
     val selectedWorkspaceItem: WorkspaceSummary? = null,
     val deleteConfirmDialog: Boolean = false,
+    val selectedTab: HomeTab = HomeTab.Projects,
+    val projectCacheDir: String = "",
+    val defaultProjectCacheDir: String = "",
 )
+
+enum class HomeTab {
+    Projects,
+    Customize,
+}

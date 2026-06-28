@@ -6,4 +6,8 @@ sealed interface HomeUiEffect {
     data class ShowMessage(val message: String) : HomeUiEffect
 
     data class EnterWorkspace(val routeArgs: WorkspaceRouteArgs) : HomeUiEffect
+
+    data class ChooseProjectCacheDir(
+        val initialPath: String,
+    ) : HomeUiEffect
 }

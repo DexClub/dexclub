@@ -9,6 +9,15 @@ plugins {
     alias(libs.plugins.buildConfig)
 }
 
+fun gitOutput(vararg args: String): String {
+    return providers.exec {
+        commandLine("git", *args)
+    }.standardOutput.asText.get().trim()
+}
+
+val gitCommitCount = gitOutput("rev-list", "--count", "HEAD")
+val gitCommitHash = gitOutput("rev-parse", "--short", "HEAD")
+
 kotlin {
     android {
         namespace = "io.github.dexclub"
@@ -74,8 +83,9 @@ kotlin {
 }
 
 buildConfig {
-    // BuildConfig configuration here.
-    // https://github.com/gmazzo/gradle-buildconfig-plugin#usage-in-kts
+    packageName("io.github.dexclub")
+    buildConfigField("String", "GIT_COMMIT_COUNT", "\"$gitCommitCount\"")
+    buildConfigField("String", "GIT_COMMIT_HASH", "\"$gitCommitHash\"")
 }
 
 room {

@@ -24,11 +24,12 @@ class WorkspaceImporter(
     suspend fun importWorkspace(
         workspaceName: String,
         targetFile: PlatformFile,
+        workspaceRootPath: String = Env.workspaceDir,
         onProgress: (String) -> Unit = {},
     ): WorkspaceCreationResult {
         require(workspaceName.isNotBlank()) { "工作区名称不能为空" }
 
-        val workspaceDir = PlatformFile(Env.workspaceDir)
+        val workspaceDir = PlatformFile(workspaceRootPath)
         var projectDir: PlatformFile? = null
 
         return try {

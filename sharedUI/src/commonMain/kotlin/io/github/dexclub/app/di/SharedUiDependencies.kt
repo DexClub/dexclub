@@ -16,7 +16,9 @@ import io.github.dexclub.data.workspace.DefaultWorkspaceRepository
 object SharedUiDependencies {
     fun createHomeSceneViewModel(): HomeSceneViewModel {
         val workspaceRepository = DefaultWorkspaceRepository()
+        val appSettingsRepository = DefaultAppSettingsRepository()
         return HomeSceneViewModel(
+            appSettingsRepository = appSettingsRepository,
             workspaceRepository = workspaceRepository,
             workspaceImporter = WorkspaceImporter(workspaceRepository),
         )
