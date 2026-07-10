@@ -118,6 +118,7 @@ class McpHttpSmokeTest {
             val initializeBody = json.parseToJsonElement(initializeResponse.bodyAsText()).jsonObject
             assertEquals("2.0", initializeBody["jsonrpc"]!!.jsonPrimitive.content)
             assertEquals("dexclub-mcp", initializeBody["result"]!!.jsonObject["serverInfo"]!!.jsonObject["name"]!!.jsonPrimitive.content)
+            assertEquals(McpBuildInfo.version, initializeBody["result"]!!.jsonObject["serverInfo"]!!.jsonObject["version"]!!.jsonPrimitive.content)
 
             val listToolsResponse = it.post(baseUrl) {
                 headers.append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
