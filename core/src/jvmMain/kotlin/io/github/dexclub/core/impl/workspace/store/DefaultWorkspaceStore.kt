@@ -13,9 +13,11 @@ import io.github.dexclub.core.impl.workspace.model.SnapshotRecord
 import io.github.dexclub.core.impl.workspace.model.TargetRecord
 import io.github.dexclub.core.impl.workspace.model.WorkspaceRecord
 import java.io.IOException
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
 import java.util.Comparator
 import kotlinx.serialization.SerializationException
 
@@ -117,72 +119,44 @@ internal class DefaultWorkspaceStore : WorkspaceStore {
     }
 
     override fun loadClassSourceMap(workdir: String, targetId: String): ClassSourceMapRecord? {
-        val indexPath = targetDir(workdir, targetId).resolve("cache/indexes/class-source-map.json")
-        if (!Files.isRegularFile(indexPath)) return null
-        return try {
-            workspaceJson.decodeFromString<ClassSourceMapDto>(Files.readString(indexPath)).toRecord()
-        } catch (_: Exception) {
-            null
+        return readOptionalJson(classSourceMapPath(workdir, targetId)) {
+            workspaceJson.decodeFromString<ClassSourceMapDto>(it).toRecord()
         }
     }
 
     override fun saveClassSourceMap(workdir: String, targetId: String, classSourceMap: ClassSourceMapRecord) {
         writeState {
-            Files.createDirectories(targetDir(workdir, targetId).resolve("cache/indexes"))
-            writeJson(
-                targetDir(workdir, targetId).resolve("cache/indexes/class-source-map.json"),
-                classSourceMap.toDto(),
-            )
+            writeJson(classSourceMapPath(workdir, targetId), classSourceMap.toDto())
         }
     }
 
     override fun loadManifestCache(workdir: String, targetId: String): ManifestCacheRecord? {
-        val cachePath = targetDir(workdir, targetId).resolve("cache/decoded/manifest.json")
-        if (!Files.isRegularFile(cachePath)) return null
-        return try {
-            workspaceJson.decodeFromString<ManifestCacheDto>(Files.readString(cachePath)).toRecord()
-        } catch (_: Exception) {
-            null
+        return readOptionalJson(manifestCachePath(workdir, targetId)) {
+            workspaceJson.decodeFromString<ManifestCacheDto>(it).toRecord()
         }
     }
 
     override fun saveManifestCache(workdir: String, targetId: String, manifestCache: ManifestCacheRecord) {
         writeState {
-            Files.createDirectories(targetDir(workdir, targetId).resolve("cache/decoded"))
-            writeJson(
-                targetDir(workdir, targetId).resolve("cache/decoded/manifest.json"),
-                manifestCache.toDto(),
-            )
+            writeJson(manifestCachePath(workdir, targetId), manifestCache.toDto())
         }
     }
 
     override fun loadResourceTableCache(workdir: String, targetId: String): ResourceTableCacheRecord? {
-        val cachePath = targetDir(workdir, targetId).resolve("cache/decoded/resource-table.json")
-        if (!Files.isRegularFile(cachePath)) return null
-        return try {
-            workspaceJson.decodeFromString<ResourceTableCacheDto>(Files.readString(cachePath)).toRecord()
-        } catch (_: Exception) {
-            null
+        return readOptionalJson(resourceTableCachePath(workdir, targetId)) {
+            workspaceJson.decodeFromString<ResourceTableCacheDto>(it).toRecord()
         }
     }
 
     override fun saveResourceTableCache(workdir: String, targetId: String, resourceTableCache: ResourceTableCacheRecord) {
         writeState {
-            Files.createDirectories(targetDir(workdir, targetId).resolve("cache/decoded"))
-            writeJson(
-                targetDir(workdir, targetId).resolve("cache/decoded/resource-table.json"),
-                resourceTableCache.toDto(),
-            )
+            writeJson(resourceTableCachePath(workdir, targetId), resourceTableCache.toDto())
         }
     }
 
     override fun loadDecodedXmlCache(workdir: String, targetId: String, xmlId: String): DecodedXmlCacheRecord? {
-        val cachePath = targetDir(workdir, targetId).resolve("cache/decoded/xml/$xmlId.json")
-        if (!Files.isRegularFile(cachePath)) return null
-        return try {
-            workspaceJson.decodeFromString<DecodedXmlCacheDto>(Files.readString(cachePath)).toRecord()
-        } catch (_: Exception) {
-            null
+        return readOptionalJson(decodedXmlCachePath(workdir, targetId, xmlId)) {
+            workspaceJson.decodeFromString<DecodedXmlCacheDto>(it).toRecord()
         }
     }
 
@@ -193,31 +167,19 @@ internal class DefaultWorkspaceStore : WorkspaceStore {
         decodedXmlCache: DecodedXmlCacheRecord,
     ) {
         writeState {
-            Files.createDirectories(targetDir(workdir, targetId).resolve("cache/decoded/xml"))
-            writeJson(
-                targetDir(workdir, targetId).resolve("cache/decoded/xml/$xmlId.json"),
-                decodedXmlCache.toDto(),
-            )
+            writeJson(decodedXmlCachePath(workdir, targetId, xmlId), decodedXmlCache.toDto())
         }
     }
 
     override fun loadResourceEntryIndex(workdir: String, targetId: String): ResourceEntryIndexRecord? {
-        val indexPath = targetDir(workdir, targetId).resolve("cache/indexes/resource-entry-index.json")
-        if (!Files.isRegularFile(indexPath)) return null
-        return try {
-            workspaceJson.decodeFromString<ResourceEntryIndexDto>(Files.readString(indexPath)).toRecord()
-        } catch (_: Exception) {
-            null
+        return readOptionalJson(resourceEntryIndexPath(workdir, targetId)) {
+            workspaceJson.decodeFromString<ResourceEntryIndexDto>(it).toRecord()
         }
     }
 
     override fun saveResourceEntryIndex(workdir: String, targetId: String, resourceEntryIndex: ResourceEntryIndexRecord) {
         writeState {
-            Files.createDirectories(targetDir(workdir, targetId).resolve("cache/indexes"))
-            writeJson(
-                targetDir(workdir, targetId).resolve("cache/indexes/resource-entry-index.json"),
-                resourceEntryIndex.toDto(),
-            )
+            writeJson(resourceEntryIndexPath(workdir, targetId), resourceEntryIndex.toDto())
         }
     }
 
@@ -287,7 +249,21 @@ internal class DefaultWorkspaceStore : WorkspaceStore {
             is ResourceEntryIndexDto -> workspaceJson.encodeToString(ResourceEntryIndexDto.serializer(), value)
             else -> error("Unsupported workspace dto: ${value::class.qualifiedName}")
         }
-        Files.writeString(path, content)
+        writeAtomically(path, content)
+    }
+
+    private fun writeAtomically(path: Path, content: String) {
+        val tempPath = Files.createTempFile(path.parent, path.fileName.toString(), ".tmp")
+        try {
+            Files.writeString(tempPath, content)
+            try {
+                Files.move(tempPath, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(tempPath, path, StandardCopyOption.REPLACE_EXISTING)
+            }
+        } finally {
+            Files.deleteIfExists(tempPath)
+        }
     }
 
     private fun writeState(action: () -> Unit) {
@@ -298,7 +274,31 @@ internal class DefaultWorkspaceStore : WorkspaceStore {
         }
     }
 
+    private fun <T> readOptionalJson(path: Path, decode: (String) -> T): T? {
+        if (!Files.isRegularFile(path)) return null
+        return try {
+            decode(Files.readString(path))
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun workspaceFile(workdir: String): Path = dexclubDirPath(workdir).resolve("workspace.json")
+
+    private fun classSourceMapPath(workdir: String, targetId: String): Path =
+        indexesDir(workdir, targetId).resolve("class-source-map.json")
+
+    private fun manifestCachePath(workdir: String, targetId: String): Path =
+        decodedCacheDir(workdir, targetId).resolve("manifest.json")
+
+    private fun resourceTableCachePath(workdir: String, targetId: String): Path =
+        decodedCacheDir(workdir, targetId).resolve("resource-table.json")
+
+    private fun decodedXmlCachePath(workdir: String, targetId: String, xmlId: String): Path =
+        decodedXmlDir(workdir, targetId).resolve("$xmlId.json")
+
+    private fun resourceEntryIndexPath(workdir: String, targetId: String): Path =
+        indexesDir(workdir, targetId).resolve("resource-entry-index.json")
 
     private fun initializeCacheDirs(targetDir: Path) {
         Files.createDirectories(targetDir.resolve("cache/decoded"))
@@ -306,6 +306,15 @@ internal class DefaultWorkspaceStore : WorkspaceStore {
         Files.createDirectories(targetDir.resolve("cache/indexes"))
         Files.createDirectories(targetDir.resolve("cache/exports/tmp"))
     }
+
+    private fun decodedCacheDir(workdir: String, targetId: String): Path =
+        targetDir(workdir, targetId).resolve("cache/decoded")
+
+    private fun decodedXmlDir(workdir: String, targetId: String): Path =
+        decodedCacheDir(workdir, targetId).resolve("xml")
+
+    private fun indexesDir(workdir: String, targetId: String): Path =
+        targetDir(workdir, targetId).resolve("cache/indexes")
 
     private fun targetDir(workdir: String, targetId: String): Path =
         dexclubDirPath(workdir).resolve("targets").resolve(targetId)

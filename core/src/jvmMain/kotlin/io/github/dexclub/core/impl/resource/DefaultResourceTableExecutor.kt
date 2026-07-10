@@ -21,7 +21,7 @@ internal class DefaultResourceTableExecutor(
         workspace: WorkspaceContext,
         inventory: MaterialInventory,
     ): ResourceTableResult {
-        val source = loader.resolveSource(workspace, inventory)
+        val source = loader.resolveSource(inventory)
         val sourceFingerprint = resourceSourceFingerprint(workspace.workdir, source.sourcePath)
         store.loadResourceTableCache(workspace.workdir, workspace.activeTargetId)
             ?.takeIf {

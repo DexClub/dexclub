@@ -67,6 +67,18 @@ data class PageWindow(
     val limit: Int? = null,
 )
 
+internal fun PageWindow.validate() {
+    require(offset >= 0) { "offset must be non-negative" }
+    require(limit == null || limit > 0) { "limit must be positive when specified" }
+}
+
+internal fun <T> List<T>.applyPageWindow(window: PageWindow): List<T> {
+    window.validate()
+    if (window.offset >= size) return emptyList()
+    val toIndex = window.limit?.let { minOf(size, window.offset + it) } ?: size
+    return subList(window.offset, toIndex)
+}
+
 data class SourceLocator(
     val sourcePath: String? = null,
     val sourceEntry: String? = null,

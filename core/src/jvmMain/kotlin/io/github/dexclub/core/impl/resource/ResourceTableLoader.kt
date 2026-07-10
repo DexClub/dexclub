@@ -1,6 +1,5 @@
 package io.github.dexclub.core.impl.resource
 
-import com.reandroid.apk.ApkModule
 import com.reandroid.arsc.chunk.TableBlock
 import io.github.dexclub.core.api.resource.ResourceDecodeError
 import io.github.dexclub.core.api.resource.ResourceDecodeErrorReason
@@ -12,10 +11,7 @@ import java.util.zip.ZipFile
 private const val resourceTableEntryName: String = "resources.arsc"
 
 internal class ResourceTableLoader {
-    fun resolveSource(
-        workspace: WorkspaceContext,
-        inventory: MaterialInventory,
-    ): ResourceTableSource {
+    fun resolveSource(inventory: MaterialInventory): ResourceTableSource {
         val sources = buildList {
             inventory.arscFiles.forEach { add(ResourceTableSource.File(it)) }
             inventory.apkFiles.forEach { add(ResourceTableSource.Apk(it)) }
@@ -62,10 +58,15 @@ internal class ResourceTableLoader {
             is ResourceTableSource.Apk -> {
                 val sourcePath = source.sourcePath
                 val apkPath = workdirPath.resolve(sourcePath).normalize()
-                ensureApkContainsResourceTable(apkPath, sourcePath)
                 val tableBlock = try {
-                    ApkModule.loadApkFile(apkPath.toFile()).use { apk ->
-                        apk.tableBlock
+                    ZipFile(apkPath.toFile()).use { zip ->
+                        val entry = zip.getEntry(resourceTableEntryName)
+                            ?: throw ResourceDecodeError(
+                                reason = ResourceDecodeErrorReason.ResourceTableEntryMissing,
+                                sourcePath = sourcePath,
+                                message = "APK does not contain resources.arsc: $sourcePath",
+                            )
+                        zip.getInputStream(entry).use { input -> TableBlock.load(input) }
                     }
                 } catch (error: ResourceDecodeError) {
                     throw error
@@ -89,19 +90,7 @@ internal class ResourceTableLoader {
     fun load(
         workspace: WorkspaceContext,
         inventory: MaterialInventory,
-    ): LoadedResourceTable = load(workspace, resolveSource(workspace, inventory))
-
-    private fun ensureApkContainsResourceTable(apkPath: Path, sourcePath: String) {
-        ZipFile(apkPath.toFile()).use { zip ->
-            if (zip.getEntry(resourceTableEntryName) == null) {
-                throw ResourceDecodeError(
-                    reason = ResourceDecodeErrorReason.ResourceTableEntryMissing,
-                    sourcePath = sourcePath,
-                    message = "APK does not contain resources.arsc: $sourcePath",
-                )
-            }
-        }
-    }
+    ): LoadedResourceTable = load(workspace, resolveSource(inventory))
 }
 
 internal data class LoadedResourceTable(

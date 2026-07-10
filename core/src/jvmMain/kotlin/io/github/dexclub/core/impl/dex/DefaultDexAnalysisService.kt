@@ -9,21 +9,18 @@ import io.github.dexclub.core.api.dex.ExportMethodDexRequest
 import io.github.dexclub.core.api.dex.ExportMethodJavaRequest
 import io.github.dexclub.core.api.dex.ExportMethodSmaliRequest
 import io.github.dexclub.core.api.dex.ExportResult
-import io.github.dexclub.core.api.dex.FieldHit
-import io.github.dexclub.core.api.dex.FieldUsageType
 import io.github.dexclub.core.api.dex.FindClassesRequest
 import io.github.dexclub.core.api.dex.FindClassesUsingStringsRequest
-import io.github.dexclub.core.api.dex.FindFieldsRequest
 import io.github.dexclub.core.api.dex.InspectMethodRequest
-import io.github.dexclub.core.api.dex.MethodDetail
-import io.github.dexclub.core.api.dex.MethodFieldUsage
 import io.github.dexclub.core.api.dex.FindMethodsRequest
 import io.github.dexclub.core.api.dex.FindMethodsUsingStringsRequest
-import io.github.dexclub.core.api.dex.MethodHit
+import io.github.dexclub.core.api.dex.FindFieldsRequest
 import io.github.dexclub.core.api.shared.Operation
+import io.github.dexclub.core.api.shared.applyPageWindow
 import io.github.dexclub.core.api.workspace.WorkspaceContext
 import io.github.dexclub.core.api.workspace.WorkspaceResolveError
 import io.github.dexclub.core.api.workspace.WorkspaceResolveErrorReason
+import io.github.dexclub.core.impl.workspace.model.MaterialInventory
 import io.github.dexclub.core.impl.workspace.store.WorkspaceStore
 
 internal class DefaultDexAnalysisService(
@@ -33,164 +30,91 @@ internal class DefaultDexAnalysisService(
     private val searchExecutor: DexSearchExecutor,
     private val exportExecutor: DexExportExecutor,
 ) : DexAnalysisService, AutoCloseable {
-    override fun findClasses(workspace: WorkspaceContext, request: FindClassesRequest): List<ClassHit> {
-        capabilityChecker.require(workspace, Operation.FindClass)
-        val snapshot = store.loadSnapshot(workspace.workdir, workspace.activeTargetId)
-            ?: throw WorkspaceResolveError(
-                reason = WorkspaceResolveErrorReason.InvalidSnapshot,
-                workdir = workspace.workdir,
-                message = "Active target snapshot is missing: ${workspace.activeTargetId}",
-            )
-        val query = queryParser.parseFindClass(request.queryText)
-        val hits = searchExecutor.findClasses(
-            workspace = workspace,
-            inventory = snapshot.inventory,
-            query = query,
-        )
-        return applyWindow(sortClassHits(hits), request.window.offset, request.window.limit)
-    }
-
-    override fun findMethods(workspace: WorkspaceContext, request: FindMethodsRequest): List<MethodHit> =
-        run {
-            capabilityChecker.require(workspace, Operation.FindMethod)
-            val snapshot = store.loadSnapshot(workspace.workdir, workspace.activeTargetId)
-                ?: throw WorkspaceResolveError(
-                    reason = WorkspaceResolveErrorReason.InvalidSnapshot,
-                    workdir = workspace.workdir,
-                    message = "Active target snapshot is missing: ${workspace.activeTargetId}",
-                )
-            val query = queryParser.parseFindMethod(request.queryText)
-            val hits = searchExecutor.findMethods(
+    override fun findClasses(workspace: WorkspaceContext, request: FindClassesRequest) =
+        runSearch(workspace, Operation.FindClass, request.window, DexAnalysisResultSorter::sortClassHits) { inventory ->
+            searchExecutor.findClasses(
                 workspace = workspace,
-                inventory = snapshot.inventory,
-                query = query,
+                inventory = inventory,
+                query = queryParser.parseFindClass(request.queryText),
             )
-            applyWindow(sortMethodHits(hits), request.window.offset, request.window.limit)
         }
 
-    override fun findFields(workspace: WorkspaceContext, request: FindFieldsRequest): List<FieldHit> =
-        run {
-            capabilityChecker.require(workspace, Operation.FindField)
-            val snapshot = store.loadSnapshot(workspace.workdir, workspace.activeTargetId)
-                ?: throw WorkspaceResolveError(
-                    reason = WorkspaceResolveErrorReason.InvalidSnapshot,
-                    workdir = workspace.workdir,
-                    message = "Active target snapshot is missing: ${workspace.activeTargetId}",
-                )
-            val query = queryParser.parseFindField(request.queryText)
-            val hits = searchExecutor.findFields(
+    override fun findMethods(workspace: WorkspaceContext, request: FindMethodsRequest) =
+        runSearch(workspace, Operation.FindMethod, request.window, DexAnalysisResultSorter::sortMethodHits) { inventory ->
+            searchExecutor.findMethods(
                 workspace = workspace,
-                inventory = snapshot.inventory,
-                query = query,
+                inventory = inventory,
+                query = queryParser.parseFindMethod(request.queryText),
             )
-            applyWindow(sortFieldHits(hits), request.window.offset, request.window.limit)
+        }
+
+    override fun findFields(workspace: WorkspaceContext, request: FindFieldsRequest) =
+        runSearch(workspace, Operation.FindField, request.window, DexAnalysisResultSorter::sortFieldHits) { inventory ->
+            searchExecutor.findFields(
+                workspace = workspace,
+                inventory = inventory,
+                query = queryParser.parseFindField(request.queryText),
+            )
         }
 
     override fun findClassesUsingStrings(
         workspace: WorkspaceContext,
         request: FindClassesUsingStringsRequest,
-    ): List<ClassHit> =
-        run {
-            capabilityChecker.require(workspace, Operation.FindClass)
-            val snapshot = store.loadSnapshot(workspace.workdir, workspace.activeTargetId)
-                ?: throw WorkspaceResolveError(
-                    reason = WorkspaceResolveErrorReason.InvalidSnapshot,
-                    workdir = workspace.workdir,
-                    message = "Active target snapshot is missing: ${workspace.activeTargetId}",
-                )
-            val query = queryParser.parseFindClassUsingStrings(request.queryText)
-            val hits = searchExecutor.findClassesUsingStrings(
-                workspace = workspace,
-                inventory = snapshot.inventory,
-                query = query,
-            )
-            applyWindow(sortClassHits(hits), request.window.offset, request.window.limit)
-        }
+    ) = runSearch(workspace, Operation.FindClass, request.window, DexAnalysisResultSorter::sortClassHits) { inventory ->
+        searchExecutor.findClassesUsingStrings(
+            workspace = workspace,
+            inventory = inventory,
+            query = queryParser.parseFindClassUsingStrings(request.queryText),
+        )
+    }
 
     override fun findMethodsUsingStrings(
         workspace: WorkspaceContext,
         request: FindMethodsUsingStringsRequest,
-    ): List<MethodHit> =
-        run {
-            capabilityChecker.require(workspace, Operation.FindMethod)
-            val snapshot = store.loadSnapshot(workspace.workdir, workspace.activeTargetId)
-                ?: throw WorkspaceResolveError(
-                    reason = WorkspaceResolveErrorReason.InvalidSnapshot,
-                    workdir = workspace.workdir,
-                    message = "Active target snapshot is missing: ${workspace.activeTargetId}",
-                )
-            val query = queryParser.parseFindMethodUsingStrings(request.queryText)
-            val hits = searchExecutor.findMethodsUsingStrings(
-                workspace = workspace,
-                inventory = snapshot.inventory,
-                query = query,
-            )
-            applyWindow(sortMethodHits(hits), request.window.offset, request.window.limit)
-        }
+    ) = runSearch(workspace, Operation.FindMethod, request.window, DexAnalysisResultSorter::sortMethodHits) { inventory ->
+        searchExecutor.findMethodsUsingStrings(
+            workspace = workspace,
+            inventory = inventory,
+            query = queryParser.parseFindMethodUsingStrings(request.queryText),
+        )
+    }
 
     override fun inspectMethod(
         workspace: WorkspaceContext,
         request: InspectMethodRequest,
-    ): MethodDetail =
-        run {
-            capabilityChecker.require(workspace, Operation.FindMethod)
-            val snapshot = store.loadSnapshot(workspace.workdir, workspace.activeTargetId)
-                ?: throw WorkspaceResolveError(
-                    reason = WorkspaceResolveErrorReason.InvalidSnapshot,
-                    workdir = workspace.workdir,
-                    message = "Active target snapshot is missing: ${workspace.activeTargetId}",
-                )
-            sortMethodDetail(
-                searchExecutor.inspectMethod(
-                    workspace = workspace,
-                    inventory = snapshot.inventory,
-                    request = request,
-                ),
+    ) = withInventory(workspace, Operation.FindMethod) { inventory ->
+        DexAnalysisResultSorter.sortMethodDetail(
+            searchExecutor.inspectMethod(
+                workspace = workspace,
+                inventory = inventory,
+                request = request,
+            )
+        )
+    }
+
+    override fun exportClassDex(workspace: WorkspaceContext, request: ExportClassDexRequest) =
+        runExport(workspace, Operation.ExportDex) { inventory ->
+            exportExecutor.exportClassDex(
+                workspace = workspace,
+                inventory = inventory,
+                request = request,
             )
         }
 
-    override fun exportClassDex(workspace: WorkspaceContext, request: ExportClassDexRequest): ExportResult {
-        capabilityChecker.require(workspace, Operation.ExportDex)
-        val snapshot = store.loadSnapshot(workspace.workdir, workspace.activeTargetId)
-            ?: throw WorkspaceResolveError(
-                reason = WorkspaceResolveErrorReason.InvalidSnapshot,
-                workdir = workspace.workdir,
-                message = "Active target snapshot is missing: ${workspace.activeTargetId}",
+    override fun exportClassSmali(workspace: WorkspaceContext, request: ExportClassSmaliRequest) =
+        runExport(workspace, Operation.ExportSmali) { inventory ->
+            exportExecutor.exportClassSmali(
+                workspace = workspace,
+                inventory = inventory,
+                request = request,
             )
-        return exportExecutor.exportClassDex(
-            workspace = workspace,
-            inventory = snapshot.inventory,
-            request = request,
-        )
-    }
+        }
 
-    override fun exportClassSmali(workspace: WorkspaceContext, request: ExportClassSmaliRequest): ExportResult {
-        capabilityChecker.require(workspace, Operation.ExportSmali)
-        val snapshot = store.loadSnapshot(workspace.workdir, workspace.activeTargetId)
-            ?: throw WorkspaceResolveError(
-                reason = WorkspaceResolveErrorReason.InvalidSnapshot,
-                workdir = workspace.workdir,
-                message = "Active target snapshot is missing: ${workspace.activeTargetId}",
-            )
-        return exportExecutor.exportClassSmali(
-            workspace = workspace,
-            inventory = snapshot.inventory,
-            request = request,
-        )
-    }
-
-    override fun exportClassJava(workspace: WorkspaceContext, request: ExportClassJavaRequest): ExportResult =
-        run {
-            capabilityChecker.require(workspace, Operation.ExportJava)
-            val snapshot = store.loadSnapshot(workspace.workdir, workspace.activeTargetId)
-                ?: throw WorkspaceResolveError(
-                    reason = WorkspaceResolveErrorReason.InvalidSnapshot,
-                    workdir = workspace.workdir,
-                    message = "Active target snapshot is missing: ${workspace.activeTargetId}",
-                )
+    override fun exportClassJava(workspace: WorkspaceContext, request: ExportClassJavaRequest) =
+        runExport(workspace, Operation.ExportJava) { inventory ->
             exportExecutor.exportClassJava(
                 workspace = workspace,
-                inventory = snapshot.inventory,
+                inventory = inventory,
                 request = request,
             )
         }
@@ -198,17 +122,10 @@ internal class DefaultDexAnalysisService(
     override fun exportMethodSmali(
         workspace: WorkspaceContext,
         request: ExportMethodSmaliRequest,
-    ): ExportResult {
-        capabilityChecker.require(workspace, Operation.ExportSmali)
-        val snapshot = store.loadSnapshot(workspace.workdir, workspace.activeTargetId)
-            ?: throw WorkspaceResolveError(
-                reason = WorkspaceResolveErrorReason.InvalidSnapshot,
-                workdir = workspace.workdir,
-                message = "Active target snapshot is missing: ${workspace.activeTargetId}",
-            )
-        return exportExecutor.exportMethodSmali(
+    ) = runExport(workspace, Operation.ExportSmali) { inventory ->
+        exportExecutor.exportMethodSmali(
             workspace = workspace,
-            inventory = snapshot.inventory,
+            inventory = inventory,
             request = request,
         )
     }
@@ -216,17 +133,10 @@ internal class DefaultDexAnalysisService(
     override fun exportMethodDex(
         workspace: WorkspaceContext,
         request: ExportMethodDexRequest,
-    ): ExportResult {
-        capabilityChecker.require(workspace, Operation.ExportDex)
-        val snapshot = store.loadSnapshot(workspace.workdir, workspace.activeTargetId)
-            ?: throw WorkspaceResolveError(
-                reason = WorkspaceResolveErrorReason.InvalidSnapshot,
-                workdir = workspace.workdir,
-                message = "Active target snapshot is missing: ${workspace.activeTargetId}",
-            )
-        return exportExecutor.exportMethodDex(
+    ) = runExport(workspace, Operation.ExportDex) { inventory ->
+        exportExecutor.exportMethodDex(
             workspace = workspace,
-            inventory = snapshot.inventory,
+            inventory = inventory,
             request = request,
         )
     }
@@ -234,74 +144,46 @@ internal class DefaultDexAnalysisService(
     override fun exportMethodJava(
         workspace: WorkspaceContext,
         request: ExportMethodJavaRequest,
-    ): ExportResult {
-        capabilityChecker.require(workspace, Operation.ExportJava)
-        val snapshot = store.loadSnapshot(workspace.workdir, workspace.activeTargetId)
+    ) = runExport(workspace, Operation.ExportJava) { inventory ->
+        exportExecutor.exportMethodJava(
+            workspace = workspace,
+            inventory = inventory,
+            request = request,
+        )
+    }
+
+    private inline fun <T> runSearch(
+        workspace: WorkspaceContext,
+        operation: Operation,
+        window: io.github.dexclub.core.api.shared.PageWindow,
+        sorter: (List<T>) -> List<T>,
+        search: (MaterialInventory) -> List<T>,
+    ): List<T> = withInventory(workspace, operation) { inventory ->
+        sorter(search(inventory)).applyPageWindow(window)
+    }
+
+    private inline fun <T> runExport(
+        workspace: WorkspaceContext,
+        operation: Operation,
+        export: (MaterialInventory) -> T,
+    ): T = withInventory(workspace, operation, export)
+
+    private inline fun <T> withInventory(
+        workspace: WorkspaceContext,
+        operation: Operation,
+        block: (MaterialInventory) -> T,
+    ): T {
+        capabilityChecker.require(workspace, operation)
+        return block(loadActiveInventory(workspace))
+    }
+
+    private fun loadActiveInventory(workspace: WorkspaceContext): MaterialInventory =
+        store.loadSnapshot(workspace.workdir, workspace.activeTargetId)?.inventory
             ?: throw WorkspaceResolveError(
                 reason = WorkspaceResolveErrorReason.InvalidSnapshot,
                 workdir = workspace.workdir,
                 message = "Active target snapshot is missing: ${workspace.activeTargetId}",
             )
-        return exportExecutor.exportMethodJava(
-            workspace = workspace,
-            inventory = snapshot.inventory,
-            request = request,
-        )
-    }
-
-    private fun sortClassHits(hits: List<ClassHit>): List<ClassHit> =
-        hits.sortedWith(
-            compareBy<ClassHit>({ it.className }, { it.sourcePath.orEmpty() }, { it.sourceEntry.orEmpty() }),
-        )
-
-    private fun sortMethodHits(hits: List<MethodHit>): List<MethodHit> =
-        hits.sortedWith(
-            compareBy<MethodHit>(
-                { it.className },
-                { it.methodName },
-                { it.descriptor },
-                { it.sourcePath.orEmpty() },
-                { it.sourceEntry.orEmpty() },
-            ),
-        )
-
-    private fun sortFieldHits(hits: List<FieldHit>): List<FieldHit> =
-        hits.sortedWith(
-            compareBy<FieldHit>(
-                { it.className },
-                { it.fieldName },
-                { it.descriptor },
-                { it.sourcePath.orEmpty() },
-                { it.sourceEntry.orEmpty() },
-            ),
-        )
-
-    private fun sortMethodDetail(detail: MethodDetail): MethodDetail =
-        MethodDetail(
-            method = detail.method,
-            usingFields = detail.usingFields?.sortedWith(
-                compareBy<MethodFieldUsage>(
-                    { it.usingType != FieldUsageType.Read },
-                    { it.field.className },
-                    { it.field.fieldName },
-                    { it.field.descriptor },
-                    { it.field.sourcePath.orEmpty() },
-                    { it.field.sourceEntry.orEmpty() },
-                ),
-            ),
-            callers = detail.callers?.let(::sortMethodHits),
-            invokes = detail.invokes?.let(::sortMethodHits),
-            strings = detail.strings?.distinct()?.sorted(),
-            annotations = detail.annotations?.distinct()?.sorted(),
-        )
-
-    private fun <T> applyWindow(hits: List<T>, offset: Int, limit: Int?): List<T> {
-        require(offset >= 0) { "offset must be non-negative" }
-        require(limit == null || limit > 0) { "limit must be positive when specified" }
-        if (offset >= hits.size) return emptyList()
-        val toIndex = if (limit == null) hits.size else minOf(hits.size, offset + limit)
-        return hits.subList(offset, toIndex)
-    }
 
     override fun close() {
         searchExecutor.close()

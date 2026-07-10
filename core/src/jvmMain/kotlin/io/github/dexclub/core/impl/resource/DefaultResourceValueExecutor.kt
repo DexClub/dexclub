@@ -128,7 +128,7 @@ internal class DefaultResourceValueExecutor(
         inventory: MaterialInventory,
     ): ResourceTableSource? =
         try {
-            tableLoader.resolveSource(workspace, inventory)
+            tableLoader.resolveSource(inventory)
         } catch (_: ResourceDecodeError) {
             null
         }
