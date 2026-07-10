@@ -40,7 +40,7 @@ internal class Renderer {
             exitCode = 1,
         )
 
-    fun renderWorkspaceError(message: String, hint: String?): RenderedOutput =
+    fun renderWorkspaceError(message: String, hint: String?, details: String? = null): RenderedOutput =
         RenderedOutput(
             stdout = null,
             stderr = buildString {
@@ -49,6 +49,11 @@ internal class Renderer {
                 if (hint != null) {
                     appendLine()
                     append(hint)
+                }
+                if (details != null) {
+                    appendLine()
+                    appendLine()
+                    append(details)
                 }
             },
             exitCode = 2,

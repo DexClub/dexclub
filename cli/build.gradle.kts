@@ -1,6 +1,8 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import org.gradle.api.tasks.Sync
+import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.bundling.Zip
+import org.gradle.api.tasks.testing.Test
 import org.gradle.jvm.tasks.Jar
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -51,9 +53,85 @@ dependencies {
     testImplementation(kotlin("test"))
 }
 
-tasks.test {
+val cliTestSourceSet = the<SourceSetContainer>()["test"]
+
+fun Test.configureCliTestRuntime() {
     useJUnitPlatform()
     dependsOn(gradle.includedBuild("DexKit").task(":dexkit:copyLibrary"))
+}
+
+fun registerCliTestTask(
+    name: String,
+    description: String,
+    vararg classNames: String,
+) = tasks.register<Test>(name) {
+    group = "verification"
+    this.description = description
+    testClassesDirs = cliTestSourceSet.output.classesDirs
+    classpath = cliTestSourceSet.runtimeClasspath
+    configureCliTestRuntime()
+    filter {
+        classNames.forEach(::includeTestsMatching)
+    }
+}
+
+tasks.test {
+    configureCliTestRuntime()
+}
+
+val testHelp by registerCliTestTask(
+    name = "testHelp",
+    description = "运行 CLI help / parser 命令测试",
+    "io.github.dexclub.cli.CliHelpCommandTest",
+)
+
+val testWorkspace by registerCliTestTask(
+    name = "testWorkspace",
+    description = "运行 CLI workspace 生命周期命令测试",
+    "io.github.dexclub.cli.CliWorkspaceCommandTest",
+)
+
+val testFailureRendering by registerCliTestTask(
+    name = "testFailureRendering",
+    description = "运行 CLI 异常渲染与调试堆栈测试",
+    "io.github.dexclub.cli.CliAppFailureRenderingTest",
+)
+
+val testResource by registerCliTestTask(
+    name = "testResource",
+    description = "运行 CLI Android 资源相关命令测试",
+    "io.github.dexclub.cli.CliResourceCommandTest",
+)
+
+val testDexQuery by registerCliTestTask(
+    name = "testDexQuery",
+    description = "运行 CLI Dex 查询与 inspect-method 测试",
+    "io.github.dexclub.cli.CliDexQueryCommandTest",
+)
+
+val testExport by registerCliTestTask(
+    name = "testExport",
+    description = "运行 CLI 代码导出相关测试",
+    "io.github.dexclub.cli.CliExportCommandTest",
+)
+
+tasks.register("testFast") {
+    group = "verification"
+    description = "运行不依赖 Android 资源构建的 CLI 快速测试集合"
+    dependsOn(testHelp, testWorkspace, testFailureRendering)
+}
+
+tasks.register("testStructured") {
+    group = "verification"
+    description = "按命令族运行拆分后的全部 CLI 测试任务"
+    dependsOn(
+        testHelp,
+        testWorkspace,
+        testFailureRendering,
+        testResource,
+        testDexQuery,
+        testExport,
+    )
 }
 
 val generateCliVersionResource = tasks.register("generateCliVersionResource") {

@@ -11,6 +11,8 @@ import io.github.dexclub.core.api.resource.ResourceDecodeError
 import io.github.dexclub.core.api.workspace.WorkspaceInitError
 import io.github.dexclub.core.api.workspace.WorkspaceResolveError
 import io.github.dexclub.core.api.workspace.WorkspaceResolveErrorReason
+import java.io.PrintWriter
+import java.io.StringWriter
 import java.nio.file.Paths
 
 class CliApp(
@@ -18,6 +20,10 @@ class CliApp(
     private val cwdProvider: () -> String = {
         Paths.get("").toAbsolutePath().normalize().toString()
     },
+    private val debugStacktraceEnabled: Boolean = System.getenv(DEBUG_STACKTRACE_ENV)
+        ?.trim()
+        ?.equals("true", ignoreCase = true)
+        ?: false,
 ) {
     private val parser = CliParser()
     private val workdirResolver = WorkdirResolver(cwdProvider)
@@ -38,62 +44,97 @@ class CliApp(
             parsedRequest = parser.parse(argv)
             val commandResult = dispatcher.dispatch(parsedRequest)
             renderer.render(commandResult)
-        } catch (error: CliUsageError) {
-            renderer.renderCliUsageError(error)
-        } catch (error: WorkspaceResolveError) {
-            renderer.renderWorkspaceError(
-                message = error.message ?: "Workspace operation failed",
-                hint = when (error.reason) {
-                    WorkspaceResolveErrorReason.NotInitialized ->
-                        "Run 'cli init <input>' to create a workspace."
-
-                    WorkspaceResolveErrorReason.MissingBoundInput ->
-                        "Run 'cli status' for workspace details."
-
-                    else -> null
-                },
-            )
-        } catch (error: WorkspaceInitError) {
-            renderer.renderWorkspaceError(
-                message = error.message ?: "Workspace initialization failed",
-                hint = null,
-            )
-        } catch (error: CapabilityError) {
-            renderer.renderWorkspaceError(
-                message = "command '${parsedRequest?.toCommandName() ?: error.operation.toCommandName()}' is not supported by the current workspace (kind=${error.kind})",
-                hint = null,
-            )
-        } catch (error: DexQueryError) {
-            renderer.renderWorkspaceError(
-                message = error.message ?: "Dex query failed",
-                hint = null,
-            )
-        } catch (error: DexInspectError) {
-            renderer.renderWorkspaceError(
-                message = error.message ?: "Method inspection failed",
-                hint = null,
-            )
-        } catch (error: DexExportError) {
-            renderer.renderWorkspaceError(
-                message = error.message ?: "Dex export failed",
-                hint = null,
-            )
-        } catch (error: ResourceDecodeError) {
-            renderer.renderWorkspaceError(
-                message = error.message,
-                hint = null,
-            )
         } catch (error: Throwable) {
-            renderer.renderWorkspaceError(
-                message = error.message ?: "Unexpected failure",
-                hint = null,
-            )
+            renderFailure(parsedRequest, error)
         }
 
         outputWriter.write(rendered, stdout, stderr)
         return rendered.exitCode
     }
+
+    private fun renderFailure(parsedRequest: CliRequest?, error: Throwable): RenderedOutput =
+        when (error) {
+            is CliUsageError -> renderer.renderCliUsageError(error)
+            is WorkspaceResolveError -> workspaceError(
+                message = error.message,
+                defaultMessage = "Workspace operation failed",
+                hint = error.hint(),
+            )
+            is WorkspaceInitError -> workspaceError(
+                message = error.message,
+                defaultMessage = "Workspace initialization failed",
+            )
+            is CapabilityError -> workspaceError(
+                message = capabilityErrorMessage(parsedRequest, error),
+                defaultMessage = "Capability check failed",
+            )
+            is DexQueryError -> workspaceError(
+                message = error.message,
+                defaultMessage = "Dex query failed",
+            )
+            is DexInspectError -> workspaceError(
+                message = error.message,
+                defaultMessage = "Method inspection failed",
+            )
+            is DexExportError -> workspaceError(
+                message = error.message,
+                defaultMessage = "Dex export failed",
+            )
+            is ResourceDecodeError -> workspaceError(
+                message = error.message,
+                defaultMessage = "Resource decode failed",
+            )
+            else -> workspaceError(
+                message = error.message,
+                defaultMessage = "Unexpected failure",
+                hint = unexpectedFailureHint(),
+                details = error.stackTraceText().takeIf { debugStacktraceEnabled },
+            )
+        }
+
+    private fun workspaceError(
+        message: String?,
+        defaultMessage: String,
+        hint: String? = null,
+        details: String? = null,
+    ): RenderedOutput =
+        renderer.renderWorkspaceError(
+            message = message ?: defaultMessage,
+            hint = hint,
+            details = details,
+        )
+
+    private fun capabilityErrorMessage(parsedRequest: CliRequest?, error: CapabilityError): String =
+        "command '${parsedRequest?.toCommandName() ?: error.operation.toCommandName()}' is not supported by the current workspace (kind=${error.kind})"
+
+    private fun unexpectedFailureHint(): String =
+        if (debugStacktraceEnabled) {
+            "Unexpected internal error. Disable $DEBUG_STACKTRACE_ENV or unset it to hide stack traces."
+        } else {
+            "Set $DEBUG_STACKTRACE_ENV=true to print the stack trace."
+        }
 }
+
+private fun Throwable.stackTraceText(): String =
+    StringWriter().use { buffer ->
+        PrintWriter(buffer).use { writer ->
+            printStackTrace(writer)
+        }
+        buffer.toString().trimEnd()
+    }
+
+private const val DEBUG_STACKTRACE_ENV = "DEXCLUB_CLI_DEBUG_STACKTRACE"
+
+private fun WorkspaceResolveError.hint(): String? =
+    when (reason) {
+        WorkspaceResolveErrorReason.NotInitialized ->
+            "Run 'cli init <input>' to create a workspace."
+
+        WorkspaceResolveErrorReason.MissingBoundInput ->
+            "Run 'cli status' for workspace details."
+
+        else -> null
+    }
 
 private fun CliRequest.toCommandName(): String =
     when (this) {
