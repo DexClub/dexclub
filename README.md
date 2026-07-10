@@ -59,12 +59,15 @@
 - JDK 21
 - Android SDK
 - Android NDK `28.2.13676358`
-- `cmake`
+- `cmake` `3.18.1` 和 `3.31.6`
 - `ninja`
 
 说明：
 
 - Android SDK / NDK 主要服务于 DexKit native 构建和测试样本生成
+- 根构建默认启用 `mavenLocal()`；当前本仓维护链路依赖本地存在 `dev.rikka.ndk.thirdparty:libcxx:1.3.0`
+- 当前 README、根构建与 CI 默认以 `NDK 28.2.13676358` 发布 `dexkit/vendor/libcxx-prefab`；vendored 上游 `dexkit-android` 模块自身仍声明 `NDK 26.1.10909125`
+- CI 当前会同时安装 `cmake 3.18.1` 和 `3.31.6`；本地若要复现 Android / native 构建链，建议与该组合保持一致
 - `core` 的资源命令运行时不要求额外安装 Android SDK
 - 桌面端 DexKit 运行前提可参考上游文档：
   [DexKit 桌面端运行说明](https://luckypray.org/DexKit/zh-cn/guide/run-on-desktop.html)
@@ -83,6 +86,11 @@ git submodule update --init --recursive
 cd dexkit/vendor/libcxx-prefab
 ./gradlew :cxx:publishToMavenLocal
 ```
+
+说明：
+
+- 这一步会把 `dev.rikka.ndk.thirdparty:libcxx:1.3.0` 发布到本机 `mavenLocal()`
+- 当前仓库的 `dexkit / core / cli / mcp` 构建都会经过根项目仓库解析；如果这里缺失，Android / native 相关构建会直接失败
 
 ## 构建与验证
 
@@ -106,6 +114,101 @@ cd dexkit/vendor/libcxx-prefab
 ./gradlew :cli:test
 ./gradlew :mcp:test
 ```
+
+按职责跑 `core` 测试：
+
+```bash
+./gradlew :core:testFast
+./gradlew :core:testDex
+./gradlew :core:testResource
+./gradlew :core:testResourceManifest
+./gradlew :core:testResourceTable
+./gradlew :core:testResourceXml
+./gradlew :core:testResourceEntry
+./gradlew :core:testResourceValue
+./gradlew :core:testWorkspace
+./gradlew :core:testStructured
+```
+
+说明：
+
+- `:core:testFast` 跑 dex、resource 与 workspace 三组 JVM 测试入口
+- `:core:testDex` 跑 dex 分析、查询、`inspectMethod` 与导出测试
+- `:core:testResource` 串行跑全部 resource 相关测试
+- `:core:testResourceManifest` 跑 manifest 解码与结构化解析测试
+- `:core:testResourceTable` 跑 resource table 解码测试
+- `:core:testResourceXml` 跑 XML 解码测试
+- `:core:testResourceEntry` 跑 resource entry 索引与列举测试
+- `:core:testResourceValue` 跑 resource value 解析与搜索测试
+- `:core:testWorkspace` 跑 workspace 初始化、默认服务装配与运行时解析测试
+- `:core:testStructured` 按拆分后的测试分组串行跑完全部 core JVM 测试入口
+
+推荐验证路径：
+
+- 只改 dex 搜索、inspect 或导出链路时，先跑 `./gradlew :core:testDex`
+- 改 manifest 解析链路时，先跑 `./gradlew :core:testResourceManifest`
+- 改 resource table / value / search 链路时，先跑 `./gradlew :core:testResourceTable` 和 `./gradlew :core:testResourceValue`
+- 改 XML 解码或 resource entry 索引链路时，补跑 `./gradlew :core:testResourceXml` 和 `./gradlew :core:testResourceEntry`
+- 改 workspace 状态、target 管理或默认服务装配链路时，先跑 `./gradlew :core:testWorkspace`
+- 改动同时跨 dex 与 resource，或准备合并前收口时，最后跑 `./gradlew :core:testStructured`
+
+按命令族跑 `cli` 测试：
+
+```bash
+./gradlew :cli:testFast
+./gradlew :cli:testResource
+./gradlew :cli:testDexQuery
+./gradlew :cli:testExport
+./gradlew :cli:testStructured
+```
+
+说明：
+
+- `:cli:testFast` 只跑 help / workspace / failure rendering 这类快速测试
+- `:cli:testResource` 跑 manifest / resources / xml / resource search 相关测试
+- `:cli:testDexQuery` 跑 dex 查询与 `inspect-method` 相关测试
+- `:cli:testExport` 跑 smali / dex / java 导出相关测试
+- `:cli:testStructured` 按拆分后的测试分组串行跑完全部 `cli` 测试入口
+
+推荐验证路径：
+
+- 只改 `cli` 参数解析、帮助文本或错误渲染时，先跑 `./gradlew :cli:testFast`
+- 改资源相关链路时，在 `:cli:testFast` 之后补跑 `./gradlew :cli:testResource`
+- 改 dex 查询相关链路时，在 `:cli:testFast` 之后补跑 `./gradlew :cli:testDexQuery`
+- 改导出相关链路时，在 `:cli:testFast` 之后补跑 `./gradlew :cli:testExport`
+- 需要合并前收口或想完整覆盖 `cli` 入口时，最后跑 `./gradlew :cli:testStructured`
+- 多个 `:cli:test*` 任务建议串行执行，避免并发写入同一测试结果目录
+
+按职责跑 `mcp` 测试：
+
+```bash
+./gradlew :mcp:testFast
+./gradlew :mcp:testSession
+./gradlew :mcp:testDex
+./gradlew :mcp:testResource
+./gradlew :mcp:testModels
+./gradlew :mcp:testSmoke
+./gradlew :mcp:testStructured
+```
+
+说明：
+
+- `:mcp:testFast` 跑 session / dex / resource / models 这类不启动 HTTP 服务的单元测试
+- `:mcp:testSession` 跑 target session 生命周期、句柄缓存与过期回收测试
+- `:mcp:testDex` 跑 dex 查询、`inspect_method`、导出与工作区回退测试
+- `:mcp:testResource` 跑 manifest、resource 查询与 XML 解码测试
+- `:mcp:testModels` 跑结果映射、字段投影与错误 JSON 渲染测试
+- `:mcp:testSmoke` 跑 MCP HTTP 服务器 smoke 测试
+- `:mcp:testStructured` 按拆分后的测试分组串行跑完全部 `mcp` 测试入口
+
+推荐验证路径：
+
+- 只改 `McpSessionStore` 或 `open_target_session` 相关链路时，先跑 `./gradlew :mcp:testSession`
+- 改 dex 工具或导出链路时，在基础单元测试后补跑 `./gradlew :mcp:testDex`
+- 改 manifest、resource 或 XML 相关链路时，在基础单元测试后补跑 `./gradlew :mcp:testResource`
+- 改结果映射、字段筛选或错误输出时，补跑 `./gradlew :mcp:testModels`
+- 改 HTTP 安装、路由或协议握手时，最后补跑 `./gradlew :mcp:testSmoke`
+- 需要合并前收口或想完整覆盖 `mcp` 入口时，最后跑 `./gradlew :mcp:testStructured`
 
 ## 打包 CLI
 
