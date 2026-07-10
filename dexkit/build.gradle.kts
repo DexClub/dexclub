@@ -28,6 +28,8 @@ kotlin {
         }
 
         val androidMain by getting {
+            // jvm 与 android 的 ResultMappers 源码逐字节一致，共享同一份源码目录避免重复维护。
+            kotlin.srcDir("src/jvmAndroidShared/kotlin")
             dependencies {
                 // noinspection UseTomlInstead
                 implementation("io.github.dexclub.dexkit:android-core:0.0.0-local")
@@ -35,6 +37,7 @@ kotlin {
         }
 
         val jvmMain by getting {
+            kotlin.srcDir("src/jvmAndroidShared/kotlin")
             dependencies {
                 // noinspection UseTomlInstead
                 implementation("io.github.dexclub.dexkit:desktop-core:0.0.0-local")

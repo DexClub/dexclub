@@ -17,8 +17,14 @@ import io.github.dexclub.dexkit.result.toFieldDataList
 import io.github.dexclub.dexkit.result.toMethodDataList
 import org.luckypray.dexkit.DexKitBridge as NativeDexKitBridge
 import java.io.File
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 
 actual class DexKitBridge {
+    private val lock = ReentrantReadWriteLock()
+
+    @Volatile
     private var delegate: NativeDexKitBridge? = null
 
     actual constructor(dexPaths: List<String>) {
@@ -56,111 +62,125 @@ actual class DexKitBridge {
     }
 
     actual val isValid: Boolean
-        get() = delegate?.isValid == true
+        get() = lock.read { delegate?.isValid == true }
 
-    actual fun getDexNum(): Int = ensureDelegate().getDexNum()
+    actual fun getDexNum(): Int = withDelegate { it.getDexNum() }
 
-    actual fun setThreadNum(num: Int) = ensureDelegate().setThreadNum(num)
+    actual fun setThreadNum(num: Int) = withDelegate { it.setThreadNum(num) }
 
-    actual fun initFullCache() = ensureDelegate().initFullCache()
+    actual fun initFullCache() = withDelegate { it.initFullCache() }
 
     actual fun exportDexFile(outPath: String) {
         require(outPath.isNotEmpty()) { "outPath 不能为空" }
-        ensureDelegate().exportDexFile(outPath)
+        withDelegate { it.exportDexFile(outPath) }
     }
 
-    actual fun findClass(query: FindClass): ClassDataList {
-        val d = ensureDelegate()
-        return d.findClass(query.toNative(d)).map { it.toKmpClassData() }.toClassDataList(this)
+    actual fun findClass(query: FindClass): ClassDataList = withDelegate { d ->
+        d.findClass(query.toNative(d)).map { it.toKmpClassData() }.toClassDataList(this)
     }
 
-    actual fun findMethod(query: FindMethod): MethodDataList {
-        val d = ensureDelegate()
-        return d.findMethod(query.toNative(d)).map { it.toKmpMethodData() }.toMethodDataList(this)
+    actual fun findMethod(query: FindMethod): MethodDataList = withDelegate { d ->
+        d.findMethod(query.toNative(d)).map { it.toKmpMethodData() }.toMethodDataList(this)
     }
 
-    actual fun findField(query: FindField): FieldDataList {
-        val d = ensureDelegate()
-        return d.findField(query.toNative(d)).map { it.toKmpFieldData() }.toFieldDataList(this)
+    actual fun findField(query: FindField): FieldDataList = withDelegate { d ->
+        d.findField(query.toNative(d)).map { it.toKmpFieldData() }.toFieldDataList(this)
     }
 
-    actual fun batchFindClassUsingStrings(query: BatchFindClassUsingStrings): Map<String, ClassDataList> {
-        val d = ensureDelegate()
-        return d.batchFindClassUsingStrings(query.toNative(d))
+    actual fun batchFindClassUsingStrings(query: BatchFindClassUsingStrings): Map<String, ClassDataList> = withDelegate { d ->
+        d.batchFindClassUsingStrings(query.toNative(d))
             .mapValues { (_, list) -> list.map { it.toKmpClassData() }.toClassDataList(this) }
     }
 
-    actual fun batchFindMethodUsingStrings(query: BatchFindMethodUsingStrings): Map<String, MethodDataList> {
-        val d = ensureDelegate()
-        return d.batchFindMethodUsingStrings(query.toNative(d))
+    actual fun batchFindMethodUsingStrings(query: BatchFindMethodUsingStrings): Map<String, MethodDataList> = withDelegate { d ->
+        d.batchFindMethodUsingStrings(query.toNative(d))
             .mapValues { (_, list) -> list.map { it.toKmpMethodData() }.toMethodDataList(this) }
     }
 
     actual fun getClassData(descriptor: String): ClassData? {
         require(descriptor.isNotEmpty()) { "descriptor 不能为空" }
-        return ensureDelegate().getClassData(descriptor)?.toKmpClassData()
+        return withDelegate { it.getClassData(descriptor)?.toKmpClassData() }
     }
 
     actual fun getMethodData(descriptor: String): MethodData? {
         require(descriptor.isNotEmpty()) { "descriptor 不能为空" }
-        return ensureDelegate().getMethodData(descriptor)?.toKmpMethodData()
+        return withDelegate { it.getMethodData(descriptor)?.toKmpMethodData() }
     }
 
     actual fun getFieldData(descriptor: String): FieldData? {
         require(descriptor.isNotEmpty()) { "descriptor 不能为空" }
-        return ensureDelegate().getFieldData(descriptor)?.toKmpFieldData()
+        return withDelegate { it.getFieldData(descriptor)?.toKmpFieldData() }
     }
 
     actual fun getFieldReaders(descriptor: String): MethodDataList {
         require(descriptor.isNotEmpty()) { "descriptor 不能为空" }
-        return ensureDelegate().getFieldData(descriptor)
-            ?.readers?.map { it.toKmpMethodData() }.orEmpty()
-            .toMethodDataList(this)
+        return withDelegate { d ->
+            d.getFieldData(descriptor)
+                ?.readers?.map { it.toKmpMethodData() }.orEmpty()
+                .toMethodDataList(this)
+        }
     }
 
     actual fun getFieldWriters(descriptor: String): MethodDataList {
         require(descriptor.isNotEmpty()) { "descriptor 不能为空" }
-        return ensureDelegate().getFieldData(descriptor)
-            ?.writers?.map { it.toKmpMethodData() }.orEmpty()
-            .toMethodDataList(this)
+        return withDelegate { d ->
+            d.getFieldData(descriptor)
+                ?.writers?.map { it.toKmpMethodData() }.orEmpty()
+                .toMethodDataList(this)
+        }
     }
 
     actual fun getMethodCallers(descriptor: String): MethodDataList {
         require(descriptor.isNotEmpty()) { "descriptor 不能为空" }
-        return ensureDelegate().getMethodData(descriptor)
-            ?.callers?.map { it.toKmpMethodData() }.orEmpty()
-            .toMethodDataList(this)
+        return withDelegate { d ->
+            d.getMethodData(descriptor)
+                ?.callers?.map { it.toKmpMethodData() }.orEmpty()
+                .toMethodDataList(this)
+        }
     }
 
     actual fun getMethodInvokes(descriptor: String): MethodDataList {
         require(descriptor.isNotEmpty()) { "descriptor 不能为空" }
-        return ensureDelegate().getMethodData(descriptor)
-            ?.invokes?.map { it.toKmpMethodData() }.orEmpty()
-            .toMethodDataList(this)
+        return withDelegate { d ->
+            d.getMethodData(descriptor)
+                ?.invokes?.map { it.toKmpMethodData() }.orEmpty()
+                .toMethodDataList(this)
+        }
     }
 
     actual fun getMethodUsingFields(descriptor: String): List<UsingFieldData> {
         require(descriptor.isNotEmpty()) { "descriptor 不能为空" }
-        return ensureDelegate().getMethodData(descriptor)
-            ?.usingFields?.map { it.toKmpUsingFieldData() }.orEmpty()
+        return withDelegate { d ->
+            d.getMethodData(descriptor)
+                ?.usingFields?.map { it.toKmpUsingFieldData() }.orEmpty()
+        }
     }
 
     actual fun getMethodUsingStrings(descriptor: String): List<String> {
         require(descriptor.isNotEmpty()) { "descriptor 不能为空" }
-        return ensureDelegate().getMethodData(descriptor)
-            ?.usingStrings.orEmpty()
+        return withDelegate { d ->
+            d.getMethodData(descriptor)
+                ?.usingStrings.orEmpty()
+        }
     }
 
     actual fun getMethodAnnotations(descriptor: String): List<String> {
         require(descriptor.isNotEmpty()) { "descriptor 不能为空" }
-        return ensureDelegate().getMethodData(descriptor)
-            ?.annotations?.map { it.toString() }.orEmpty()
+        return withDelegate { d ->
+            d.getMethodData(descriptor)
+                ?.annotations?.map { it.toString() }.orEmpty()
+        }
     }
 
     actual fun close() {
-        delegate?.close()
-        delegate = null
+        lock.write {
+            delegate?.close()
+            delegate = null
+        }
     }
+
+    private inline fun <T> withDelegate(block: (NativeDexKitBridge) -> T): T =
+        lock.read { block(ensureDelegate()) }
 
     private fun ensureDelegate(): NativeDexKitBridge =
         checkNotNull(delegate) { "DexKitBridge 未初始化，请传入有效的 dex/apk 数据" }
