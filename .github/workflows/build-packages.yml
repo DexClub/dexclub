@@ -1,9 +1,6 @@
 name: Build Packages
 
 on:
-  pull_request:
-    branches:
-      - master
   push:
     tags:
       - "v*"
@@ -60,16 +57,10 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      - name: Download CLI package artifacts
+      - name: Download package artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: dexclub-cli-*
-          path: release-artifacts
-
-      - name: Download MCP package artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: dexclub-mcp-*
+          pattern: dexclub*
           path: release-artifacts
 
       - name: Publish release assets

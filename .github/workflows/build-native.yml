@@ -64,12 +64,12 @@ jobs:
           }
 
           $sdkDir = $sdkDir -replace '\\', '/'
-          "sdk.dir=$sdkDir" | Out-File -FilePath (Join-Path $PWD "dexkit/vendor/libcxx-prefab/local.properties") -Encoding ascii
+          "sdk.dir=$sdkDir" | Out-File -FilePath (Join-Path $PWD "dexkit-binding/vendor/libcxx-prefab/local.properties") -Encoding ascii
 
       - name: Publish libcxx prefab to mavenLocal
         shell: pwsh
         run: |
-          & "./gradlew" --no-daemon -p "dexkit/vendor/libcxx-prefab" :cxx:publishToMavenLocal
+          & "./gradlew" --no-daemon -p "dexkit-binding/vendor/libcxx-prefab" :cxx:publishToMavenLocal
 
       - name: Stage libcxx mavenLocal files
         shell: pwsh
@@ -104,7 +104,7 @@ jobs:
             arch: x64
             native_file_name: libdexkit.so
             gradle_command: ./gradlew
-            gradle_task: :DexKit:dexkit:copyLibrary
+            gradle_task: prepareDexKitDesktopNative
             msys2_msystem: ""
             msys2_install: ""
             msys2_bin_subdir: ""
@@ -114,7 +114,7 @@ jobs:
             arch: arm64
             native_file_name: libdexkit.so
             gradle_command: ./gradlew
-            gradle_task: :DexKit:dexkit:copyLibrary
+            gradle_task: prepareDexKitDesktopNative
             msys2_msystem: ""
             msys2_install: ""
             msys2_bin_subdir: ""
@@ -124,7 +124,7 @@ jobs:
             arch: arm64
             native_file_name: libdexkit.so
             gradle_command: ./gradlew
-            gradle_task: :DexKit:dexkit-android:assembleRelease
+            gradle_task: assembleDexKitAndroidRelease
             msys2_msystem: ""
             msys2_install: ""
             msys2_bin_subdir: ""
@@ -134,7 +134,7 @@ jobs:
             arch: x64
             native_file_name: libdexkit.dll
             gradle_command: .\\gradlew.bat
-            gradle_task: :DexKit:dexkit:copyLibrary
+            gradle_task: prepareDexKitDesktopNative
             msys2_msystem: ""
             msys2_install: ""
             msys2_bin_subdir: ""
@@ -144,7 +144,7 @@ jobs:
             arch: x64
             native_file_name: libdexkit.dylib
             gradle_command: ./gradlew
-            gradle_task: :DexKit:dexkit:copyLibrary
+            gradle_task: prepareDexKitDesktopNative
             msys2_msystem: ""
             msys2_install: ""
             msys2_bin_subdir: ""
@@ -154,7 +154,7 @@ jobs:
             arch: arm64
             native_file_name: libdexkit.dylib
             gradle_command: ./gradlew
-            gradle_task: :DexKit:dexkit:copyLibrary
+            gradle_task: prepareDexKitDesktopNative
             msys2_msystem: ""
             msys2_install: ""
             msys2_bin_subdir: ""
@@ -221,6 +221,7 @@ jobs:
             platform-tools
             build-tools;36.0.0
             platforms;android-36
+            ndk;26.1.10909125
             ndk;28.2.13676358
             cmake;3.18.1
             cmake;3.31.6
@@ -246,14 +247,14 @@ jobs:
 
           $sdkDir = $sdkDir -replace '\\', '/'
           "sdk.dir=$sdkDir" | Out-File -FilePath (Join-Path $PWD "local.properties") -Encoding ascii
-          "sdk.dir=$sdkDir" | Out-File -FilePath (Join-Path $PWD "dexkit/vendor/DexKit/local.properties") -Encoding ascii
+          "sdk.dir=$sdkDir" | Out-File -FilePath (Join-Path $PWD "dexkit-binding/vendor/DexKit/local.properties") -Encoding ascii
 
       - name: Build DexKit native artifact
         if: steps.filter.outputs.enabled == 'true'
         shell: pwsh
         run: |
           if ("${{ matrix.target }}" -eq "windows-x64") {
-            Push-Location "dexkit/vendor/DexKit"
+            Push-Location "dexkit-binding/vendor/DexKit"
             try {
               & ".\\gradlew.bat" --no-daemon :dexkit:cmakeBuild --console=plain
             } finally {
@@ -274,7 +275,7 @@ jobs:
               $env:PATH = "$toolchainBin;$env:PATH"
             }
 
-            & "${{ matrix.gradle_command }}" --no-daemon ${{ matrix.gradle_task }}
+            & "${{ matrix.gradle_command }}" --no-daemon -p dexkit-binding ${{ matrix.gradle_task }}
           }
 
       - name: Stage native artifact
@@ -285,7 +286,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
 
           if ("${{ matrix.target }}" -eq "android-arm64") {
-            $aarPath = Join-Path $PWD "dexkit/vendor/DexKit/dexkit-android/build/outputs/aar/dexkit-android-release.aar"
+            $aarPath = Join-Path $PWD "dexkit-binding/vendor/DexKit/dexkit-android/build/outputs/aar/dexkit-android-release.aar"
             if (!(Test-Path $aarPath)) {
               throw "Missing Android AAR artifact: $aarPath"
             }
@@ -304,10 +305,10 @@ jobs:
             Copy-Item $nativePath (Join-Path $artifactDir "${{ matrix.native_file_name }}")
           } else {
             if ("${{ matrix.target }}" -eq "windows-x64") {
-              $nativePath = Get-ChildItem -Path "dexkit/vendor/DexKit/dexkit/build/cmake/main" -Recurse -Filter "${{ matrix.native_file_name }}" |
+              $nativePath = Get-ChildItem -Path "dexkit-binding/vendor/DexKit/dexkit/build/cmake/main" -Recurse -Filter "${{ matrix.native_file_name }}" |
                 Select-Object -First 1 -ExpandProperty FullName
             } else {
-              $nativePath = Join-Path $PWD "dexkit/vendor/DexKit/dexkit/build/library/${{ matrix.native_file_name }}"
+              $nativePath = Join-Path $PWD "dexkit-binding/vendor/DexKit/dexkit/build/library/${{ matrix.native_file_name }}"
             }
             if (!(Test-Path $nativePath)) {
               throw "Missing native library artifact: $nativePath"

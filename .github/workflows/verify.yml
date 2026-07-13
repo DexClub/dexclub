@@ -1,0 +1,79 @@
+name: Verify
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: JVM/Android host tests and Linux packaging
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: >-
+            platform-tools
+            build-tools;36.0.0
+            platforms;android-36
+            ndk;26.1.10909125
+            ndk;28.2.13676358
+            cmake;3.18.1
+            cmake;3.31.6
+
+      - name: Prepare Android local.properties
+        shell: pwsh
+        run: |
+          $sdkDir = $env:ANDROID_SDK_ROOT
+          if ([string]::IsNullOrWhiteSpace($sdkDir)) {
+            throw "ANDROID_SDK_ROOT is empty after setup-android"
+          }
+
+          $sdkDir = $sdkDir -replace '\\', '/'
+          "sdk.dir=$sdkDir" | Out-File -FilePath (Join-Path $PWD "local.properties") -Encoding ascii
+          "sdk.dir=$sdkDir" | Out-File -FilePath (Join-Path $PWD "dexkit-binding/vendor/DexKit/local.properties") -Encoding ascii
+          "sdk.dir=$sdkDir" | Out-File -FilePath (Join-Path $PWD "dexkit-binding/vendor/libcxx-prefab/local.properties") -Encoding ascii
+
+      - name: Publish libcxx prefab
+        run: ./gradlew --no-daemon -p dexkit-binding/vendor/libcxx-prefab :cxx:publishToMavenLocal
+
+      - name: Verify dexkit-binding
+        run: ./gradlew --no-daemon -p dexkit-binding jvmTest testAndroidHostTest
+
+      - name: Run root JVM tests and package smoke
+        run: >-
+          ./gradlew --no-daemon --console=plain
+          :app-service:test
+          :domain-core:jvmTest
+          :cli-app:test
+          :mcp-app:test
+          :mcp-app:testSmoke
+          :cli-app:shadowDistZip
+          :mcp-app:installDist
