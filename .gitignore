@@ -3,6 +3,8 @@
 /build/
 /.dexclub-cli/
 
+**/.gradle/
+**/.kotlin/
 **/build/
 
 .idea/

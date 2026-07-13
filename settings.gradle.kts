@@ -9,23 +9,20 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        mavenLocal()
         google()
         mavenCentral()
     }
 }
 
-rootProject.name = "dexclub-cli"
+rootProject.name = "dexclub"
 
-include(":cli")
-include(":core")
-include(":dexkit")
-include(":mcp")
+include(":cli-app")
+include(":app-service")
+include(":domain-core")
+include(":mcp-app")
 
-includeBuild("dexkit/vendor/DexKit") {
-    name = "DexKit"
+includeBuild("dexkit-binding") {
     dependencySubstitution {
-        substitute(module("io.github.dexclub.dexkit:desktop-core")).using(project(":dexkit"))
-        substitute(module("io.github.dexclub.dexkit:android-core")).using(project(":dexkit-android"))
+        substitute(module("io.github.dexclub:dexkit-binding")).using(project(":"))
     }
 }

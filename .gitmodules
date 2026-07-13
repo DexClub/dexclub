@@ -1,6 +1,6 @@
-[submodule "dexkit/vendor/DexKit"]
-	path = dexkit/vendor/DexKit
+[submodule "dexkit-binding/vendor/DexKit"]
+	path = dexkit-binding/vendor/DexKit
 	url = https://github.com/GangJust/DexKit.git
-[submodule "dexkit/vendor/libcxx-prefab"]
-	path = dexkit/vendor/libcxx-prefab
+[submodule "dexkit-binding/vendor/libcxx-prefab"]
+	path = dexkit-binding/vendor/libcxx-prefab
 	url = https://github.com/GangJust/libcxx-prefab.git
