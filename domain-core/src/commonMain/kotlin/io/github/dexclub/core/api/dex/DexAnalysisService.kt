@@ -1,0 +1,41 @@
+package io.github.dexclub.core.api.dex
+
+import io.github.dexclub.core.api.workspace.WorkspaceContext
+
+interface DexAnalysisService {
+    /**
+     * Release reusable dex runtime resources associated with the given target.
+     * The caller must ensure the target is no longer used by any active consumer.
+     */
+    fun releaseDexContext(workspace: WorkspaceContext) = Unit
+
+    fun findClasses(workspace: WorkspaceContext, request: FindClassesRequest): List<ClassHit>
+
+    fun findMethods(workspace: WorkspaceContext, request: FindMethodsRequest): List<MethodHit>
+
+    fun findFields(workspace: WorkspaceContext, request: FindFieldsRequest): List<FieldHit>
+
+    fun findClassesUsingStrings(
+        workspace: WorkspaceContext,
+        request: FindClassesUsingStringsRequest,
+    ): List<ClassHit>
+
+    fun findMethodsUsingStrings(
+        workspace: WorkspaceContext,
+        request: FindMethodsUsingStringsRequest,
+    ): List<MethodHit>
+
+    fun inspectMethod(workspace: WorkspaceContext, request: InspectMethodRequest): MethodDetail
+
+    fun exportClassDex(workspace: WorkspaceContext, request: ExportClassDexRequest): ExportResult
+
+    fun exportClassSmali(workspace: WorkspaceContext, request: ExportClassSmaliRequest): ExportResult
+
+    fun exportClassJava(workspace: WorkspaceContext, request: ExportClassJavaRequest): ExportResult
+
+    fun exportMethodSmali(workspace: WorkspaceContext, request: ExportMethodSmaliRequest): ExportResult
+
+    fun exportMethodDex(workspace: WorkspaceContext, request: ExportMethodDexRequest): ExportResult
+
+    fun exportMethodJava(workspace: WorkspaceContext, request: ExportMethodJavaRequest): ExportResult
+}
