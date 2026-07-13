@@ -1,78 +1,39 @@
-# dexclub-cli
+# dexclub
 
-`dexclub-cli` 是一个面向 `dex / apk / Android 资源` 的 Kotlin 多模块项目。
-它当前同时提供：
+`dexclub` 是一个面向 `dex / apk / Android 资源` 的 Kotlin 多模块项目，当前同时提供：
 
-- 一套围绕工作区的 CLI，用来做 dex 查询、方法检查、代码导出以及 Android 资源解析
-- 一套面向 AI/agent 的 MCP server，用来把同一批能力以工具调用方式暴露给上层编排
+- 基于工作区的 CLI，用于 dex 查询、方法检查、代码导出和 Android 资源解析
+- 基于 HTTP 的 MCP server，用于把同一批能力暴露给 AI / agent 调用
 
-当前仓库包含四个核心模块：
-
-- `cli`
-  命令行入口，负责参数解析、命令分发、结果渲染与退出码
-- `core`
-  稳定能力边界，负责 workspace、dex 查询/导出、resource 解析
-- `dexkit`
-  面向 KMP 的 DexKit 包装层
-- `mcp`
-  HTTP MCP server，负责把 `core` 能力暴露成 AI 可调用工具面
-
-## 当前能力
+## 能力概览
 
 - 初始化并管理 `.dexclub` 工作区
-- 在同一工作区内列出并切换 active target
-- 输出工作区状态与 active target 摘要
-- 按 JSON 条件查找类、方法、字段
-- 按字符串批量条件查找类和方法
-- 查看单个方法的一层关系详情
-- 导出单类 dex、smali、Java
-- 导出单方法 dex、smali、Java
+- 列出、切换、刷新 active target
+- 查询类、方法、字段
+- 通过 `inspect_method` 检查方法详情
+- 通过 `export_*` 导出 dex、smali、Java 证据
 - 解析 `AndroidManifest.xml`
 - 读取 `resources.arsc`
 - 解码二进制 XML
 - 列出、解析、搜索资源条目
-- 通过 MCP 暴露 target session、dex 查询、方法检查、代码导出、manifest 与资源相关工具
+- 通过 MCP 暴露 target session、dex、resource 相关工具
 
-## 仓库结构
+## 模块结构
 
-- `cli/`
-  当前命令行模块
-- `core/`
-  当前能力库模块
-- `dexkit/`
-  KMP DexKit 包装层
-- `mcp/`
-  MCP server 模块
-- `skills/`
-  仓库内维护的 Codex skill 副本
-- `dexkit/vendor/DexKit/`
-  vendored 上游 DexKit
-- `dexkit/vendor/libcxx-prefab/`
-  Android 构建链依赖的本地 `libcxx` prefab 仓库
-- `.docs/v3/`
-  命令面、对象模型、执行流与存储结构设计文档
+根工程当前直接包含 4 个子项目，并通过 `included build` 接入 `dexkit-binding`：
 
-## 环境要求
+- `cli-app` CLI 入口
+- `mcp-app` MCP server 入口
+- `app-service` 共享应用层，负责 use case 和 runtime 装配
+- `domain-core` 稳定模型、能力边界与底层实现基础
+- `dexkit-binding` DexKit 绑定层
+- `gui-app` （计划中）未来兼容方向，当前未接入根构建
 
-开发和本地构建默认要求：
+## 快速开始
+
+环境要求：
 
 - JDK 21
-- Android SDK
-- Android NDK `28.2.13676358`
-- `cmake` `3.18.1` 和 `3.31.6`
-- `ninja`
-
-说明：
-
-- Android SDK / NDK 主要服务于 DexKit native 构建和测试样本生成
-- 根构建默认启用 `mavenLocal()`；当前本仓维护链路依赖本地存在 `dev.rikka.ndk.thirdparty:libcxx:1.3.0`
-- 当前 README、根构建与 CI 默认以 `NDK 28.2.13676358` 发布 `dexkit/vendor/libcxx-prefab`；vendored 上游 `dexkit-android` 模块自身仍声明 `NDK 26.1.10909125`
-- CI 当前会同时安装 `cmake 3.18.1` 和 `3.31.6`；本地若要复现 Android / native 构建链，建议与该组合保持一致
-- `core` 的资源命令运行时不要求额外安装 Android SDK
-- 桌面端 DexKit 运行前提可参考上游文档：
-  [DexKit 桌面端运行说明](https://luckypray.org/DexKit/zh-cn/guide/run-on-desktop.html)
-
-## 初始化仓库
 
 首次拉取后先初始化 submodule：
 
@@ -80,350 +41,94 @@
 git submodule update --init --recursive
 ```
 
-如果本地还没有发布 `libcxx`，先执行：
+常用快速验证：
 
 ```bash
-cd dexkit/vendor/libcxx-prefab
-./gradlew :cxx:publishToMavenLocal
+./gradlew verifyFast
 ```
 
-说明：
-
-- 这一步会把 `dev.rikka.ndk.thirdparty:libcxx:1.3.0` 发布到本机 `mavenLocal()`
-- 当前仓库的 `dexkit / core / cli / mcp` 构建都会经过根项目仓库解析；如果这里缺失，Android / native 相关构建会直接失败
-
-## 构建与验证
-
-编译 `dexkit`：
+结构化验证：
 
 ```bash
-./gradlew :dexkit:compileKotlinJvm
-./gradlew :dexkit:assembleAndroidMain
+./gradlew :app-service:testStructured
+./gradlew :cli-app:testStructured
+./gradlew :mcp-app:testStructured
+./gradlew :domain-core:testWorkspace
 ```
 
-编译 `core / cli / mcp`：
+如果只需要编译主模块：
 
 ```bash
-./gradlew :core:compileKotlinJvm :cli:compileKotlin :mcp:compileKotlin
+./gradlew :app-service:compileKotlin :domain-core:compileKotlinJvm :cli-app:compileKotlin :mcp-app:compileKotlin
 ```
 
-运行测试：
+## 打包与运行
+
+打包 CLI：
 
 ```bash
-./gradlew :core:jvmTest
-./gradlew :cli:test
-./gradlew :mcp:test
+./gradlew :cli-app:fatJar
+./gradlew :cli-app:installShadowDist :cli-app:shadowDistZip
 ```
 
-按职责跑 `core` 测试：
+打包 MCP：
 
 ```bash
-./gradlew :core:testFast
-./gradlew :core:testDex
-./gradlew :core:testResource
-./gradlew :core:testResourceManifest
-./gradlew :core:testResourceTable
-./gradlew :core:testResourceXml
-./gradlew :core:testResourceEntry
-./gradlew :core:testResourceValue
-./gradlew :core:testWorkspace
-./gradlew :core:testStructured
+./gradlew :mcp-app:installDist
 ```
 
-说明：
-
-- `:core:testFast` 跑 dex、resource 与 workspace 三组 JVM 测试入口
-- `:core:testDex` 跑 dex 分析、查询、`inspectMethod` 与导出测试
-- `:core:testResource` 串行跑全部 resource 相关测试
-- `:core:testResourceManifest` 跑 manifest 解码与结构化解析测试
-- `:core:testResourceTable` 跑 resource table 解码测试
-- `:core:testResourceXml` 跑 XML 解码测试
-- `:core:testResourceEntry` 跑 resource entry 索引与列举测试
-- `:core:testResourceValue` 跑 resource value 解析与搜索测试
-- `:core:testWorkspace` 跑 workspace 初始化、默认服务装配与运行时解析测试
-- `:core:testStructured` 按拆分后的测试分组串行跑完全部 core JVM 测试入口
-
-推荐验证路径：
-
-- 只改 dex 搜索、inspect 或导出链路时，先跑 `./gradlew :core:testDex`
-- 改 manifest 解析链路时，先跑 `./gradlew :core:testResourceManifest`
-- 改 resource table / value / search 链路时，先跑 `./gradlew :core:testResourceTable` 和 `./gradlew :core:testResourceValue`
-- 改 XML 解码或 resource entry 索引链路时，补跑 `./gradlew :core:testResourceXml` 和 `./gradlew :core:testResourceEntry`
-- 改 workspace 状态、target 管理或默认服务装配链路时，先跑 `./gradlew :core:testWorkspace`
-- 改动同时跨 dex 与 resource，或准备合并前收口时，最后跑 `./gradlew :core:testStructured`
-
-按命令族跑 `cli` 测试：
+CLI 示例：
 
 ```bash
-./gradlew :cli:testFast
-./gradlew :cli:testResource
-./gradlew :cli:testDexQuery
-./gradlew :cli:testExport
-./gradlew :cli:testStructured
+java -jar cli-app/build/libs/dexclub-all.jar --help
+java -jar cli-app/build/libs/dexclub-all.jar init /path/to/app.apk
+java -jar cli-app/build/libs/dexclub-all.jar status /path/to/workdir
 ```
 
-说明：
-
-- `:cli:testFast` 只跑 help / workspace / failure rendering 这类快速测试
-- `:cli:testResource` 跑 manifest / resources / xml / resource search 相关测试
-- `:cli:testDexQuery` 跑 dex 查询与 `inspect-method` 相关测试
-- `:cli:testExport` 跑 smali / dex / java 导出相关测试
-- `:cli:testStructured` 按拆分后的测试分组串行跑完全部 `cli` 测试入口
-
-推荐验证路径：
-
-- 只改 `cli` 参数解析、帮助文本或错误渲染时，先跑 `./gradlew :cli:testFast`
-- 改资源相关链路时，在 `:cli:testFast` 之后补跑 `./gradlew :cli:testResource`
-- 改 dex 查询相关链路时，在 `:cli:testFast` 之后补跑 `./gradlew :cli:testDexQuery`
-- 改导出相关链路时，在 `:cli:testFast` 之后补跑 `./gradlew :cli:testExport`
-- 需要合并前收口或想完整覆盖 `cli` 入口时，最后跑 `./gradlew :cli:testStructured`
-- 多个 `:cli:test*` 任务建议串行执行，避免并发写入同一测试结果目录
-
-按职责跑 `mcp` 测试：
-
-```bash
-./gradlew :mcp:testFast
-./gradlew :mcp:testSession
-./gradlew :mcp:testDex
-./gradlew :mcp:testResource
-./gradlew :mcp:testModels
-./gradlew :mcp:testSmoke
-./gradlew :mcp:testStructured
-```
-
-说明：
-
-- `:mcp:testFast` 跑 session / dex / resource / models 这类不启动 HTTP 服务的单元测试
-- `:mcp:testSession` 跑 target session 生命周期、句柄缓存与过期回收测试
-- `:mcp:testDex` 跑 dex 查询、`inspect_method`、导出与工作区回退测试
-- `:mcp:testResource` 跑 manifest、resource 查询与 XML 解码测试
-- `:mcp:testModels` 跑结果映射、字段投影与错误 JSON 渲染测试
-- `:mcp:testSmoke` 跑 MCP HTTP 服务器 smoke 测试
-- `:mcp:testStructured` 按拆分后的测试分组串行跑完全部 `mcp` 测试入口
-
-推荐验证路径：
-
-- 只改 `McpSessionStore` 或 `open_target_session` 相关链路时，先跑 `./gradlew :mcp:testSession`
-- 改 dex 工具或导出链路时，在基础单元测试后补跑 `./gradlew :mcp:testDex`
-- 改 manifest、resource 或 XML 相关链路时，在基础单元测试后补跑 `./gradlew :mcp:testResource`
-- 改结果映射、字段筛选或错误输出时，补跑 `./gradlew :mcp:testModels`
-- 改 HTTP 安装、路由或协议握手时，最后补跑 `./gradlew :mcp:testSmoke`
-- 需要合并前收口或想完整覆盖 `mcp` 入口时，最后跑 `./gradlew :mcp:testStructured`
-
-## 打包 CLI
-
-打包 fat jar：
-
-```bash
-./gradlew :cli:fatJar
-```
-
-生成带启动脚本的分发目录与 zip：
-
-```bash
-./gradlew :cli:installShadowDist :cli:shadowDistZip
-```
-
-## 打包 MCP
-
-生成 MCP 分发目录：
-
-```bash
-./gradlew :mcp:installDist
-```
-
-## 运行 CLI
-
-fat jar 入口：
-
-```bash
-java -jar cli/build/libs/dexclub-cli-all.jar <command> [args]
-```
-
-Windows PowerShell 下推荐优先使用分发脚本：
+MCP 示例：
 
 ```powershell
-& .\cli\build\install\cli-shadow\bin\cli.ps1 <command> [args]
+# PowerShell
+$env:DEXCLUB_MCP_HOST="127.0.0.1" # 默认监听本机回环地址
+$env:DEXCLUB_MCP_PORT="8787"      # 默认端口
+$env:DEXCLUB_MCP_PATH="/mcp"      # 默认 MCP 路径
+.\mcp-app\build\install\mcp\bin\mcp.bat
 ```
 
-查看帮助：
+常用环境变量：
 
-```bash
-java -jar cli/build/libs/dexclub-cli-all.jar --help
-java -jar cli/build/libs/dexclub-cli-all.jar help
-java -jar cli/build/libs/dexclub-cli-all.jar help find-method
-```
+- `DEXCLUB_MCP_HOST`：监听地址，默认 `127.0.0.1`；如果改成非回环地址，MCP 服务会暴露到局域网或外网，只建议在可信网络使用
+- `DEXCLUB_MCP_PORT`：监听端口，默认 `8787`
+- `DEXCLUB_MCP_PATH`：HTTP 路径，默认 `/mcp`
+- `DEXCLUB_MCP_TRACE`：是否启用详细 trace 诊断，默认 `true`；设为 `false` 后不再写 `logs/mcp.log`，也不记录 HTTP / tool 级详细 trace
+- `DEXCLUB_MCP_STDERR`：是否输出运行期控制台 `stderr` 日志，默认 `false`；设为 `true` 后 tool failure、未捕获异常、shutdown 等信息会打印到控制台。启动阶段的提示和监听地址会始终展示
+- `DEXCLUB_MCP_SESSION_IDLE_TIMEOUT_MINUTES`：session 空闲超时分钟数，默认 `10`，超时自动释放，避免内存长时间占用
+- `DEXCLUB_MCP_MAX_SESSIONS`：同时保留的 session 上限，默认 `5`；超出后按最近最少使用顺序淘汰旧 session，避免多会话长期占用内存
+- `DEXCLUB_MCP_MAX_HANDLES_PER_SESSION`：单个 session 内可保留的 `method_handle` / `class_handle` 总数上限，默认 `1000`；超出后按最近最少使用顺序淘汰旧 handle，避免长会话累计过多句柄状态
+- `DEXCLUB_MCP_MAX_TRACE_ARCHIVES`：trace 日志归档保留数量，默认 `10`
+- `DEXCLUB_DEXKIT_NATIVE_LIBRARY_DIR`：显式指定 DexKit native 动态库所在目录；加载时会按当前平台文件名在该目录下查找库文件
 
-Windows PowerShell 如果要传复杂 `--query-json`，优先使用：
+补充说明：
 
-```powershell
-& .\cli\build\install\cli-shadow\bin\cli.ps1 find-class E:\path\to\workdir --query-json '{"matcher":{"className":{"value":"Sample","matchType":"Contains","ignoreCase":true}}}'
-```
+- 通过 `installDist` 生成的脚本启动时，`APP_HOME` 会自动指向分发目录，日志默认写到 `mcp-app/build/install/mcp/bin/logs/`
+- 如果直接以 `java -jar` 方式运行且未显式设置 native 路径，DexKit native 库需要位于 jar 同目录，或通过上面的环境变量 / JVM property 提供
 
-说明：
+## 文档入口
 
-- `cli.ps1` 会比 `cli.bat` 更稳定地保留 PowerShell 参数边界
-- 对复杂 JSON 查询，也可以优先使用 `--query-file`
+- [.docs/v4/index.md](./.docs/v4/index.md)
+  当前结构边界、模块关系和 `v4` 文档入口
+- [.docs/native-maintenance.md](./.docs/native-maintenance.md)
+  `dexkit-binding / vendor / Android native` 维护说明
+- [skills/README.md](./skills/README.md)
+  仓库内 skills 的维护说明
 
-DexKit native 运行提示：
+## 补充说明
 
-- fat jar 分发场景下，通常只需把 DexKit native 动态库放在 `dexclub-cli-all.jar` 同目录
-- 如果不是通过 fat jar 运行，则可以通过 native 文件路径或 native 目录显式指定，也可以通过环境变量传入，或确保其位于 `java.library.path` 可见范围内
-
-## 运行 MCP
-
-当前 `mcp` 模块提供一个基于 HTTP 的 MCP server，默认监听：
-
-- `host = 127.0.0.1`
-- `port = 8787`
-- `path = /mcp`
-
-Windows PowerShell：
-
-```powershell
-$env:DEXCLUB_MCP_PORT="8787"
-.\mcp\build\install\mcp\bin\mcp.bat
-```
-
-运行参数可通过环境变量调整：
-
-- `DEXCLUB_MCP_HOST`
-- `DEXCLUB_MCP_PORT`
-- `DEXCLUB_MCP_PATH`
-- `DEXCLUB_MCP_TRACE`
-
-说明：
-
-- `mcp` 是面向 Codex / agent 的工具服务，不是交互式 CLI
-- 终端默认保留最小运行日志（启动、tool failure、未捕获异常、shutdown）
-- 详细轨迹默认写入 `logs/mcp.log`；每次启动会先把旧的 `mcp.log` 归档到 `logs/archive/mcp_<启动时间>.log`，可通过 `DEXCLUB_MCP_TRACE=false` 显式关闭
-- `mcp` 默认依赖 DexKit native 动态库位于分发目录的 `lib/` 下
-
-## Skills
-
-仓库当前也维护面向 Codex 的 skill 副本，位于：
-
-- `skills/`
-
-当前主要 skill：
-
-- `dexclub-analysis`
-  通过 `mcp__dexclub__` 驱动 APK / Dex / manifest / resources 分析
-
-说明：
-
-- 仓库内 `skills/` 是版本化源码，不一定会被当前机器上的 Codex 自动发现
-- 如果需要在本机 Codex 中实际触发，通常还需要同步到 `$CODEX_HOME/skills`
-- 具体说明见 [skills/README.md](D:/Code/My/Github/dexclub-cli/skills/README.md)
-
-## 工作区模型
-
-当前命令面遵循两条规则：
-
-- `init` 必须显式传入单文件输入路径
-- 其余命令统一在已初始化工作区上执行，`[workdir]` 可省略；省略时默认使用当前目录
-
-当前工作区允许存在多个已初始化 target，但任意时刻只有一个 active target：
-
-- `init <input>`：为该输入创建或刷新 target，并将其设为当前 active target
-- `switch <input>`：只在当前工作区内切换到已经初始化过的 target，不创建新 target
-- `targets`：列出当前工作区已有 target，并标出当前 active target
-
-受管工作区固定写入：
-
-```text
-<workdir>/.dexclub/
-```
-
-## 常用命令
-
-初始化工作区：
-
-```bash
-java -jar cli/build/libs/dexclub-cli-all.jar init /path/to/app.apk
-java -jar cli/build/libs/dexclub-cli-all.jar init /path/to/classes.dex
-java -jar cli/build/libs/dexclub-cli-all.jar init /path/to/AndroidManifest.xml
-```
-
-查看工作区状态：
-
-```bash
-java -jar cli/build/libs/dexclub-cli-all.jar status /path/to/workdir
-java -jar cli/build/libs/dexclub-cli-all.jar inspect /path/to/workdir --json
-java -jar cli/build/libs/dexclub-cli-all.jar gc /path/to/workdir
-```
-
-切换和列出 target：
-
-```bash
-java -jar cli/build/libs/dexclub-cli-all.jar switch a.apk
-java -jar cli/build/libs/dexclub-cli-all.jar targets /path/to/workdir
-java -jar cli/build/libs/dexclub-cli-all.jar targets /path/to/workdir --json
-```
-
-Dex 查询：
-
-```bash
-java -jar cli/build/libs/dexclub-cli-all.jar find-class /path/to/workdir \
-  --query-json '{"matcher":{"className":{"value":"Sample","matchType":"Contains","ignoreCase":true}}}' \
-  --json
-```
-
-```bash
-java -jar cli/build/libs/dexclub-cli-all.jar find-method-using-strings /path/to/workdir \
-  --query-file /path/to/query.json
-```
-
-方法详情：
-
-```bash
-java -jar cli/build/libs/dexclub-cli-all.jar inspect-method /path/to/workdir \
-  --descriptor 'Lcom/example/Sample;->name()Ljava/lang/String;' \
-  --json
-```
-
-代码导出：
-
-```bash
-java -jar cli/build/libs/dexclub-cli-all.jar export-class-smali /path/to/workdir \
-  --class Lcom/example/Sample; \
-  --output /tmp/Sample.smali
-```
-
-```bash
-java -jar cli/build/libs/dexclub-cli-all.jar export-method-smali /path/to/workdir \
-  --method 'Lcom/example/Sample;->name()Ljava/lang/String;' \
-  --output /tmp/Sample_method.smali
-```
-
-资源命令：
-
-```bash
-java -jar cli/build/libs/dexclub-cli-all.jar manifest /path/to/workdir
-java -jar cli/build/libs/dexclub-cli-all.jar res-table /path/to/workdir --json
-java -jar cli/build/libs/dexclub-cli-all.jar decode-xml /path/to/workdir --path res/layout/activity_main.xml
-java -jar cli/build/libs/dexclub-cli-all.jar get-res-value /path/to/workdir --id 0x7f0a0001
-```
-
-## CI
-
-仓库当前提供：
-
-- [.github/workflows/build-native.yml](.github/workflows/build-native.yml)
-- [.github/workflows/build-cli.yml](.github/workflows/build-cli.yml)
-- [.github/workflows/build-mcp.yml](.github/workflows/build-mcp.yml)
-- [.github/workflows/build-packages.yml](.github/workflows/build-packages.yml)
-
-职责划分如下：
-
-- `build-native.yml`
-  构建 DexKit native 产物
-- `build-cli.yml`
-  消费 native 产物并打包 CLI 分发物
-- `build-mcp.yml`
-  消费 native 产物并打包 MCP 分发物
-- `build-packages.yml`
-  统一驱动 native、CLI、MCP 构建，并在 tag 下统一上传 release 附件
+- `dexkit-binding/vendor/DexKit/` 是 vendored 上游 DexKit
+- `dexkit-binding/vendor/libcxx-prefab/` 是本地 `libcxx` prefab 仓库
+- Android SDK / NDK、`cmake`、`ninja` 只在 native / Android 维护路径下需要
+- DexKit 桌面端运行前提可参考上游文档：
+  [DexKit 桌面端运行说明](https://luckypray.org/DexKit/zh-cn/guide/run-on-desktop.html)
 
 ## License
 

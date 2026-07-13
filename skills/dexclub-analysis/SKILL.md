@@ -50,11 +50,18 @@ If the user already provides a full method descriptor such as `Lpkg/Class;->name
 
 Treat a full descriptor as a direct object reference, not as a search hint.
 
+When using `open_target_session`:
+
+- pass an absolute filesystem path in `input`
+- do not pass a relative path such as `app.apk`
+- remember that relative paths are resolved against the dexclub MCP process working directory, not the user's conversational cwd
+
 ## Session Rules
 
-Always prefer `session-first`.
+Always prefer `target-session-first`.
 
 - open a target session unless the task is clearly a one-shot light query
+- when opening a target session, always use an absolute `input` path to an existing file
 - after obtaining `session_id`, keep using it
 - do not keep redundantly passing `workdir` once `session_id` exists
 - prefer `method_handle` and `class_handle` after they are returned by dexclub
@@ -67,6 +74,18 @@ If `session_id not found`:
 
 - reopen the target session
 - return to the latest useful step and continue
+
+If `open_target_session` reports that the input does not exist:
+
+- first check whether `input` was passed as a relative path
+- retry with an absolute path to the existing APK/dex/resource target
+- do not assume the MCP process is running in the same directory as the conversation workspace
+
+If underlying workspace materials changed and you need the same target session to observe the new snapshot:
+
+- call `refresh_target_session`
+- treat existing `method_handle` / `class_handle` as invalid after refresh
+- reacquire handles through fresh `find_*` or `inspect_*` results
 
 If `method_handle not found` or `class_handle not found`:
 
@@ -87,7 +106,7 @@ First confirm runtime state through:
 - `list_target_sessions`
 - `diagnose_target_sessions`
 
-Only continue using previous handles when the session is confirmed to still exist. Otherwise, rebuild the session on the MCP path instead of drifting into `workdir` fallback for deep analysis.
+Only continue using previous handles when the target session is confirmed to still exist. Otherwise, rebuild the session on the MCP path instead of drifting into `workdir` fallback for deep analysis.
 
 ## Entry Strategy
 
@@ -100,6 +119,13 @@ In black-box analysis, use this default priority:
 5. `find_methods`
 
 Do not start with a broad `find_methods` query when stronger anchors already exist.
+
+Treat `find_methods` as a class-name or method-name driven search first.
+
+- `class_name_contains` and `method_name_contains` are the primary narrowing inputs
+- `descriptor_contains` is only a secondary substring filter applied after the primary search
+- do not choose `find_methods` when `descriptor_contains` is the only clue
+- if the only concrete clue is already a full method descriptor, skip `find_methods` and go straight to `inspect_method`
 
 During the first positioning round, choose one lowest-cost viable path.
 
@@ -136,7 +162,7 @@ Keep arguments minimal.
 Default rules:
 
 - use `brief=true` for `find_*`, `list_res`, and `find_resource_values` unless more detail is required
-- for the first session-based narrowing call, prefer `brief=true` without explicit `fields`
+- for the first target-session-based narrowing call, prefer `brief=true` without explicit `fields`
   - current MCP brief defaults already return compact identifiers
   - only add `fields` when the next step truly depends on specific projected keys
 - use the smallest useful `fields`
@@ -163,7 +189,7 @@ For dexclub MCP `find_*` calls, do not guess field aliases. Use only exact field
     - `sourcePath`
     - `sourceEntry`
     - `classHandle`
-- when the first session-based `find_*` call is only used to get a compact next-step identifier, omitting `fields` under `brief=true` is acceptable
+- when the first target-session-based `find_*` call is only used to get a compact next-step identifier, omitting `fields` under `brief=true` is acceptable
   - current MCP brief defaults already return compact useful identifiers
   - this can reduce projection mistakes
 - if you do need to specify `fields`, choose them from the exact supported names above and keep them minimal for the current step
@@ -171,6 +197,8 @@ For dexclub MCP `find_*` calls, do not guess field aliases. Use only exact field
   - do not use descriptor form like `Lcom/foo/Bar;`
   - do not use slash-form fragments like `com/foo/Bar`
 - treat `descriptor_contains` as a raw substring filter, not as a direct object reference
+  - it does not replace `class_name_contains` or `method_name_contains` as the primary `find_methods` selector
+  - do not call `find_methods` with only `descriptor_contains`
   - do not switch to `descriptor_contains=Lpkg/Class;->` when you already intend to target one concrete method or one concrete owner
   - if you already have a full method descriptor, go straight to `inspect_method` or `export_method_*`
 - do not synthesize or rewrite method descriptors from class exports, Java text, or obfuscated guesses before export
@@ -318,6 +346,33 @@ Prefer ending each analysis round with:
 2. key supporting evidence
 3. what remains uncertain
 
+## Practical Reminders
+
+In real usage, the most common drift patterns are:
+
+- expanding multiple heavy entry paths in the first round
+- repeatedly passing `workdir` after `session_id` already exists
+- exporting large text evidence before narrowing candidates
+- constructing fake handles instead of reacquiring them from MCP results
+- requesting `manifest include_text=true` before structured manifest data proves it is necessary
+
+When the current branch becomes expensive too early, prefer this reset:
+
+1. keep the current `session_id`
+2. go back to the strongest clue
+3. rerun the smallest useful `find_*` call with `brief=true`
+4. add `fields` only when the next step truly needs explicit projection
+5. inspect one likely object first
+6. export only if evidence text is still necessary
+
+During that reset:
+
+- on the first recovery search, prefer `brief=true` without explicit `fields`
+- use dotted class-name fragments for `class_name_contains`
+- do not treat `descriptor_contains` as a substitute for a concrete method descriptor
+- do not use `descriptor_contains` as the sole selector for `find_methods`
+- reacquire exact descriptors from MCP results before export; do not hand-write them from decompiled text
+
 ## Useful MCP Surface
 
 The core dexclub MCP tools for this skill are:
@@ -326,11 +381,13 @@ The core dexclub MCP tools for this skill are:
 - `list_target_sessions`
 - `get_target_session`
 - `close_target_session`
+- `refresh_target_session`
 - `diagnose_target_sessions`
 - `manifest`
 - `list_res`
 - `find_resource_values`
 - `get_resource_value`
+- `decode_xml`
 - `find_classes_using_strings`
 - `find_methods`
 - `find_methods_using_strings`
@@ -341,12 +398,3 @@ The core dexclub MCP tools for this skill are:
 - `export_method_smali`
 
 Use `diagnose_target_sessions` when the current session state feels unclear or potentially stale.
-
-## References
-
-For the underlying design constraints and rationale, read these only when needed:
-
-- `../../.docs/v3/42-ai-capability-surface.md`
-- `../../.docs/v3/43-mcp-tool-surface.md`
-- `../../.docs/v3/44-skill-workflow.md`
-- `references/workflow-notes.md`

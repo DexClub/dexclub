@@ -102,14 +102,22 @@ skill 再基于这些对象形成结论。
 - `DEXCLUB_MCP_PORT`
 - `DEXCLUB_MCP_PATH`
 - `DEXCLUB_MCP_TRACE`
+- `DEXCLUB_MCP_SESSION_IDLE_TIMEOUT_MINUTES`
+- `DEXCLUB_MCP_MAX_SESSIONS`
+- `DEXCLUB_MCP_MAX_HANDLES_PER_SESSION`
+- `DEXCLUB_MCP_MAX_TRACE_ARCHIVES`
 
 其中：
 
 - 终端默认保留最小运行日志
-- 详细 HTTP / tool 轨迹默认写入 `logs/mcp.log`
+- 通过分发脚本启动时，详细 HTTP / tool 轨迹默认写入启动脚本同级目录下的 `logs/mcp.log`
 - `logs/mcp.log` 始终表示当前 MCP 进程日志
-- 每次启动会先把旧的 `mcp.log` 归档到 `logs/archive/mcp_<启动时间>.log`
+- 每次启动会先把旧的 `mcp.log` 归档到 `logs/archive/mcp_<启动时间>.log`，默认保留最近 10 份
 - `DEXCLUB_MCP_TRACE=false` 时，可显式关闭详细轨迹文件
+- target session 默认空闲 10 分钟过期
+- 内存中默认最多保留 5 个 target session，超限按 LRU 淘汰
+- 每个 session 默认最多缓存 1000 个 method/class handle，相同对象复用 handle，超限按 LRU 淘汰
+- 非 loopback 监听地址会输出可信网络告警，但不会阻止启动
 - 启动日志会明确打印最终监听的 `host:port/path`
 
 这样可以避免将 transport 层 session 与 DexClub 自身 session 语义混在一起。
@@ -193,6 +201,7 @@ P0 当前已落地的最小口径是：
   - 必要时通过 `list_target_sessions / get_target_session / close_target_session`
     管理这些并存 session
 - 长时间未访问的空闲 session 会被自动回收，并一并清理该 session 下的 `method_handle / class_handle`
+- 单个 session 的 handle 缓存有容量上限，最久未使用的 handle 可能被提前淘汰
 - 因此 `session_id`、`method_handle`、`class_handle` 都应被视为运行时上下文，不保证长期稳定有效
 
 ### 2. 对象定位优先级
@@ -435,6 +444,8 @@ P0 当前已落地的最小口径是：
 
 - `now`
 - `idleTimeoutSeconds`
+- `maxSessions`
+- `maxHandlesPerSession`
 - `sessionCount`
 - `methodHandleCount`
 - `classHandleCount`
@@ -479,6 +490,8 @@ P0 不要求：
 P0 只要求：
 
 - handle 在当前 session 内可稳定复用
+- 相同 descriptor/source 组合复用同一 handle
+- handle 受每 session LRU 容量约束
 
 ## 定位类 Tool
 
