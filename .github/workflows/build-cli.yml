@@ -226,7 +226,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path $packageDir | Out-Null
           New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
 
-          $targetBaseName = "dexclub-${{ matrix.os_name }}-${{ matrix.arch }}"
+          $targetBaseName = "dexclub-cli-${{ matrix.os_name }}-${{ matrix.arch }}"
           $targetZip = Join-Path $artifactDir "$targetBaseName.zip"
           Expand-Archive -Path $sourceZip -DestinationPath $extractDir -Force
 
@@ -255,6 +255,6 @@ jobs:
         if: steps.filter.outputs.enabled == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: dexclub-${{ matrix.os_name }}-${{ matrix.arch }}
+          name: dexclub-cli-${{ matrix.os_name }}-${{ matrix.arch }}
           path: artifacts/
           if-no-files-found: error
