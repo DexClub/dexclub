@@ -76,30 +76,38 @@ internal fun compileResourceApk(
 }
 
 private fun resolveAapt2Command(): String {
-    val sdkRoot = System.getenv("ANDROID_HOME")
-        ?.takeIf { it.isNotBlank() }
-        ?.let(::File)
-        ?: error("ANDROID_HOME was not found; cannot locate aapt2")
+    val sdkRoot = resolveAndroidSdkRoot()
     return sdkRoot.resolve("build-tools").listFiles()
         ?.sortedByDescending(File::getName)
         ?.asSequence()
-        ?.map { it.resolve("aapt2.exe") }
+        ?.flatMap { buildToolsDir ->
+            sequenceOf(
+                buildToolsDir.resolve("aapt2"),
+                buildToolsDir.resolve("aapt2.exe"),
+            )
+        }
         ?.firstOrNull { it.isFile }
         ?.absolutePath
-        ?: error("No usable aapt2.exe was found")
+        ?: error("No usable aapt2 executable was found under ${sdkRoot.resolve("build-tools").absolutePath}")
 }
 
 private fun resolveAndroidJar(): File {
-    val sdkRoot = System.getenv("ANDROID_HOME")
-        ?.takeIf { it.isNotBlank() }
-        ?.let(::File)
-        ?: error("ANDROID_HOME was not found; cannot locate android.jar")
+    val sdkRoot = resolveAndroidSdkRoot()
     return sdkRoot.resolve("platforms").walkTopDown()
         .filter { it.isFile && it.name == "android.jar" }
         .sortedByDescending(File::getAbsolutePath)
         .firstOrNull()
-        ?: error("No usable android.jar was found")
+        ?: error("No usable android.jar was found under ${sdkRoot.resolve("platforms").absolutePath}")
 }
+
+private fun resolveAndroidSdkRoot(): File = sequenceOf("ANDROID_SDK_ROOT", "ANDROID_HOME")
+    .mapNotNull { name ->
+        System.getenv(name)
+            ?.takeIf { it.isNotBlank() }
+            ?.let(::File)
+    }
+    .firstOrNull()
+    ?: error("Neither ANDROID_SDK_ROOT nor ANDROID_HOME was found; cannot locate Android SDK")
 
 private fun runExternalCommand(command: List<String>, workingDirectory: File) {
     val process = ProcessBuilder(command)

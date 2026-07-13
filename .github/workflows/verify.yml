@@ -68,12 +68,19 @@ jobs:
         run: ./gradlew --no-daemon -p dexkit-binding jvmTest testAndroidHostTest
 
       - name: Run root JVM tests and package smoke
-        run: >-
-          ./gradlew --no-daemon --console=plain
-          :app-service:test
-          :domain-core:jvmTest
-          :cli-app:test
-          :mcp-app:test
-          :mcp-app:testSmoke
-          :cli-app:shadowDistZip
-          :mcp-app:installDist
+        shell: pwsh
+        run: |
+          $nativeDir = (Resolve-Path (Join-Path $PWD "dexkit-binding/vendor/DexKit/dexkit/build/library")).Path
+          if (!(Test-Path $nativeDir)) {
+            throw "Missing DexKit desktop native directory after dexkit-binding verification: $nativeDir"
+          }
+
+          $env:DEXCLUB_DEXKIT_NATIVE_LIBRARY_DIR = $nativeDir
+          & "./gradlew" --no-daemon --console=plain "-Pdexkit.native.dir=$nativeDir" `
+            :app-service:test `
+            :domain-core:jvmTest `
+            :cli-app:test `
+            :mcp-app:test `
+            :mcp-app:testSmoke `
+            :cli-app:shadowDistZip `
+            :mcp-app:installDist

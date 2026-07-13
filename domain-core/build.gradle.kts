@@ -8,6 +8,8 @@ import org.gradle.api.tasks.testing.Test
 import java.util.concurrent.TimeUnit
 
 val dexkitBindingModule = "io.github.dexclub:dexkit-binding:0.0.0-local"
+val dexkitNativeLibraryDirProperty = "dexclub.dexkit.native.library.dir"
+val externalDexKitNativeDir = providers.gradleProperty("dexkit.native.dir")
 
 fun resolveCoreVersion(): String {
     val configured = project.version.toString()
@@ -68,7 +70,11 @@ fun Test.configureCoreJvmTestRuntime() {
 }
 
 fun Test.configureCoreJvmTestRuntime(requiresDexKitNative: Boolean) {
-    if (requiresDexKitNative) {
+    val externalNativeDir = externalDexKitNativeDir.orNull?.trim().orEmpty()
+    if (externalNativeDir.isNotEmpty()) {
+        systemProperty(dexkitNativeLibraryDirProperty, externalNativeDir)
+    }
+    if (requiresDexKitNative && externalNativeDir.isEmpty()) {
         dependsOn(gradle.includedBuild("dexkit-binding").task(":prepareDexKitDesktopNative"))
     }
 }

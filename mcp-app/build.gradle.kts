@@ -9,6 +9,9 @@ plugins {
     application
 }
 
+val dexkitNativeLibraryDirProperty = "dexclub.dexkit.native.library.dir"
+val externalDexKitNativeDir = providers.gradleProperty("dexkit.native.dir")
+
 kotlin {
     jvmToolchain(21)
 }
@@ -101,6 +104,10 @@ configurations[mcpSmokeTestSourceSet.runtimeOnlyConfigurationName].extendsFrom(c
 fun Test.configureMcpTestRuntime() {
     useJUnitPlatform()
     systemProperty("dexclub.repo.root", rootDir.absolutePath)
+    val externalNativeDir = externalDexKitNativeDir.orNull?.trim().orEmpty()
+    if (externalNativeDir.isNotEmpty()) {
+        systemProperty(dexkitNativeLibraryDirProperty, externalNativeDir)
+    }
 }
 
 fun registerMcpTestTask(

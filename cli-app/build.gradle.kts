@@ -14,6 +14,8 @@ plugins {
     application
 }
 
+val dexkitNativeLibraryDirProperty = "dexclub.dexkit.native.library.dir"
+
 kotlin {
     jvmToolchain(21)
 }
@@ -61,7 +63,11 @@ fun Test.configureCliTestRuntime() {
 
 fun Test.configureCliTestRuntime(requiresDexKitNative: Boolean) {
     useJUnitPlatform()
-    if (requiresDexKitNative) {
+    val externalNativeDir = externalDexKitNativeDir.orNull?.trim().orEmpty()
+    if (externalNativeDir.isNotEmpty()) {
+        systemProperty(dexkitNativeLibraryDirProperty, externalNativeDir)
+    }
+    if (requiresDexKitNative && externalNativeDir.isEmpty()) {
         dependsOn(gradle.includedBuild("dexkit-binding").task(":prepareDexKitDesktopNative"))
     }
 }
