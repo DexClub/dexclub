@@ -78,7 +78,7 @@ internal fun ExportMethodTextUseCaseResult.toExportTextResult(
     sessionId = session?.sessionIdOrNull(),
     descriptor = descriptor,
     view = view,
-    text = text,
+    text = text.stabilizeMcpExportText(),
 )
 
 internal fun ExportClassTextUseCaseResult.toExportTextResult(
@@ -87,7 +87,7 @@ internal fun ExportClassTextUseCaseResult.toExportTextResult(
     sessionId = session?.sessionIdOrNull(),
     descriptor = descriptor,
     view = view,
-    text = text,
+    text = text.stabilizeMcpExportText(),
 )
 
 internal fun FindMethodsUsingStringsUseCaseResult.toFindMethodsUsingStringsResult(
@@ -157,4 +157,9 @@ internal fun DecodeXmlUseCaseResult.toDecodeXmlResult(): DecodeXmlResult =
     )
 
 private fun TargetSession.sessionIdOrNull(): String? = sessionId.takeIf(String::isNotBlank)
+
+private val loadedFromCommentLinePattern = Regex("""(?m)^/\*\s*(?:JADX INFO:\s*)?loaded from: .*?\*/\R?""")
+
+internal fun String.stabilizeMcpExportText(): String =
+    replace(loadedFromCommentLinePattern, "")
 
