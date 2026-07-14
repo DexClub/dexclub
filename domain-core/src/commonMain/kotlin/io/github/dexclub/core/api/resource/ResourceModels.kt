@@ -4,7 +4,6 @@ import io.github.dexclub.core.api.shared.PageWindow
 
 enum class ResourceResolution {
     TableBacked,
-    PathInferred,
     TableValue,
     Unresolved,
     TableHole,

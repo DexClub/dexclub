@@ -74,10 +74,9 @@ private val resourceEntryListOrder =
 private fun listOrderResolutionRank(resolution: ResourceResolution): Int =
     when (resolution) {
         ResourceResolution.TableBacked -> 0
-        ResourceResolution.PathInferred -> 1
-        ResourceResolution.TableValue -> 2
-        ResourceResolution.Unresolved -> 3
-        ResourceResolution.TableHole -> 4
+        ResourceResolution.TableValue -> 1
+        ResourceResolution.Unresolved -> 2
+        ResourceResolution.TableHole -> 3
     }
 
 private fun listOrderCompleteness(entry: ResourceEntry): Int =

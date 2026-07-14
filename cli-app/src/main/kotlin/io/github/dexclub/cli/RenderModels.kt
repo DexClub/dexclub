@@ -428,7 +428,6 @@ private fun WorkspaceIssueSeverity.toCliValue(): String =
 private fun ResourceResolution.toCliValue(): String =
     when (this) {
         ResourceResolution.TableBacked -> "table-backed"
-        ResourceResolution.PathInferred -> "path-inferred"
         ResourceResolution.TableValue -> "table-value"
         ResourceResolution.Unresolved -> "unresolved"
         ResourceResolution.TableHole -> "table-hole"

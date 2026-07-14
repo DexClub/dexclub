@@ -537,7 +537,6 @@ private fun String.toWorkspaceKind(): WorkspaceKind =
 private fun ResourceResolution.toStorageValue(): String =
     when (this) {
         ResourceResolution.TableBacked -> "table-backed"
-        ResourceResolution.PathInferred -> "path-inferred"
         ResourceResolution.TableValue -> "table-value"
         ResourceResolution.Unresolved -> "unresolved"
         ResourceResolution.TableHole -> "table-hole"
@@ -546,7 +545,6 @@ private fun ResourceResolution.toStorageValue(): String =
 private fun String.toResourceResolution(): ResourceResolution =
     when (lowercase()) {
         "table-backed" -> ResourceResolution.TableBacked
-        "path-inferred" -> ResourceResolution.PathInferred
         "table-value" -> ResourceResolution.TableValue
         "unresolved" -> ResourceResolution.Unresolved
         "table-hole" -> ResourceResolution.TableHole
