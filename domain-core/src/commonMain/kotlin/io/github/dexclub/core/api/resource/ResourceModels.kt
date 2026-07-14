@@ -5,7 +5,9 @@ import io.github.dexclub.core.api.shared.PageWindow
 enum class ResourceResolution {
     TableBacked,
     PathInferred,
+    TableValue,
     Unresolved,
+    TableHole,
 }
 
 data class ManifestResult(
@@ -126,6 +128,22 @@ data class ResourceEntry(
     val resolution: ResourceResolution = ResourceResolution.Unresolved,
 )
 
+fun ResourceEntry.normalizedResolution(): ResourceEntry =
+    when {
+        resolution == ResourceResolution.Unresolved &&
+            filePath.isNullOrBlank() &&
+            !name.isNullOrBlank() ->
+            copy(resolution = ResourceResolution.TableValue)
+
+        resolution == ResourceResolution.Unresolved &&
+            name.isNullOrBlank() &&
+            filePath.isNullOrBlank() &&
+            sourceEntry.isNullOrBlank() ->
+            copy(resolution = ResourceResolution.TableHole)
+
+        else -> this
+    }
+
 data class ResourceTableResult(
     val sourcePath: String? = null,
     val sourceEntry: String? = null,
@@ -156,6 +174,12 @@ data class ResourceValue(
     val type: String,
     val name: String,
     val value: String? = null,
+    val pluralItems: List<ResourcePluralItem>? = null,
+)
+
+data class ResourcePluralItem(
+    val quantity: String,
+    val value: String,
 )
 
 data class FindResourcesRequest(

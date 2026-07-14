@@ -54,7 +54,7 @@ class ResourceTableServiceTest {
         val entry = result.entries.single()
         assertEquals("string", entry.type)
         assertEquals("app_name", entry.name)
-        assertEquals(ResourceResolution.Unresolved, entry.resolution)
+        assertEquals(ResourceResolution.TableValue, entry.resolution)
         assertTrue(entry.resourceId?.startsWith("0x") == true)
     }
 

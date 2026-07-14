@@ -80,6 +80,119 @@ class ResourceValueServiceTest {
     }
 
     @Test
+    fun resolveResourceValueUsesRealValueTypesForScalars() {
+        val workdir = createTempDirectory("dexclub-resource-resolve-scalars")
+        val apkFile = workdir.resolve("app.apk").toFile()
+        compileResourceApk(
+            outputApk = apkFile,
+            manifestText = """<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="fixture.resolvescalars"><application android:label="@string/app_name" /></manifest>""",
+            resourceXml = """
+                <resources>
+                    <string name="app_name">DexClub Fixture</string>
+                    <bool name="feature_enabled">true</bool>
+                    <integer name="max_items">3</integer>
+                    <dimen name="spacing">8dp</dimen>
+                </resources>
+            """.trimIndent(),
+        )
+
+        val services = createDefaultServices()
+        services.workspace.initialize(apkFile.toString())
+        val workspace = services.workspace.open(WorkspaceRef(workdir.toString()))
+
+        val boolValue = services.resource.getResourceValue(
+            workspace,
+            ResolveResourceRequest(type = "bool", name = "feature_enabled"),
+        )
+        val integerValue = services.resource.getResourceValue(
+            workspace,
+            ResolveResourceRequest(type = "integer", name = "max_items"),
+        )
+        val dimenValue = services.resource.getResourceValue(
+            workspace,
+            ResolveResourceRequest(type = "dimen", name = "spacing"),
+        )
+
+        assertEquals("true", boolValue.value)
+        assertEquals("3", integerValue.value)
+        assertTrue(dimenValue.value.orEmpty().contains("8"))
+        assertTrue(dimenValue.value != "true")
+    }
+
+    @Test
+    fun resolveResourceValueExpandsPluralsAsStructuredItems() {
+        val workdir = createTempDirectory("dexclub-resource-resolve-plurals")
+        val apkFile = workdir.resolve("app.apk").toFile()
+        compileResourceApk(
+            outputApk = apkFile,
+            manifestText = """<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="fixture.resolveplurals"><application android:label="@string/app_name" /></manifest>""",
+            resourceXml = """
+                <resources>
+                    <string name="app_name">DexClub Fixture</string>
+                    <plurals name="comment_count">
+                        <item quantity="one">%d comment</item>
+                        <item quantity="other">%d comments</item>
+                    </plurals>
+                </resources>
+            """.trimIndent(),
+        )
+
+        val services = createDefaultServices()
+        services.workspace.initialize(apkFile.toString())
+        val workspace = services.workspace.open(WorkspaceRef(workdir.toString()))
+
+        val result = services.resource.getResourceValue(
+            workspace,
+            ResolveResourceRequest(type = "plurals", name = "comment_count"),
+        )
+
+        assertEquals("plurals", result.type)
+        assertEquals("comment_count", result.name)
+        assertEquals(null, result.value)
+        assertEquals(2, result.pluralItems?.size)
+        assertEquals("one", result.pluralItems?.get(0)?.quantity)
+        assertEquals("%d comment", result.pluralItems?.get(0)?.value)
+        assertEquals("other", result.pluralItems?.get(1)?.quantity)
+        assertEquals("%d comments", result.pluralItems?.get(1)?.value)
+    }
+
+    @Test
+    fun resolveResourceValueReusesCachedPluralItems() {
+        val workdir = createTempDirectory("dexclub-resource-resolve-plurals-cache")
+        val apkFile = workdir.resolve("app.apk").toFile()
+        compileResourceApk(
+            outputApk = apkFile,
+            manifestText = """<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="fixture.resolvepluralscache"><application android:label="@string/app_name" /></manifest>""",
+            resourceXml = """
+                <resources>
+                    <string name="app_name">DexClub Fixture</string>
+                    <plurals name="comment_count">
+                        <item quantity="one">%d comment</item>
+                        <item quantity="other">%d comments</item>
+                    </plurals>
+                </resources>
+            """.trimIndent(),
+        )
+
+        val services = createDefaultServices()
+        services.workspace.initialize(apkFile.toString())
+        val workspace = services.workspace.open(WorkspaceRef(workdir.toString()))
+        services.resource.dumpResourceTable(workspace)
+        val cacheFile = workdir.resolve(".dexclub/targets/${workspace.activeTargetId}/cache/decoded/resource-table.json").toFile()
+        cacheFile.writeText(
+            cacheFile.readText(Charsets.UTF_8).replace("%d comments", "%d cached comments"),
+            Charsets.UTF_8,
+        )
+
+        val result = services.resource.getResourceValue(
+            workspace,
+            ResolveResourceRequest(type = "plurals", name = "comment_count"),
+        )
+
+        assertEquals("%d cached comments", result.pluralItems?.last()?.value)
+    }
+
+    @Test
     fun resolveResourceValueReusesCachedResourceTablePayload() {
         val workdir = createTempDirectory("dexclub-resource-resolve-cache")
         val apkFile = workdir.resolve("app.apk").toFile()

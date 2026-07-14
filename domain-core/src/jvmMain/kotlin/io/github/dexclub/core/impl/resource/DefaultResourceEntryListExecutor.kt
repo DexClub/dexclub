@@ -4,6 +4,7 @@ import com.reandroid.apk.ApkModule
 import com.reandroid.apk.ResFile
 import io.github.dexclub.core.api.resource.ResourceEntry
 import io.github.dexclub.core.api.resource.ResourceResolution
+import io.github.dexclub.core.api.resource.normalizedResolution
 import io.github.dexclub.core.api.workspace.WorkspaceContext
 import io.github.dexclub.core.impl.workspace.model.MaterialInventory
 import io.github.dexclub.core.impl.workspace.model.ResourceEntryIndexRecord
@@ -23,7 +24,7 @@ internal class DefaultResourceEntryListExecutor(
                 it.toolVersion == toolVersion &&
                     it.contentFingerprint == workspace.snapshot.contentFingerprint
             }
-            ?.let { return it.entries }
+            ?.let { return it.entries.map(ResourceEntry::normalizedResolution) }
 
         val workdirPath = Path.of(workspace.workdir)
         val entries = buildList {
@@ -31,19 +32,7 @@ internal class DefaultResourceEntryListExecutor(
                 addAll(listApkEntries(workdirPath.resolve(apkSourcePath).normalize(), apkSourcePath))
             }
         }
-        val normalizedEntries = collapseLogicalEntries(entries)
-            .distinct()
-            .sortedWith(
-                compareBy<ResourceEntry>(
-                    { it.type.orEmpty() },
-                    { it.name.orEmpty() },
-                    { it.filePath.orEmpty() },
-                    { it.sourcePath.orEmpty() },
-                    { it.sourceEntry.orEmpty() },
-                    { it.resolution.name },
-                    { it.resourceId.orEmpty() },
-                ),
-            )
+        val normalizedEntries = normalizeResourceEntries(entries)
         store.saveResourceEntryIndex(
             workdir = workspace.workdir,
             targetId = workspace.activeTargetId,
@@ -62,16 +51,7 @@ internal class DefaultResourceEntryListExecutor(
         ApkModule.loadApkFile(apkPath.toFile()).use { apk ->
             val mappedEntries = apk.listResFiles()
                 .flatMap { resFile -> mapApkResFile(resFile, sourcePath) }
-            val mappedKeys = mappedEntries
-                .filter { it.resourceId != null || it.type != null || it.name != null }
-                .mapTo(mutableSetOf()) {
-                    TableBackedKey(
-                        resourceId = it.resourceId,
-                        type = it.type,
-                        name = it.name,
-                        sourcePath = it.sourcePath,
-                    )
-                }
+            val mappedKeys = mappedEntries.mapNotNullTo(mutableSetOf()) { it.logicalGroupingKey() }
             val unresolvedEntries = apk.tableBlock.resources
                 .asSequence()
                 .map { resource ->
@@ -82,128 +62,124 @@ internal class DefaultResourceEntryListExecutor(
                         filePath = null,
                         sourcePath = sourcePath,
                         sourceEntry = null,
-                        resolution = ResourceResolution.Unresolved,
+                        resolution = unresolvedResourceResolution(resource.any() != null),
                     )
                 }
-                .filter { entry ->
-                    TableBackedKey(
-                        resourceId = entry.resourceId,
-                        type = entry.type,
-                        name = entry.name,
-                        sourcePath = entry.sourcePath,
-                    ) !in mappedKeys
-                }
+                .filter { entry -> entry.logicalGroupingKey() !in mappedKeys }
                 .toList()
-            mappedEntries + unresolvedEntries
+            (mappedEntries + unresolvedEntries).map(ResourceEntry::normalizedResolution)
         }
 
     private fun mapApkResFile(resFile: ResFile, sourcePath: String): List<ResourceEntry> {
         val filePath = resFile.filePath ?: return emptyList()
-        val tableBacked = mutableListOf<ResourceEntry>()
-        resFile.forEach { entry ->
-            val resourceEntry = entry.resourceEntry
-            tableBacked.add(
-                ResourceEntry(
-                    resourceId = resourceEntry.hexId,
-                    type = entry.typeName,
-                    name = entry.name,
-                    filePath = filePath,
-                    sourcePath = sourcePath,
-                    sourceEntry = filePath,
-                    resolution = ResourceResolution.TableBacked,
-                ),
-            )
-        }
-        if (tableBacked.isNotEmpty()) {
-            return tableBacked
-        }
-        val inferred = inferFromResFilePath(filePath) ?: return emptyList()
-        return listOf(
-            ResourceEntry(
-                resourceId = null,
-                type = inferred.type,
-                name = inferred.name,
-                filePath = filePath,
-                sourcePath = sourcePath,
-                sourceEntry = filePath,
-                resolution = ResourceResolution.PathInferred,
-            ),
-        )
-    }
-
-    private fun inferFromResFilePath(filePath: String): InferredResourcePath? {
-        val normalized = filePath.replace('\\', '/')
-        val parts = normalized.split('/')
-        val resIndex = parts.indexOf("res")
-        if (resIndex < 0 || resIndex + 2 >= parts.size) {
-            return null
-        }
-        val typeDirectory = parts[resIndex + 1]
-        val baseType = typeDirectory.substringBefore('-')
-        if (baseType.isBlank() || baseType == "values") {
-            return null
-        }
-        val fileName = parts.last()
-        val extensionIndex = fileName.lastIndexOf('.')
-        if (extensionIndex <= 0) {
-            return null
-        }
-        val entryName = fileName.substring(0, extensionIndex)
-        if (entryName.isBlank()) {
-            return null
-        }
-        return InferredResourcePath(
-            type = baseType,
-            name = entryName,
-        )
-    }
-
-    private fun collapseLogicalEntries(entries: List<ResourceEntry>): List<ResourceEntry> {
-        val grouped = linkedMapOf<TableBackedKey, MutableList<ResourceEntry>>()
-        val passthrough = mutableListOf<ResourceEntry>()
-        entries.forEach { entry ->
-            if (entry.resolution != ResourceResolution.TableBacked) {
-                passthrough += entry
-                return@forEach
+        return buildList {
+            resFile.forEach { entry ->
+                val resourceEntry = entry.resourceEntry
+                add(
+                    ResourceEntry(
+                        resourceId = resourceEntry.hexId,
+                        type = entry.typeName,
+                        name = entry.name,
+                        filePath = filePath,
+                        sourcePath = sourcePath,
+                        sourceEntry = filePath,
+                        resolution = ResourceResolution.TableBacked,
+                    ),
+                )
             }
-            val key = TableBackedKey(
-                resourceId = entry.resourceId,
-                type = entry.type,
-                name = entry.name,
-                sourcePath = entry.sourcePath,
-            )
-            grouped.getOrPut(key) { mutableListOf() } += entry
         }
-        val collapsed = grouped.values.map { candidates ->
-            candidates.minWithOrNull(compareBy<ResourceEntry>(
-                { qualifierRank(it.filePath) },
-                { it.filePath.orEmpty().length },
-                { it.filePath.orEmpty() },
-            )) ?: error("unexpected empty candidate set")
-        }
-        return collapsed + passthrough
     }
 
-    private fun qualifierRank(filePath: String?): Int {
-        if (filePath == null) return Int.MAX_VALUE
-        val parts = filePath.replace('\\', '/').split('/')
-        val resIndex = parts.indexOf("res")
-        if (resIndex < 0 || resIndex + 1 >= parts.size) {
-            return Int.MAX_VALUE
-        }
-        val typeDirectory = parts[resIndex + 1]
-        return typeDirectory.count { it == '-' }
-    }
 }
 
-private data class InferredResourcePath(
-    val type: String,
-    val name: String,
-)
+internal fun normalizeResourceEntries(entries: List<ResourceEntry>): List<ResourceEntry> {
+    val normalized = entries.map(ResourceEntry::normalizedResolution)
+    val grouped = linkedMapOf<LogicalResourceKey, MutableList<ResourceEntry>>()
+    val passthrough = mutableListOf<ResourceEntry>()
+    normalized.forEach { entry ->
+        val key = entry.logicalGroupingKey()
+        if (key == null) {
+            passthrough += entry
+        } else {
+            grouped.getOrPut(key) { mutableListOf() } += entry
+        }
+    }
+    val collapsed = grouped.values.map { candidates ->
+        candidates.minWithOrNull(resourceEntryPreferenceOrder)
+            ?: error("unexpected empty candidate set")
+    }
+    return (collapsed + passthrough)
+        .distinct()
+        .sortedWith(resourceEntrySortOrder)
+}
 
-private data class TableBackedKey(
-    val resourceId: String?,
-    val type: String?,
-    val name: String?,
-    val sourcePath: String?,
-)
+internal sealed interface LogicalResourceKey {
+    data class ById(
+        val sourcePath: String,
+        val type: String,
+        val resourceId: String,
+    ) : LogicalResourceKey
+
+    data class ByName(
+        val sourcePath: String,
+        val type: String,
+        val name: String,
+    ) : LogicalResourceKey
+}
+
+private fun ResourceEntry.logicalGroupingKey(): LogicalResourceKey? =
+    when {
+        !sourcePath.isNullOrBlank() && !type.isNullOrBlank() && !resourceId.isNullOrBlank() ->
+            LogicalResourceKey.ById(
+                sourcePath = sourcePath,
+                type = type,
+                resourceId = resourceId,
+            )
+
+        !sourcePath.isNullOrBlank() && !type.isNullOrBlank() && !name.isNullOrBlank() ->
+            LogicalResourceKey.ByName(
+                sourcePath = sourcePath,
+                type = type,
+                name = name,
+            )
+
+        else -> null
+    }
+
+private val resourceEntrySortOrder =
+    compareBy<ResourceEntry>(
+        { it.type.orEmpty() },
+        { it.name.orEmpty() },
+        { it.filePath.orEmpty() },
+        { it.sourcePath.orEmpty() },
+        { it.sourceEntry.orEmpty() },
+        { it.resolution.name },
+        { it.resourceId.orEmpty() },
+    )
+
+private val resourceEntryPreferenceOrder =
+    compareBy<ResourceEntry>(
+        { resolutionRank(it.resolution) },
+        { -resourceCompleteness(it) },
+        { it.filePath.orEmpty().length },
+        { it.filePath.orEmpty() },
+        { it.sourceEntry.orEmpty() },
+        { it.name.orEmpty() },
+        { it.resourceId.orEmpty() },
+    )
+
+private fun resolutionRank(resolution: ResourceResolution): Int =
+    when (resolution) {
+        ResourceResolution.TableBacked -> 0
+        ResourceResolution.PathInferred -> 1
+        ResourceResolution.TableValue -> 2
+        ResourceResolution.Unresolved -> 3
+        ResourceResolution.TableHole -> 4
+    }
+
+private fun resourceCompleteness(entry: ResourceEntry): Int =
+    listOf(entry.name, entry.filePath, entry.sourcePath, entry.sourceEntry, entry.resourceId)
+        .count { !it.isNullOrBlank() }
+
+private fun unresolvedResourceResolution(hasEntryPayload: Boolean): ResourceResolution =
+    if (hasEntryPayload) ResourceResolution.TableValue else ResourceResolution.TableHole

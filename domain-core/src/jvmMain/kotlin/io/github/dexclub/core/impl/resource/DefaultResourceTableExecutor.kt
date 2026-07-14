@@ -3,10 +3,13 @@ package io.github.dexclub.core.impl.resource
 import com.reandroid.apk.ApkModule
 import com.reandroid.arsc.chunk.TableBlock
 import io.github.dexclub.core.api.resource.ResourceEntry
+import io.github.dexclub.core.api.resource.ResourcePluralItem
 import io.github.dexclub.core.api.resource.ResourceResolution
 import io.github.dexclub.core.api.resource.ResourceTableResult
+import io.github.dexclub.core.api.resource.normalizedResolution
 import io.github.dexclub.core.api.workspace.WorkspaceContext
 import io.github.dexclub.core.impl.workspace.model.ResourceTableCacheRecord
+import io.github.dexclub.core.impl.workspace.model.ResourcePluralItemRecord
 import io.github.dexclub.core.impl.workspace.model.ResourceTablePayloadRecord
 import io.github.dexclub.core.impl.workspace.model.ResourceTableValueRecord
 import io.github.dexclub.core.impl.workspace.model.MaterialInventory
@@ -62,16 +65,17 @@ internal class DefaultResourceTableExecutor(
                     values = loaded.tableBlock.resources
                         .asSequence()
                         .mapNotNull { resource ->
-                            resource.any()
-                                ?.toDisplayValue()
-                                ?.let { value ->
-                                    ResourceTableValueRecord(
-                                        resourceId = resource.hexId,
-                                        type = resource.type,
-                                        name = resource.name,
-                                        value = value,
-                                    )
-                                }
+                            val decoded = resource.any()?.toDecodedResourceValue(resource.type) ?: return@mapNotNull null
+                            if (decoded.value == null && decoded.pluralItems == null) {
+                                return@mapNotNull null
+                            }
+                            ResourceTableValueRecord(
+                                resourceId = resource.hexId,
+                                type = resource.type,
+                                name = resource.name,
+                                value = decoded.value,
+                                pluralItems = decoded.pluralItems?.map(::toRecord),
+                            )
                         }
                         .sortedWith(
                             compareBy<ResourceTableValueRecord>(
@@ -102,7 +106,7 @@ internal class DefaultResourceTableExecutor(
                     filePath = null,
                     sourcePath = sourcePath,
                     sourceEntry = sourceEntry,
-                    resolution = ResourceResolution.Unresolved,
+                    resolution = if (resource.any() != null) ResourceResolution.TableValue else ResourceResolution.TableHole,
                 )
             }
             .sortedWith(
@@ -135,6 +139,12 @@ internal class DefaultResourceTableExecutor(
             packageCount = cache.payload.packages.size,
             typeCount = cache.payload.typeCount,
             entryCount = cache.payload.entries.size,
-            entries = cache.payload.entries,
+            entries = cache.payload.entries.map(ResourceEntry::normalizedResolution),
+        )
+
+    private fun toRecord(item: ResourcePluralItem): ResourcePluralItemRecord =
+        ResourcePluralItemRecord(
+            quantity = item.quantity,
+            value = item.value,
         )
 }

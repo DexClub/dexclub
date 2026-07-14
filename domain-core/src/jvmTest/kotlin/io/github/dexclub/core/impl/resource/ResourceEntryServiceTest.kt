@@ -1,6 +1,7 @@
 package io.github.dexclub.core.impl.resource
 
 import io.github.dexclub.core.api.resource.ResourceResolution
+import io.github.dexclub.core.api.resource.normalizedResolution
 import io.github.dexclub.core.api.shared.CapabilityError
 import io.github.dexclub.core.api.shared.Operation
 import io.github.dexclub.core.api.shared.createDefaultServices
@@ -51,7 +52,7 @@ class ResourceEntryServiceTest {
         val stringEntry = entries.first { it.type == "string" && it.name == "app_name" }
         assertEquals("app.apk", stringEntry.sourcePath)
         assertEquals(null, stringEntry.filePath)
-        assertEquals(ResourceResolution.Unresolved, stringEntry.resolution)
+        assertEquals(ResourceResolution.TableValue, stringEntry.resolution)
         assertTrue(stringEntry.resourceId?.startsWith("0x") == true)
     }
 
@@ -134,5 +135,89 @@ class ResourceEntryServiceTest {
 
         assertEquals(Operation.ResourceEntryList, error.operation)
         assertTrue(error.requiredCapability == "resourceEntryList")
+    }
+
+    @Test
+    fun normalizedResolutionMarksNamelessTableSlotsAsTableHole() {
+        val hole = io.github.dexclub.core.api.resource.ResourceEntry(
+            resourceId = "0x7f0d0014",
+            type = "layout",
+            name = null,
+            filePath = null,
+            sourcePath = "sample.apk",
+            sourceEntry = null,
+            resolution = ResourceResolution.Unresolved,
+        ).normalizedResolution()
+
+        val unresolved = io.github.dexclub.core.api.resource.ResourceEntry(
+            resourceId = "0x7f110001",
+            type = "string",
+            name = "app_name",
+            filePath = null,
+            sourcePath = "sample.apk",
+            sourceEntry = null,
+            resolution = ResourceResolution.Unresolved,
+        ).normalizedResolution()
+
+        assertEquals(ResourceResolution.TableHole, hole.resolution)
+        assertEquals(ResourceResolution.TableValue, unresolved.resolution)
+    }
+
+    @Test
+    fun normalizeResourceEntriesPrefersResolvedEntriesOverUnresolvedShells() {
+        val entries = normalizeResourceEntries(
+            listOf(
+                io.github.dexclub.core.api.resource.ResourceEntry(
+                    resourceId = "0x7f0d0014",
+                    type = "layout",
+                    name = null,
+                    filePath = null,
+                    sourcePath = "sample.apk",
+                    sourceEntry = null,
+                    resolution = ResourceResolution.TableHole,
+                ),
+                io.github.dexclub.core.api.resource.ResourceEntry(
+                    resourceId = "0x7f0d0014",
+                    type = "layout",
+                    name = "activity_main",
+                    filePath = "res/layout/activity_main.xml",
+                    sourcePath = "sample.apk",
+                    sourceEntry = "res/layout/activity_main.xml",
+                    resolution = ResourceResolution.TableBacked,
+                ),
+                io.github.dexclub.core.api.resource.ResourceEntry(
+                    resourceId = "0x7f120001",
+                    type = "xml",
+                    name = null,
+                    filePath = null,
+                    sourcePath = "sample.apk",
+                    sourceEntry = null,
+                    resolution = ResourceResolution.TableHole,
+                ),
+                io.github.dexclub.core.api.resource.ResourceEntry(
+                    resourceId = "0x7f120001",
+                    type = "xml",
+                    name = "network_security_config",
+                    filePath = "res/xml/network_security_config.xml",
+                    sourcePath = "sample.apk",
+                    sourceEntry = "res/xml/network_security_config.xml",
+                    resolution = ResourceResolution.TableBacked,
+                ),
+            ),
+        )
+
+        assertEquals(2, entries.size)
+
+        val layout = entries.first { it.type == "layout" }
+        assertEquals("activity_main", layout.name)
+        assertEquals("res/layout/activity_main.xml", layout.filePath)
+        assertEquals("res/layout/activity_main.xml", layout.sourceEntry)
+        assertEquals(ResourceResolution.TableBacked, layout.resolution)
+
+        val xml = entries.first { it.type == "xml" }
+        assertEquals("network_security_config", xml.name)
+        assertEquals("res/xml/network_security_config.xml", xml.filePath)
+        assertEquals("res/xml/network_security_config.xml", xml.sourceEntry)
+        assertEquals(ResourceResolution.TableBacked, xml.resolution)
     }
 }

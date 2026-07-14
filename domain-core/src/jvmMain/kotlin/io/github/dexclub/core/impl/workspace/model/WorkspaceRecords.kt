@@ -145,6 +145,12 @@ internal data class ResourceTableValueRecord(
     val type: String? = null,
     val name: String? = null,
     val value: String? = null,
+    val pluralItems: List<ResourcePluralItemRecord>? = null,
+)
+
+internal data class ResourcePluralItemRecord(
+    val quantity: String,
+    val value: String,
 )
 
 internal data class DecodedXmlCacheRecord(

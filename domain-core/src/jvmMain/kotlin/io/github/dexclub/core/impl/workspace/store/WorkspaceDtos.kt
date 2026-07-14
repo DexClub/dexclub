@@ -4,6 +4,7 @@ import io.github.dexclub.core.api.shared.CapabilitySet
 import io.github.dexclub.core.api.shared.InputType
 import io.github.dexclub.core.api.shared.WorkspaceKind
 import io.github.dexclub.core.api.resource.ResourceEntry
+import io.github.dexclub.core.api.resource.ResourcePluralItem
 import io.github.dexclub.core.api.resource.ResourceResolution
 import io.github.dexclub.core.impl.workspace.model.ClassSourceMapRecord
 import io.github.dexclub.core.impl.workspace.model.ClassSourceRefRecord
@@ -12,6 +13,7 @@ import io.github.dexclub.core.impl.workspace.model.DecodedXmlCacheRecord
 import io.github.dexclub.core.impl.workspace.model.MaterialInventory
 import io.github.dexclub.core.impl.workspace.model.ResourceEntryIndexRecord
 import io.github.dexclub.core.impl.workspace.model.ResourceTableCacheRecord
+import io.github.dexclub.core.impl.workspace.model.ResourcePluralItemRecord
 import io.github.dexclub.core.impl.workspace.model.ResourceTablePayloadRecord
 import io.github.dexclub.core.impl.workspace.model.ResourceTableValueRecord
 import io.github.dexclub.core.impl.workspace.model.SnapshotRecord
@@ -134,6 +136,13 @@ internal data class ResourceTableValueDto(
     val type: String? = null,
     val name: String? = null,
     val value: String? = null,
+    val pluralItems: List<ResourcePluralItemDto>? = null,
+)
+
+@Serializable
+internal data class ResourcePluralItemDto(
+    val quantity: String,
+    val value: String,
 )
 
 @Serializable
@@ -397,6 +406,7 @@ internal fun ResourceTableValueDto.toModel(): ResourceTableValueRecord =
         type = type,
         name = name,
         value = value,
+        pluralItems = pluralItems?.map(ResourcePluralItemDto::toModel),
     )
 
 internal fun ResourceTableValueRecord.toDto(): ResourceTableValueDto =
@@ -404,6 +414,19 @@ internal fun ResourceTableValueRecord.toDto(): ResourceTableValueDto =
         resourceId = resourceId,
         type = type,
         name = name,
+        value = value,
+        pluralItems = pluralItems?.map(ResourcePluralItemRecord::toDto),
+    )
+
+internal fun ResourcePluralItemDto.toModel(): ResourcePluralItemRecord =
+    ResourcePluralItemRecord(
+        quantity = quantity,
+        value = value,
+    )
+
+internal fun ResourcePluralItemRecord.toDto(): ResourcePluralItemDto =
+    ResourcePluralItemDto(
+        quantity = quantity,
         value = value,
     )
 
@@ -515,13 +538,17 @@ private fun ResourceResolution.toStorageValue(): String =
     when (this) {
         ResourceResolution.TableBacked -> "table-backed"
         ResourceResolution.PathInferred -> "path-inferred"
+        ResourceResolution.TableValue -> "table-value"
         ResourceResolution.Unresolved -> "unresolved"
+        ResourceResolution.TableHole -> "table-hole"
     }
 
 private fun String.toResourceResolution(): ResourceResolution =
     when (lowercase()) {
         "table-backed" -> ResourceResolution.TableBacked
         "path-inferred" -> ResourceResolution.PathInferred
+        "table-value" -> ResourceResolution.TableValue
         "unresolved" -> ResourceResolution.Unresolved
+        "table-hole" -> ResourceResolution.TableHole
         else -> throw IllegalArgumentException("Unsupported resource resolution: $this")
     }

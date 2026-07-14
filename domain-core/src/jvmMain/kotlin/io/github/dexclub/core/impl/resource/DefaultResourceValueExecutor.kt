@@ -5,6 +5,7 @@ import io.github.dexclub.core.api.resource.ResolveResourceRequest
 import io.github.dexclub.core.api.resource.ResourceDecodeError
 import io.github.dexclub.core.api.resource.ResourceDecodeErrorReason
 import io.github.dexclub.core.api.resource.ResourceEntryValueHit
+import io.github.dexclub.core.api.resource.ResourcePluralItem
 import io.github.dexclub.core.api.resource.ResourceValue
 import io.github.dexclub.core.api.workspace.WorkspaceContext
 import io.github.dexclub.core.impl.workspace.model.MaterialInventory
@@ -68,11 +69,13 @@ internal class DefaultResourceValueExecutor(
                 message = buildNotFoundMessage(request),
             )
 
+        val decoded = entry.toDecodedResourceValue(resource.type)
         return ResourceValue(
             resourceId = resource.hexId,
             type = resource.type,
             name = resource.name,
-            value = entry.toDisplayValue(),
+            value = decoded.value,
+            pluralItems = decoded.pluralItems,
         )
     }
 
@@ -174,6 +177,7 @@ internal class DefaultResourceValueExecutor(
             type = valueRecord.type ?: request.type.orEmpty(),
             name = valueRecord.name ?: request.name.orEmpty(),
             value = valueRecord.value,
+            pluralItems = valueRecord.pluralItems?.map(::toApiPluralItem),
         )
     }
 
@@ -229,4 +233,10 @@ internal class DefaultResourceValueExecutor(
         } else {
             value.equals(query.value, ignoreCase = query.ignoreCase)
         }
+
+    private fun toApiPluralItem(record: io.github.dexclub.core.impl.workspace.model.ResourcePluralItemRecord): ResourcePluralItem =
+        ResourcePluralItem(
+            quantity = record.quantity,
+            value = record.value,
+        )
 }
