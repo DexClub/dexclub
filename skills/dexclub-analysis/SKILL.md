@@ -226,6 +226,53 @@ Default to structured manifest inspection.
   - `receivers`
   - `providers`
 
+## Resource Semantics
+
+When using dexclub resource tools, distinguish resource identity, file backing, and decoded value capability.
+
+`list_res` is primarily for:
+
+- resource identity
+- source mapping
+- resolution state
+
+Do not treat `list_res` as a decoded-value API.
+
+Interpret `resolution` as follows:
+
+- `table-backed`
+  - file-backed packaged resource
+  - commonly seen on APK entries such as `layout`, `xml`, `drawable`, `color`
+- `table-value`
+  - resource table entry exists and is usable as a value resource
+  - `sourceEntry` and `filePath` may legitimately be null
+  - commonly seen on `string`, `bool`, `integer`, `dimen`, and `plurals`
+- `table-hole`
+  - empty slot in the resource table
+  - do not treat it as a parser failure
+  - do not keep chasing it as though a file path must exist
+- `unresolved`
+  - treat as incomplete evidence rather than as a decoded value
+  - if it matters, confirm with `get_resource_value`, `res-table`, or a narrower follow-up path
+
+For value-oriented resource analysis:
+
+- use `get_resource_value` to confirm one concrete resource
+- use `find_resource_values` for scalar-value search
+- use `list_res` to understand whether the object is file-backed, table-valued, or a table hole
+
+For `plurals`:
+
+- do not expect a single scalar `value`
+- expect structured `pluralItems` when expansion is available
+- if `pluralItems` are absent, treat that as a capability gap or contract limitation, not as evidence that the resource has no value
+
+For `table-value` resources:
+
+- null `filePath` is normal
+- null `sourceEntry` is normal
+- do not misclassify them as unresolved merely because they are not file-backed
+
 ## Inspect and Export Rules
 
 Default order:
@@ -289,6 +336,13 @@ For resource and smali MCP calls, do not guess optional parameters.
   - `resolution`
 - for `export_method_smali`, omit `mode` unless you explicitly need `class`
   - supported values are only `snippet` and `class`
+
+Resource-tool usage guidance:
+
+- prefer `list_res` first when the question is about resource existence, type, or source mapping
+- prefer `get_resource_value` when the question is about the concrete decoded value of one resource
+- prefer `find_resource_values` when the question starts from a scalar value clue
+- do not assume `find_resource_values` is the right path for complex bag resources such as `plurals`
 
 Do not keep exporting sibling methods or nearby helpers merely because they look related.
 

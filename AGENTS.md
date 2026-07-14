@@ -10,6 +10,8 @@ Default to Chinese in user-facing responses for this repository unless the user 
 
 - Do not make extra changes just because they seem reasonable. Stay within the explicitly requested scope unless the user clearly asks for additional adjustments or confirms them after discussion.
 
+- When updating repository skills, treat the distributable files under `skills/` as the source of truth. Apply the change to the repository copy first, then sync the corresponding local installed skill under `$CODEX_HOME/skills` when needed. Do not update only the local installed copy and leave the repository version stale.
+
 ## Commit \& Pull Request Guidelines
 
 Do not create git commits proactively after making or verifying changes. Commit only when the user explicitly asks to commit or confirms that the current changes should be committed.
