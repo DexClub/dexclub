@@ -25,6 +25,7 @@ import io.github.dexclub.core.api.resource.ManifestInspectionResult
 import io.github.dexclub.core.api.resource.ManifestResult
 import io.github.dexclub.core.api.resource.ResourceEntry
 import io.github.dexclub.core.api.resource.ResourceEntryValueHit
+import io.github.dexclub.core.api.resource.ResourceResolution
 import io.github.dexclub.core.api.resource.ResourceService
 import io.github.dexclub.core.api.resource.ResourceTableResult
 import io.github.dexclub.core.api.resource.ResolveResourceRequest
@@ -44,6 +45,7 @@ import io.github.dexclub.core.api.workspace.WorkspaceRef
 import io.github.dexclub.core.api.workspace.WorkspaceService
 import io.github.dexclub.core.api.workspace.WorkspaceStatus
 import io.github.dexclub.core.app.dex.FindMethodsUseCaseRequest
+import io.github.dexclub.core.app.resource.ListResourcesUseCaseRequest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -72,6 +74,79 @@ class AppUseCasesTest {
         assertEquals(workspace, result.workspace)
         assertEquals(0, result.total)
         assertEquals(emptyList(), result.items)
+    }
+
+    @Test
+    fun listResourcesUseCasePrefersResolvedEntriesBeforeUnresolvedWhenPaging() {
+        val workspace = fakeWorkspaceContext()
+        val appUseCases = AppUseCases(
+            services = Services(
+                workspace = FakeWorkspaceService(workspace),
+                dex = FakeDexAnalysisService(),
+                resource = FakeResourceService(
+                    resourceEntries = listOf(
+                        ResourceEntry(
+                            resourceId = "0x7f170004",
+                            type = "xml",
+                            name = null,
+                            filePath = null,
+                            sourcePath = "sample.apk",
+                            sourceEntry = null,
+                            resolution = ResourceResolution.Unresolved,
+                        ),
+                        ResourceEntry(
+                            resourceId = "0x7f1700a0",
+                            type = "xml",
+                            name = "_",
+                            filePath = "r/0v.xml",
+                            sourcePath = "sample.apk",
+                            sourceEntry = "r/0v.xml",
+                            resolution = ResourceResolution.TableBacked,
+                        ),
+                        ResourceEntry(
+                            resourceId = "0x7f0d0014",
+                            type = "layout",
+                            name = null,
+                            filePath = null,
+                            sourcePath = "sample.apk",
+                            sourceEntry = null,
+                            resolution = ResourceResolution.Unresolved,
+                        ),
+                        ResourceEntry(
+                            resourceId = "0x7f0d1d79",
+                            type = "layout",
+                            name = "_",
+                            filePath = "r/0++.xml",
+                            sourcePath = "sample.apk",
+                            sourceEntry = "r/0++.xml",
+                            resolution = ResourceResolution.TableBacked,
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val xml = appUseCases.resource.listResourcesUseCase.execute(
+            ListResourcesUseCaseRequest(
+                workspace = workspace,
+                type = "xml",
+                offset = 0,
+                limit = 1,
+            ),
+        )
+        assertEquals("r/0v.xml", xml.items.single().filePath)
+        assertEquals(ResourceResolution.TableBacked, xml.items.single().resolution)
+
+        val layout = appUseCases.resource.listResourcesUseCase.execute(
+            ListResourcesUseCaseRequest(
+                workspace = workspace,
+                type = "layout",
+                offset = 0,
+                limit = 1,
+            ),
+        )
+        assertEquals("r/0++.xml", layout.items.single().filePath)
+        assertEquals(ResourceResolution.TableBacked, layout.items.single().resolution)
     }
 }
 
@@ -170,7 +245,9 @@ private class FakeDexAnalysisService : DexAnalysisService {
         TODO("unused in AppUseCasesTest")
 }
 
-private class FakeResourceService : ResourceService {
+private class FakeResourceService(
+    private val resourceEntries: List<ResourceEntry> = emptyList(),
+) : ResourceService {
     override fun decodeManifest(workspace: WorkspaceContext): ManifestResult = TODO("unused in AppUseCasesTest")
 
     override fun inspectManifest(
@@ -185,7 +262,7 @@ private class FakeResourceService : ResourceService {
         TODO("unused in AppUseCasesTest")
 
     override fun listResourceEntries(workspace: WorkspaceContext): List<ResourceEntry> =
-        TODO("unused in AppUseCasesTest")
+        resourceEntries
 
     override fun getResourceValue(workspace: WorkspaceContext, request: ResolveResourceRequest): ResourceValue =
         TODO("unused in AppUseCasesTest")

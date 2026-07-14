@@ -128,6 +128,13 @@ internal data class ResourceValueView(
     val type: String,
     val name: String,
     val value: String? = null,
+    val pluralItems: List<ResourcePluralItemView>? = null,
+)
+
+@Serializable
+internal data class ResourcePluralItemView(
+    val quantity: String,
+    val value: String,
 )
 
 @Serializable

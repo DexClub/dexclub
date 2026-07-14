@@ -14,6 +14,7 @@ typealias ManifestUsesSdk = io.github.dexclub.core.api.resource.ManifestUsesSdk
 typealias ResourceDecodeError = io.github.dexclub.core.api.resource.ResourceDecodeError
 typealias ResourceEntry = io.github.dexclub.core.api.resource.ResourceEntry
 typealias ResourceEntryValueHit = io.github.dexclub.core.api.resource.ResourceEntryValueHit
+typealias ResourcePluralItem = io.github.dexclub.core.api.resource.ResourcePluralItem
 typealias ResourceResolution = io.github.dexclub.core.api.resource.ResourceResolution
 typealias ResourceTableResult = io.github.dexclub.core.api.resource.ResourceTableResult
 typealias ResourceValue = io.github.dexclub.core.api.resource.ResourceValue

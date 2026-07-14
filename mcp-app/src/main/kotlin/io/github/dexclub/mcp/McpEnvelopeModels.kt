@@ -4,6 +4,17 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 @Serializable
+internal data class McpErrorDetail(
+    val code: String,
+    val message: String,
+)
+
+@Serializable
+internal data class McpErrorEnvelope(
+    val error: McpErrorDetail,
+)
+
+@Serializable
 internal data class OpenTargetSessionResult(
     val sessionId: String,
     val createdAt: String,

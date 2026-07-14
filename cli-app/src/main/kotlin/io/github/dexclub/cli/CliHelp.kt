@@ -285,7 +285,7 @@ internal object CliHelp {
             output = "Text prints resourceId, type, name, and value lines.",
             notes = listOf(
                 "--id and --type/--name are mutually exclusive.",
-                "Only direct values or direct reference forms are rendered in the first version.",
+                "Scalar values are rendered directly; plurals are returned as structured quantity items.",
             ),
         ),
         CommandHelpSpec(

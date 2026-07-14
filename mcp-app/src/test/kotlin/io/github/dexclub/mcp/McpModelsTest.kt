@@ -8,6 +8,7 @@ import io.github.dexclub.core.app.dex.FindMethodsUseCaseResult
 import io.github.dexclub.core.app.dex.InspectMethodUseCaseResult
 import io.github.dexclub.core.app.session.TargetSessionService
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
@@ -252,12 +253,49 @@ class McpModelsTest {
         }.message.orEmpty()
         assertTrue(rawMessage.contains("Unsupported include section"), "precondition: $rawMessage")
 
-        val result = app.errorResult(rawMessage)
+        val result = app.errorResult(rawMessage, code = "invalid_argument")
 
         assertEquals(true, result.isError)
         val text = (result.content.single() as io.modelcontextprotocol.kotlin.sdk.types.TextContent).text
         val parsed = Json.parseToJsonElement(text.orEmpty()).jsonObject
-        assertEquals(rawMessage, parsed["error"]!!.jsonPrimitive.content)
+        val error = parsed["error"]!!.jsonObject
+        assertEquals("invalid_argument", error["code"]!!.jsonPrimitive.content)
+        assertEquals(rawMessage, error["message"]!!.jsonPrimitive.content)
         assertNull(parsed["injected"])
     }
+
+    @Test
+    fun listResourcesProjectionKeepsRequestedNullFields() {
+        val result = io.github.dexclub.core.app.resource.ListResourcesUseCaseResult(
+            session = null,
+            workspace = fakeWorkspaceContext(),
+            total = 1,
+            offset = 0,
+            limit = 1,
+            hasMore = false,
+            items = listOf(
+                io.github.dexclub.core.api.resource.ResourceEntry(
+                    resourceId = "0x7f010001",
+                    type = "xml",
+                    name = null,
+                    filePath = null,
+                    sourcePath = "sample.apk",
+                    sourceEntry = null,
+                    resolution = io.github.dexclub.core.api.resource.ResourceResolution.Unresolved,
+                ),
+            ),
+        ).toListResourcesResult(
+            fields = setOf("resourceId", "type", "name", "filePath", "sourcePath", "sourceEntry", "resolution"),
+        )
+
+        val item = result.items.single()
+        assertEquals("0x7f010001", item["resourceId"]!!.jsonPrimitive.content)
+        assertEquals("xml", item["type"]!!.jsonPrimitive.content)
+        assertEquals(JsonNull, item["name"])
+        assertEquals(JsonNull, item["filePath"])
+        assertEquals("sample.apk", item["sourcePath"]!!.jsonPrimitive.content)
+        assertEquals(JsonNull, item["sourceEntry"])
+        assertEquals("unresolved", item["resolution"]!!.jsonPrimitive.content)
+    }
+
 }

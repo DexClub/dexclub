@@ -4,6 +4,7 @@ import io.github.dexclub.core.app.contract.ClassHit
 import io.github.dexclub.core.app.contract.MethodHit
 import io.github.dexclub.core.app.contract.ResourceEntry
 import io.github.dexclub.core.app.contract.ResourceEntryValueHit
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -57,12 +58,12 @@ internal fun ClassHit.toProjectedJson(fields: Set<String>, handleProvider: ((Cla
 
 internal fun ResourceEntry.toProjectedJson(fields: Set<String>): JsonObject =
     buildJsonObject {
-        if ("resourceId" in fields && resourceId != null) put("resourceId", resourceId)
-        if ("type" in fields && type != null) put("type", type)
-        if ("name" in fields && name != null) put("name", name)
-        if ("filePath" in fields && filePath != null) put("filePath", filePath)
-        if ("sourcePath" in fields && sourcePath != null) put("sourcePath", sourcePath)
-        if ("sourceEntry" in fields && sourceEntry != null) put("sourceEntry", sourceEntry)
+        if ("resourceId" in fields) putNullableString("resourceId", resourceId)
+        if ("type" in fields) putNullableString("type", type)
+        if ("name" in fields) putNullableString("name", name)
+        if ("filePath" in fields) putNullableString("filePath", filePath)
+        if ("sourcePath" in fields) putNullableString("sourcePath", sourcePath)
+        if ("sourceEntry" in fields) putNullableString("sourceEntry", sourceEntry)
         if ("resolution" in fields) put("resolution", resolution.toMcpValue())
     }
 
@@ -75,4 +76,8 @@ internal fun ResourceEntryValueHit.toProjectedJson(fields: Set<String>): JsonObj
         if ("sourcePath" in fields && sourcePath != null) put("sourcePath", sourcePath)
         if ("sourceEntry" in fields && sourceEntry != null) put("sourceEntry", sourceEntry)
     }
+
+private fun kotlinx.serialization.json.JsonObjectBuilder.putNullableString(name: String, value: String?) {
+    if (value == null) put(name, JsonNull) else put(name, value)
+}
 

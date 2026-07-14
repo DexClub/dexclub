@@ -22,6 +22,7 @@ import io.github.dexclub.core.app.projection.MethodDetailProjection
 import io.github.dexclub.core.app.projection.MethodFieldUsageProjection
 import io.github.dexclub.core.app.projection.MethodHitProjection
 import io.github.dexclub.core.app.projection.ResourceEntryValueHitProjection
+import io.github.dexclub.core.app.projection.ResourcePluralItemProjection
 import io.github.dexclub.core.app.projection.ResourceValueProjection
 import kotlinx.serialization.Serializable
 
@@ -119,6 +120,7 @@ internal data class ResourceValueView(
     val type: String,
     val name: String,
     val value: String? = null,
+    val pluralItems: List<ResourcePluralItemView>? = null,
 ) {
     companion object {
         fun from(result: ResourceValueProjection): ResourceValueView =
@@ -127,6 +129,21 @@ internal data class ResourceValueView(
                 type = result.type,
                 name = result.name,
                 value = result.value,
+                pluralItems = result.pluralItems?.map(ResourcePluralItemView::from),
+            )
+    }
+}
+
+@Serializable
+internal data class ResourcePluralItemView(
+    val quantity: String,
+    val value: String,
+) {
+    companion object {
+        fun from(item: ResourcePluralItemProjection): ResourcePluralItemView =
+            ResourcePluralItemView(
+                quantity = item.quantity,
+                value = item.value,
             )
     }
 }
@@ -412,7 +429,9 @@ private fun ResourceResolution.toCliValue(): String =
     when (this) {
         ResourceResolution.TableBacked -> "table-backed"
         ResourceResolution.PathInferred -> "path-inferred"
+        ResourceResolution.TableValue -> "table-value"
         ResourceResolution.Unresolved -> "unresolved"
+        ResourceResolution.TableHole -> "table-hole"
     }
 
 private fun CapabilitySet.enabledCapabilities(): List<String> =

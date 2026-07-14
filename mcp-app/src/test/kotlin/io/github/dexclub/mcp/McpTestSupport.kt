@@ -92,7 +92,7 @@ fun fakeWorkspaceContext(): WorkspaceContext =
 
 internal fun createTestApp(
     workspace: WorkspaceContext = fakeWorkspaceContext(),
-    workspaceService: FakeWorkspaceService = FakeWorkspaceService(workspace),
+    workspaceService: WorkspaceService = FakeWorkspaceService(workspace),
     dexService: FakeDexAnalysisService = FakeDexAnalysisService(),
     resourceService: FakeResourceService = FakeResourceService(),
     sessionStore: TargetSessionService = TargetSessionService(),
@@ -282,6 +282,7 @@ class FakeDexAnalysisService(
 class FakeResourceService(
     private val resourceEntries: List<ResourceEntry> = emptyList(),
     private val resourceValueHits: List<ResourceEntryValueHit> = emptyList(),
+    private val resourceValue: ResourceValue? = null,
 ) : ResourceService {
     var lastWorkspace: WorkspaceContext? = null
     var lastInspectManifestRequest: InspectManifestRequest? = null
@@ -346,12 +347,12 @@ class FakeResourceService(
         }
 
     override fun getResourceValue(workspace: WorkspaceContext, request: ResolveResourceRequest): ResourceValue =
-        ResourceValue(
+        (resourceValue ?: ResourceValue(
             resourceId = request.resourceId ?: "0x7f010001",
             type = request.type ?: "string",
             name = request.name ?: "fixture_name",
             value = "Fixture Name",
-        ).also {
+        )).also {
             lastWorkspace = workspace
             lastResolveResourceRequest = request
         }

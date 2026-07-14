@@ -18,6 +18,7 @@ import io.github.dexclub.core.app.projection.MethodDetailProjection
 import io.github.dexclub.core.app.projection.MethodFieldUsageProjection
 import io.github.dexclub.core.app.projection.MethodHitProjection
 import io.github.dexclub.core.app.projection.ResourceEntryValueHitProjection
+import io.github.dexclub.core.app.projection.ResourcePluralItemProjection
 import io.github.dexclub.core.app.projection.ResourceValueProjection
 import io.github.dexclub.core.app.session.TargetSession
 import io.github.dexclub.core.app.contract.TargetHandle
@@ -141,6 +142,13 @@ internal fun ResourceValueProjection.toView(): ResourceValueView =
         type = type,
         name = name,
         value = value,
+        pluralItems = pluralItems?.map(ResourcePluralItemProjection::toView),
+    )
+
+internal fun ResourcePluralItemProjection.toView(): ResourcePluralItemView =
+    ResourcePluralItemView(
+        quantity = quantity,
+        value = value,
     )
 
 internal fun ResourceEntryValueHitProjection.toView(): ResourceEntryValueHitView =
@@ -255,6 +263,8 @@ internal fun ResourceResolution.toMcpValue(): String =
     when (this) {
         ResourceResolution.TableBacked -> "table-backed"
         ResourceResolution.PathInferred -> "path-inferred"
+        ResourceResolution.TableValue -> "table-value"
         ResourceResolution.Unresolved -> "unresolved"
+        ResourceResolution.TableHole -> "table-hole"
     }
 

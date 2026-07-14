@@ -6,10 +6,8 @@ import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequest
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 
 internal sealed interface ExecutionContextResolution {
     data class Ready(val context: TargetExecutionContext) : ExecutionContextResolution
@@ -44,21 +42,23 @@ internal fun McpApp.executionContextOrFailureResult(request: CallToolRequest): E
     } catch (_: NoSuchElementException) {
         ExecutionContextResolution.Failed(missingSessionResult(sessionId.orEmpty()))
     } catch (cause: IllegalArgumentException) {
-        ExecutionContextResolution.Failed(errorResult(cause.message.orEmpty()))
+        ExecutionContextResolution.Failed(errorResult(cause.message.orEmpty(), code = "invalid_argument"))
+    } catch (cause: Exception) {
+        ExecutionContextResolution.Failed(internalErrorResult(cause))
     }
 }
 
 internal fun McpApp.missingSessionOrWorkdirResult(): CallToolResult =
-    errorResult("session_id or workdir is required")
+    errorResult("session_id or workdir is required", code = "missing_target")
 
 internal fun McpApp.missingSessionResult(sessionId: String): CallToolResult =
-    errorResult(staleSessionMessage(sessionId))
+    errorResult(staleSessionMessage(sessionId), code = "session_not_found")
 
 internal fun McpApp.missingRequiredArgumentsResult(vararg names: String): CallToolResult =
-    errorResult(missingRequiredArgumentsMessage(*names))
+    errorResult(missingRequiredArgumentsMessage(*names), code = "missing_argument")
 
 internal fun McpApp.missingAnyOfRequiredArgumentsResult(vararg alternatives: String): CallToolResult =
-    errorResult("${alternatives.joinToString(" or ")} is required")
+    errorResult("${alternatives.joinToString(" or ")} is required", code = "missing_argument")
 
 internal fun McpApp.missingRequiredArgumentsMessage(vararg names: String): String =
     when (names.size) {
@@ -72,11 +72,16 @@ internal fun McpApp.staleSessionMessage(sessionId: String): String =
     "session_id not found: $sessionId. The MCP process may have restarted, the session may have expired, or the chat may have been restored. Reopen the target with open_target_session, or switch to workdir for stateless calls"
 
 // Keep this internal for tests: error messages may carry raw user input and must be JSON-serialized to avoid string injection.
-internal fun McpApp.errorResult(message: String): CallToolResult =
+internal fun McpApp.errorResult(message: String, code: String = "invalid_request"): CallToolResult =
     CallToolResult(
-        content = listOf(TextContent(json.encodeToString(buildJsonObject { put("error", message) }))),
+        content = listOf(TextContent(json.encodeToString(McpErrorEnvelope.serializer(), McpErrorEnvelope(McpErrorDetail(code, message))))),
         isError = true,
     )
+
+internal fun McpApp.internalErrorResult(cause: Exception): CallToolResult {
+    val message = cause.message?.takeIf(String::isNotBlank) ?: "Unexpected internal error"
+    return errorResult(message, code = "internal_error")
+}
 
 internal fun CallToolRequest.optionalStringArgument(name: String): String? =
     arguments?.get(name)?.jsonPrimitive?.content?.trim()?.ifEmpty { null }

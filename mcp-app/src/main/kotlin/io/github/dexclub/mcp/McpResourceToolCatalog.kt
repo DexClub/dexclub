@@ -23,7 +23,7 @@ internal object McpResourceToolCatalog {
         ),
         McpToolMetadata(
             name = "find_resource_values",
-            description = "Search resource candidates by resolved value. Only string, integer, bool, and color are supported. Prefer brief=true and fields to narrow results before confirming with get_resource_value.",
+            description = "Search resource candidates by resolved scalar value. Prefer brief=true and fields to narrow results before confirming with get_resource_value. Complex bag resources such as plurals are better inspected with get_resource_value.",
             inputProperties = contextualInputProperties(
                 McpToolInputProperties.string("type"),
                 McpToolInputProperties.string("value"),
@@ -38,7 +38,7 @@ internal object McpResourceToolCatalog {
         ),
         McpToolMetadata(
             name = "get_resource_value",
-            description = "Resolve a resource ID or type/name pair to a structured resource value.",
+            description = "Resolve a resource ID or type/name pair to a structured resource value. Scalar resources return value; plurals return structured pluralItems when available.",
             inputProperties = contextualInputProperties(
                 McpToolInputProperties.string("resource_id"),
                 McpToolInputProperties.string("type"),

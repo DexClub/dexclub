@@ -2,6 +2,7 @@ package io.github.dexclub.core.app.projection
 
 import io.github.dexclub.core.app.contract.DecodedXmlResult
 import io.github.dexclub.core.app.contract.ResourceEntryValueHit
+import io.github.dexclub.core.app.contract.ResourcePluralItem
 import io.github.dexclub.core.app.contract.ResourceValue
 
 data class DecodedXmlProjection(
@@ -15,6 +16,12 @@ data class ResourceValueProjection(
     val type: String,
     val name: String,
     val value: String? = null,
+    val pluralItems: List<ResourcePluralItemProjection>? = null,
+)
+
+data class ResourcePluralItemProjection(
+    val quantity: String,
+    val value: String,
 )
 
 data class ResourceEntryValueHitProjection(
@@ -38,6 +45,13 @@ fun ResourceValue.toProjection(): ResourceValueProjection =
         resourceId = resourceId,
         type = type,
         name = name,
+        value = value,
+        pluralItems = pluralItems?.map(ResourcePluralItem::toProjection),
+    )
+
+fun ResourcePluralItem.toProjection(): ResourcePluralItemProjection =
+    ResourcePluralItemProjection(
+        quantity = quantity,
         value = value,
     )
 

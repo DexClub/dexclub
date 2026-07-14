@@ -1,6 +1,7 @@
 package io.github.dexclub.core.app.resource
 
 import io.github.dexclub.core.api.resource.ResourceEntry
+import io.github.dexclub.core.api.resource.ResourceResolution
 import io.github.dexclub.core.api.resource.ResourceService
 import io.github.dexclub.core.api.workspace.WorkspaceContext
 import io.github.dexclub.core.app.session.TargetSession
@@ -44,6 +45,7 @@ class ListResourcesUseCase(
         val filtered = resourceService.listResourceEntries(executionContext.workspace)
             .asSequence()
             .filter { normalizedType == null || it.type == normalizedType }
+            .sortedWith(resourceEntryListOrder)
             .toList()
         val slice = applyWindowSlice(filtered, request.offset, request.limit)
         return ListResourcesUseCaseResult(
@@ -57,3 +59,27 @@ class ListResourcesUseCase(
         )
     }
 }
+
+private val resourceEntryListOrder =
+    compareBy<ResourceEntry>(
+        { it.type.orEmpty() },
+        { listOrderResolutionRank(it.resolution) },
+        { -listOrderCompleteness(it) },
+        { it.name.orEmpty() },
+        { it.filePath.orEmpty() },
+        { it.sourceEntry.orEmpty() },
+        { it.resourceId.orEmpty() },
+    )
+
+private fun listOrderResolutionRank(resolution: ResourceResolution): Int =
+    when (resolution) {
+        ResourceResolution.TableBacked -> 0
+        ResourceResolution.PathInferred -> 1
+        ResourceResolution.TableValue -> 2
+        ResourceResolution.Unresolved -> 3
+        ResourceResolution.TableHole -> 4
+    }
+
+private fun listOrderCompleteness(entry: ResourceEntry): Int =
+    listOf(entry.name, entry.filePath, entry.sourcePath, entry.sourceEntry, entry.resourceId)
+        .count { !it.isNullOrBlank() }

@@ -209,7 +209,15 @@ internal class Renderer {
             }
             appendLine("type=${view.type}")
             appendLine("name=${view.name}")
-            append("value=${view.value.orEmpty()}")
+            if (view.pluralItems != null) {
+                if (view.value != null) {
+                    appendLine("value=${view.value}")
+                }
+                append("pluralItems=")
+                append(view.pluralItems.joinToString(",") { "${it.quantity}=${it.value}" })
+            } else {
+                append("value=${view.value.orEmpty()}")
+            }
         }
 
     private fun renderResourceValueHits(hits: List<ResourceEntryValueHitView>): String =

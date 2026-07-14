@@ -272,6 +272,46 @@ class CliResourceCommandTest {
     }
 
     @Test
+    fun getResValueReturnsStructuredPluralItemsThroughCliPipeline() {
+        val workspaceDir = createTempDirectory("dexclub-get-res-value-plurals")
+        val apkFile = workspaceDir.resolve("app.apk").toFile()
+        compileResourceApk(
+            outputApk = apkFile,
+            manifestText = """<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="fixture.resolve.plurals"><application android:label="@string/app_name" /></manifest>""",
+            resourceXml = """
+                <resources>
+                    <string name="app_name">DexClub Fixture</string>
+                    <plurals name="comment_count">
+                        <item quantity="one">%d comment</item>
+                        <item quantity="other">%d comments</item>
+                    </plurals>
+                </resources>
+            """.trimIndent(),
+        )
+        val app = CliApp(
+            services = createDefaultAppServices(),
+            cwdProvider = { workspaceDir.toString() },
+        )
+
+        val initOut = runCli(app, listOf("init", apkFile.absolutePath))
+        assertEquals(0, initOut.exitCode)
+
+        val output = runCli(
+            app,
+            listOf("get-res-value", "--type", "plurals", "--name", "comment_count", "--json"),
+        )
+        assertEquals(0, output.exitCode, output.stderr)
+        val parsed = Json.parseToJsonElement(output.stdout).jsonObject
+        assertEquals("plurals", parsed.getValue("type").jsonPrimitive.content)
+        assertEquals("comment_count", parsed.getValue("name").jsonPrimitive.content)
+        val pluralItems = parsed.getValue("pluralItems").jsonArray
+        assertEquals("one", pluralItems[0].jsonObject.getValue("quantity").jsonPrimitive.content)
+        assertEquals("%d comment", pluralItems[0].jsonObject.getValue("value").jsonPrimitive.content)
+        assertEquals("other", pluralItems[1].jsonObject.getValue("quantity").jsonPrimitive.content)
+        assertEquals("%d comments", pluralItems[1].jsonObject.getValue("value").jsonPrimitive.content)
+    }
+
+    @Test
     fun getResValueReturnsCapabilityErrorOnDexWorkspace() {
         val workspaceDir = createTempDirectory("dexclub-get-res-value-unsupported")
         workspaceDir.resolve("classes.dex").writeText("")

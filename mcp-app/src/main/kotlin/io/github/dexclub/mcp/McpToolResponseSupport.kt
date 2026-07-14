@@ -29,7 +29,9 @@ internal inline fun McpApp.runToolCatching(block: () -> CallToolResult): CallToo
         val session = cause.message?.removePrefix("session_id not found: ").orEmpty()
         missingSessionResult(session)
     } catch (cause: IllegalArgumentException) {
-        errorResult(cause.message.orEmpty())
+        errorResult(cause.message.orEmpty(), code = "invalid_argument")
+    } catch (cause: Exception) {
+        internalErrorResult(cause)
     }
 
 internal fun McpApp.inspectMethodResult(
