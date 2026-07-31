@@ -38,6 +38,8 @@ Windows PowerShell：
 
 `open_target_session` 的 `input` 可以是 APK、Dex 等受支持输入。相对路径按 MCP server 进程的当前目录解析。
 
+Session 快照中的 `inventoryCounts` 统计当前 target 识别出的顶层物料，不展开归档内容。例如 APK 输入通常表现为 `apkCount=1`，其中的 `classes.dex`、`AndroidManifest.xml` 和 `resources.arsc` 不会分别增加其他计数；实际可用能力以同一快照中的 `capabilities` 为准。
+
 ## 工具目录
 
 Target session：

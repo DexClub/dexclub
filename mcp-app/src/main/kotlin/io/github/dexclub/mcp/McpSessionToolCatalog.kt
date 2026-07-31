@@ -4,7 +4,7 @@ internal object McpSessionToolCatalog {
     val tools: List<McpToolMetadata> = listOf(
         McpToolMetadata(
             name = "open_target_session",
-            description = "Initialize a target input and create a reusable DexClub target session. input must be an absolute path to an existing target file; relative paths are resolved against the MCP process working directory.",
+            description = "Initialize a target input and create a reusable DexClub target session. input must be an absolute path to an existing target file; relative paths are resolved against the MCP process working directory. Snapshot inventoryCounts describe recognized top-level target materials; APK archive members are not counted separately.",
             inputProperties = listOf(McpToolInputProperties.string("input")),
             required = setOf("input"),
         ),

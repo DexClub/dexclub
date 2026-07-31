@@ -43,6 +43,11 @@ Treat a full descriptor as a direct object reference, not a search hint.
 
 When calling `open_target_session`, always pass an absolute existing path. Relative paths resolve against the MCP server process, not the conversational working directory.
 
+Interpret snapshot `inventoryCounts` as recognized top-level target materials, not archive members.
+For an APK, `apkCount=1` with zero Dex, Manifest, or ARSC counts is expected even when those
+capabilities work through entries inside the APK. Use `capabilities` and focused tool calls to
+verify supported operations; do not report the top-level counts as an extraction mismatch.
+
 ## Route by Clue
 
 Choose the entry tool by clue type instead of following one global tool priority.
@@ -89,6 +94,9 @@ For each tool:
 
 Read [references/find-queries.md](references/find-queries.md) whenever constructing, combining, or repairing a common `find_*` query. Read [references/find-query-fields.md](references/find-query-fields.md) when an exact field, nested type, required property, default, or enum value is unclear. Treat the live MCP tool schema as authoritative; do not copy or infer fields that it does not advertise.
 
+Read the required query reference before the first `find_*` call. A rejected exploratory query is
+a failed attempt, not a valid endpoint check, even when a corrected retry later succeeds.
+
 Start recursive relationship matchers one layer deep. Add another layer only when it tests a concrete hypothesis and materially narrows candidates.
 
 Avoid an empty `query` or empty `matcher` unless the user explicitly requests inventory-like enumeration. Prefer adding a real package, string, name, type, annotation, field, caller, or callee constraint.
@@ -112,6 +120,14 @@ If the underlying target changes, call `refresh_target_session`, discard old han
 After restoring a chat or restarting Codex or the MCP server, confirm previous state with `get_target_session`, `list_target_sessions`, or `diagnose_target_sessions`. Reopen the target when the session no longer exists.
 
 If a session or handle is not found, rebuild or reacquire it. Never reconstruct handles manually.
+
+For a bounded one-shot validation, close the target session before the final report and use
+`diagnose_target_sessions` or `list_target_sessions` when cleanup itself is part of the check.
+If an interactive follow-up is clearly expected, a session may remain open for reuse, but state
+that it is intentionally retained and do not create additional sessions for the same target.
+
+Do not send the final report until one of those two end states is true: the session was closed and
+cleanup was verified, or the report explicitly says that the session remains open for follow-up.
 
 ## Result and Paging Discipline
 
@@ -157,6 +173,11 @@ Default to structured manifest inspection.
 
 Common manifest sections include `uses-sdk`, `application`, `uses-permissions`, `defined-permissions`, `uses-features`, `queries`, `activities`, `activity-aliases`, `services`, `receivers`, and `providers`.
 
+For launcher discovery, query `activity-aliases` first and follow the returned target activity with
+a component-scoped `manifest` call. Only request the full `activities` section when no usable alias
+exists or the launcher target is unresolved; do not fetch all activities and aliases together when
+a staged query can answer the same question.
+
 Application and component results expose high-value fields such as `theme` and `windowSoftInputMode` plus a namespace-aware `attributes` list. Use the explicit field when it answers the question; inspect `attributes` for long-tail or same-local-name attributes without losing namespace identity. Preserve raw resource references from attributes and resolve them through `get_resource_value`.
 
 ## Resource Semantics
@@ -197,6 +218,29 @@ Use only schema-advertised resource projection fields. Common fields are:
 - `find_resource_values`: `resourceId`, `packageName`, `type`, `name`, `value`, `qualifier`, `valueKind`, `matchTarget`, `bagIndex`, `bagKey`, `sourcePath`, `sourceEntry`
 - `list_res`: `resourceId`, `packageName`, `type`, `name`, `filePath`, `sourcePath`, `sourceEntry`, `resolution`
 
+When reporting tool coverage, derive the inventory from the live `mcp__dexclub__` tool list and
+deduplicate names before counting. Report endpoint coverage separately from invocation attempts:
+retries of one failing endpoint do not create additional covered tools.
+
+For endpoint validation, compute the inventory once and retain it instead of recounting names in
+the final response:
+
+```javascript
+const dexclubTools = [...new Set(
+  ALL_TOOLS.map(({ name }) => name)
+    .filter(name => name.startsWith("mcp__dexclub__")),
+)].sort();
+```
+
+Use `dexclubTools.length` as the denominator. Track every endpoint by name with successful and
+failed attempt counts. Treat an MCP result whose content reports `isError` or contains an `error`
+object as a failed attempt even when the outer orchestration call completed successfully. Report
+`successful endpoints / dexclubTools.length` separately from total successful and failed attempts.
+
+When validating `decode_xml`, first obtain a small file-backed XML path through `list_res` and
+`get_resource_value`. Do not decode `AndroidManifest.xml` merely to exercise the endpoint; use it
+only when its raw text is required evidence.
+
 ## Inspect and Export Rules
 
 Default to locate, inspect, then export.
@@ -209,6 +253,11 @@ Default per-round budgets:
 - export no more than one class
 
 Exceed a budget only when the next export tests a key branch, adds a new evidence type, or compensates for incomplete Java or inspect output.
+
+At the end of each evidence branch, synthesize what the current exports prove and name the exact
+remaining uncertainty before exporting again. Continue only when another export should resolve that
+uncertainty or test a materially different branch. Stop when the user's question is already answered;
+do not start a new round merely to inspect nearby candidates.
 
 Prefer Java for quick semantic understanding. Use smali when Java is incomplete, misleading, or insufficient for control-flow proof. Do not export both views without a concrete reason.
 
@@ -236,6 +285,10 @@ Distinguish clues, facts, evidence, and conclusions. Do not promote one search h
 Keep the scope of a conclusion no broader than the evidence examined. Treat a zero result from a package-, type-, API-, or branch-constrained query as scoped evidence, not a global negative. Before claiming that a feature or flow is absent, follow plausible indirection or explicitly report the inspected scope and remaining uncertainty.
 
 Do not assign semantics to an obfuscated or wrapper call from its name or argument values alone. Inspect the implementation that gives those values meaning, or report the call only as a clue.
+
+Do not present sibling order, ownership, or a fixed layout tree as established when only module
+registration and dynamic binding are known. Render unverified siblings as unordered or explicitly
+label the ordering as unresolved.
 
 If the user asks only for a likely implementation owner or entry location, stop when evidence is sufficient for that narrower question and state remaining uncertainty.
 
