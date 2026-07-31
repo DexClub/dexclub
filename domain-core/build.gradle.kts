@@ -1,11 +1,11 @@
+import org.gradle.api.tasks.SourceSetContainer
+import org.gradle.api.tasks.testing.Test
+import java.util.concurrent.TimeUnit
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
 }
-
-import org.gradle.api.tasks.SourceSetContainer
-import org.gradle.api.tasks.testing.Test
-import java.util.concurrent.TimeUnit
 
 val dexkitBindingModule = "io.github.dexclub:dexkit-binding:0.0.0-local"
 val dexkitNativeLibraryDirProperty = "dexclub.dexkit.native.library.dir"
