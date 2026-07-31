@@ -31,6 +31,7 @@ fun assertMcpToolInputContracts(tools: JsonArray) {
 }
 
 private fun JsonObject.signature(): String {
+    if ("\$ref" in this) return "object"
     val type = getValue("type").jsonPrimitive.content
     if (type != "array") {
         val enumValues = (this["enum"] as? JsonArray)

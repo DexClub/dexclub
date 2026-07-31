@@ -5,10 +5,11 @@ import io.github.dexclub.core.app.contract.MethodDetailSection
 import io.github.dexclub.core.app.contract.MethodHit
 import io.github.dexclub.core.app.contract.SourceLocator
 import io.github.dexclub.core.app.contract.WorkspaceContext
-import io.github.dexclub.core.app.dex.FindClassesUsingStringsUseCaseResult
-import io.github.dexclub.core.app.dex.FindMethodsUsingStringsUseCaseResult
+import io.github.dexclub.core.app.dex.FindClassesUseCaseResult
+import io.github.dexclub.core.app.dex.FindFieldsUseCaseResult
 import io.github.dexclub.core.app.dex.FindMethodsUseCaseResult
 import io.github.dexclub.core.app.dex.InspectMethodUseCaseResult
+import kotlinx.serialization.json.JsonObject
 
 internal fun McpApp.inspectMethod(
     workspace: WorkspaceContext,
@@ -110,35 +111,16 @@ internal fun McpApp.exportClassSmaliText(
         ),
     ).text
 
-internal fun McpApp.findClassesUsingStrings(
+internal fun McpApp.findClasses(
     workspace: WorkspaceContext,
-    containsAnyStrings: List<String>,
-    containsAllStrings: List<String>,
+    query: JsonObject,
     offset: Int? = null,
     limit: Int? = null,
-): FindClassesUsingStringsUseCaseResult =
-    appUseCases.dex.findClassesUsingStringsUseCase.execute(
-        io.github.dexclub.core.app.dex.FindClassesUsingStringsUseCaseRequest(
+): FindClassesUseCaseResult =
+    appUseCases.dex.findClassesUseCase.execute(
+        io.github.dexclub.core.app.dex.FindClassesUseCaseRequest(
             workspace = workspace,
-            containsAnyStrings = containsAnyStrings,
-            containsAllStrings = containsAllStrings,
-            offset = offset,
-            limit = limit,
-        ),
-    )
-
-internal fun McpApp.findMethodsUsingStrings(
-    workspace: WorkspaceContext,
-    containsAnyStrings: List<String>,
-    containsAllStrings: List<String>,
-    offset: Int? = null,
-    limit: Int? = null,
-): FindMethodsUsingStringsUseCaseResult =
-    appUseCases.dex.findMethodsUsingStringsUseCase.execute(
-        io.github.dexclub.core.app.dex.FindMethodsUsingStringsUseCaseRequest(
-            workspace = workspace,
-            containsAnyStrings = containsAnyStrings,
-            containsAllStrings = containsAllStrings,
+            queryText = query.toString(),
             offset = offset,
             limit = limit,
         ),
@@ -146,18 +128,46 @@ internal fun McpApp.findMethodsUsingStrings(
 
 internal fun McpApp.findMethods(
     workspace: WorkspaceContext,
-    classNameContains: String? = null,
-    methodNameContains: String? = null,
-    descriptorContains: String? = null,
+    query: JsonObject,
     offset: Int? = null,
     limit: Int? = null,
 ): FindMethodsUseCaseResult =
     appUseCases.dex.findMethodsUseCase.execute(
         io.github.dexclub.core.app.dex.FindMethodsUseCaseRequest(
             workspace = workspace,
-            classNameContains = classNameContains,
-            methodNameContains = methodNameContains,
-            descriptorContains = descriptorContains,
+            queryText = query.toString(),
+            offset = offset,
+            limit = limit,
+        ),
+    )
+
+internal fun McpApp.findFields(
+    workspace: WorkspaceContext,
+    query: JsonObject,
+    offset: Int? = null,
+    limit: Int? = null,
+): FindFieldsUseCaseResult =
+    appUseCases.dex.findFieldsUseCase.execute(
+        io.github.dexclub.core.app.dex.FindFieldsUseCaseRequest(
+            workspace = workspace,
+            queryText = query.toString(),
+            offset = offset,
+            limit = limit,
+        ),
+    )
+
+internal fun McpApp.findClassesExecution(
+    sessionId: String?,
+    workdir: String?,
+    query: JsonObject,
+    offset: Int? = null,
+    limit: Int? = null,
+): FindClassesUseCaseResult =
+    appUseCases.dex.findClassesUseCase.execute(
+        io.github.dexclub.core.app.dex.FindClassesUseCaseRequest(
+            sessionId = sessionId,
+            workdir = workdir,
+            queryText = query.toString(),
             offset = offset,
             limit = limit,
         ),
@@ -166,9 +176,7 @@ internal fun McpApp.findMethods(
 internal fun McpApp.findMethodsExecution(
     sessionId: String?,
     workdir: String?,
-    classNameContains: String? = null,
-    methodNameContains: String? = null,
-    descriptorContains: String? = null,
+    query: JsonObject,
     offset: Int? = null,
     limit: Int? = null,
 ): FindMethodsUseCaseResult =
@@ -176,47 +184,24 @@ internal fun McpApp.findMethodsExecution(
         io.github.dexclub.core.app.dex.FindMethodsUseCaseRequest(
             sessionId = sessionId,
             workdir = workdir,
-            classNameContains = classNameContains,
-            methodNameContains = methodNameContains,
-            descriptorContains = descriptorContains,
+            queryText = query.toString(),
             offset = offset,
             limit = limit,
         ),
     )
 
-internal fun McpApp.findClassesUsingStringsExecution(
+internal fun McpApp.findFieldsExecution(
     sessionId: String?,
     workdir: String?,
-    containsAnyStrings: List<String>,
-    containsAllStrings: List<String>,
+    query: JsonObject,
     offset: Int? = null,
     limit: Int? = null,
-): FindClassesUsingStringsUseCaseResult =
-    appUseCases.dex.findClassesUsingStringsUseCase.execute(
-        io.github.dexclub.core.app.dex.FindClassesUsingStringsUseCaseRequest(
+): FindFieldsUseCaseResult =
+    appUseCases.dex.findFieldsUseCase.execute(
+        io.github.dexclub.core.app.dex.FindFieldsUseCaseRequest(
             sessionId = sessionId,
             workdir = workdir,
-            containsAnyStrings = containsAnyStrings,
-            containsAllStrings = containsAllStrings,
-            offset = offset,
-            limit = limit,
-        ),
-    )
-
-internal fun McpApp.findMethodsUsingStringsExecution(
-    sessionId: String?,
-    workdir: String?,
-    containsAnyStrings: List<String>,
-    containsAllStrings: List<String>,
-    offset: Int? = null,
-    limit: Int? = null,
-): FindMethodsUsingStringsUseCaseResult =
-    appUseCases.dex.findMethodsUsingStringsUseCase.execute(
-        io.github.dexclub.core.app.dex.FindMethodsUsingStringsUseCaseRequest(
-            sessionId = sessionId,
-            workdir = workdir,
-            containsAnyStrings = containsAnyStrings,
-            containsAllStrings = containsAllStrings,
+            queryText = query.toString(),
             offset = offset,
             limit = limit,
         ),

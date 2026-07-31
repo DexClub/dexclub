@@ -177,8 +177,6 @@ private fun CliRequest.toCommandName(): String =
         is CliRequest.FindClass -> "find-class"
         is CliRequest.FindMethod -> "find-method"
         is CliRequest.FindField -> "find-field"
-        is CliRequest.FindClassUsingStrings -> "find-class-using-strings"
-        is CliRequest.FindMethodUsingStrings -> "find-method-using-strings"
         is CliRequest.ExportClassDex -> "export-class-dex"
         is CliRequest.ExportClassJava -> "export-class-java"
         is CliRequest.ExportClassSmali -> "export-class-smali"

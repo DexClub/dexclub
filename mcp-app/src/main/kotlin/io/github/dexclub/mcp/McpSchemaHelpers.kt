@@ -11,6 +11,12 @@ internal fun booleanSchema() = buildJsonObject { put("type", "boolean") }
 
 internal fun integerSchema() = buildJsonObject { put("type", "integer") }
 
+internal fun integerSchema(minimum: Int, maximum: Int? = null) = buildJsonObject {
+    put("type", "integer")
+    put("minimum", minimum)
+    maximum?.let { put("maximum", it) }
+}
+
 internal fun stringArraySchema() = buildJsonObject {
     put("type", "array")
     put("items", stringSchema())

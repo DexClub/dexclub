@@ -65,7 +65,7 @@ internal data class ManifestDecodeResult(
 )
 
 @Serializable
-internal data class FindClassesUsingStringsResult(
+internal data class FindClassesResult(
     val sessionId: String? = null,
     val total: Int,
     val offset: Int,
@@ -83,7 +83,7 @@ internal data class ExportTextResult(
 )
 
 @Serializable
-internal data class FindMethodsUsingStringsResult(
+internal data class FindFieldsResult(
     val sessionId: String? = null,
     val total: Int,
     val offset: Int,

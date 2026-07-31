@@ -11,10 +11,8 @@ import io.github.dexclub.core.api.dex.ExportMethodSmaliRequest
 import io.github.dexclub.core.api.dex.ExportResult
 import io.github.dexclub.core.api.dex.FieldHit
 import io.github.dexclub.core.api.dex.FindClassesRequest
-import io.github.dexclub.core.api.dex.FindClassesUsingStringsRequest
 import io.github.dexclub.core.api.dex.FindFieldsRequest
 import io.github.dexclub.core.api.dex.FindMethodsRequest
-import io.github.dexclub.core.api.dex.FindMethodsUsingStringsRequest
 import io.github.dexclub.core.api.dex.InspectMethodRequest
 import io.github.dexclub.core.api.dex.MethodDetail
 import io.github.dexclub.core.api.dex.MethodHit
@@ -192,16 +190,6 @@ private class CloseTrackingDexAnalysisService : DexAnalysisService, AutoCloseabl
     override fun findMethods(workspace: WorkspaceContext, request: FindMethodsRequest): List<MethodHit> = emptyList()
 
     override fun findFields(workspace: WorkspaceContext, request: FindFieldsRequest): List<FieldHit> = emptyList()
-
-    override fun findClassesUsingStrings(
-        workspace: WorkspaceContext,
-        request: FindClassesUsingStringsRequest,
-    ): List<ClassHit> = emptyList()
-
-    override fun findMethodsUsingStrings(
-        workspace: WorkspaceContext,
-        request: FindMethodsUsingStringsRequest,
-    ): List<MethodHit> = emptyList()
 
     override fun inspectMethod(workspace: WorkspaceContext, request: InspectMethodRequest): MethodDetail =
         MethodDetail(MethodHit("Lsample/Test;", "foo", "Lsample/Test;->foo()V"))

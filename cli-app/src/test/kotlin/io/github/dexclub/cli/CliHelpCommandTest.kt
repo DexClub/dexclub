@@ -103,6 +103,24 @@ class CliHelpCommandTest {
     }
 
     @Test
+    fun resourceCommandHelpDocumentsStructuredValueContract() {
+        val app = CliApp(
+            services = createDefaultAppServices(),
+            cwdProvider = { createTempDirectory("dexclub-resource-help").toString() },
+        )
+
+        val getValue = runCli(app, listOf("help", "get-res-value"))
+        assertEquals(0, getValue.exitCode)
+        assertTrue(getValue.stdout.contains("configuration variants"))
+        assertTrue(getValue.stdout.contains("typed value or a generic bag"))
+
+        val findValues = runCli(app, listOf("help", "find-res-values"))
+        assertEquals(0, findValues.exitCode)
+        assertTrue(findValues.stdout.contains("packageName, qualifier, valueKind, and matchTarget"))
+        assertTrue(findValues.stdout.contains("decoded_value, raw_data, reference, bag_key, or any"))
+    }
+
+    @Test
     fun unknownCommandHintsHelp() {
         val app = CliApp(
             services = createDefaultAppServices(),

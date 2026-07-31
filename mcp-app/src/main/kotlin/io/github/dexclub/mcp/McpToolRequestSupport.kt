@@ -3,6 +3,7 @@ package io.github.dexclub.mcp
 import io.github.dexclub.core.app.contract.MethodDetailSection
 import io.github.dexclub.core.app.contract.ManifestInspectionSection
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequest
+import kotlinx.serialization.json.JsonPrimitive
 
 internal data class DexToolTarget(
     val sessionId: String?,
@@ -42,6 +43,28 @@ internal fun CallToolRequest.classProjectionFields(sessionId: String?): Set<Stri
         sessionRequiredFields = setOf("classHandle"),
         hasSession = sessionId != null,
     )
+
+internal fun CallToolRequest.fieldProjectionFields(): Set<String>? =
+    parseRequestedFields(
+        stringArrayArgument("fields"),
+        supported = fieldFieldNames,
+    )
+
+internal fun CallToolRequest.findOffset(): Int =
+    (strictIntArgument("offset") ?: 0).also { require(it >= 0) { "offset must be non-negative" } }
+
+internal fun CallToolRequest.findLimit(): Int =
+    (strictIntArgument("limit") ?: MCP_FIND_DEFAULT_LIMIT).also {
+        require(it in 1..MCP_FIND_MAX_LIMIT) { "limit must be between 1 and $MCP_FIND_MAX_LIMIT" }
+    }
+
+private fun CallToolRequest.strictIntArgument(name: String): Int? {
+    val value = arguments?.get(name) ?: return null
+    val primitive = value as? JsonPrimitive
+    require(primitive != null && !primitive.isString) { "$name must be an integer" }
+    return primitive.content.toIntOrNull()
+        ?: throw IllegalArgumentException("$name must be an integer")
+}
 
 internal fun CallToolRequest.resourceEntryProjectionFields(): Set<String>? =
     parseRequestedFields(

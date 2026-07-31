@@ -1,18 +1,20 @@
 package io.github.dexclub.mcp
 
 import io.github.dexclub.core.app.contract.ClassHit
+import io.github.dexclub.core.app.contract.DexQueryError
 import io.github.dexclub.core.app.contract.MethodHit
 import io.github.dexclub.core.app.dex.ExportClassTextUseCaseResult
 import io.github.dexclub.core.app.dex.ExportMethodTextUseCaseResult
-import io.github.dexclub.core.app.dex.FindClassesUsingStringsUseCaseResult
+import io.github.dexclub.core.app.dex.FindClassesUseCaseResult
+import io.github.dexclub.core.app.dex.FindFieldsUseCaseResult
 import io.github.dexclub.core.app.dex.FindMethodsUseCaseResult
-import io.github.dexclub.core.app.dex.FindMethodsUsingStringsUseCaseResult
 import io.github.dexclub.core.app.dex.InspectMethodUseCaseResult
 import io.github.dexclub.core.app.resource.DecodeXmlUseCaseResult
 import io.github.dexclub.core.app.resource.FindResourceValuesUseCaseResult
 import io.github.dexclub.core.app.resource.GetResourceValueUseCaseResult
 import io.github.dexclub.core.app.resource.InspectManifestUseCaseResult
 import io.github.dexclub.core.app.resource.ListResourcesUseCaseResult
+import io.github.dexclub.core.app.contract.ResourceDecodeError
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.serialization.KSerializer
@@ -28,8 +30,10 @@ internal inline fun McpApp.runToolCatching(block: () -> CallToolResult): CallToo
     } catch (cause: NoSuchElementException) {
         val session = cause.message?.removePrefix("session_id not found: ").orEmpty()
         missingSessionResult(session)
-    } catch (cause: io.github.dexclub.core.app.contract.ResourceDecodeError) {
+    } catch (cause: ResourceDecodeError) {
         resourceErrorResult(cause)
+    } catch (cause: DexQueryError) {
+        errorResult(cause.message.orEmpty(), code = "invalid_query")
     } catch (cause: IllegalArgumentException) {
         errorResult(cause.message.orEmpty(), code = "invalid_argument")
     } catch (cause: Exception) {
@@ -57,31 +61,29 @@ internal fun McpApp.findMethodsResult(
         ),
     )
 
-internal fun McpApp.findClassesUsingStringsResult(
-    execution: FindClassesUsingStringsUseCaseResult,
+internal fun McpApp.findClassesResult(
+    execution: FindClassesUseCaseResult,
     handleProvider: ((ClassHit) -> String)?,
     fields: Set<String>?,
     brief: Boolean,
 ): CallToolResult =
     successResult(
-        FindClassesUsingStringsResult.serializer(),
-        execution.toFindClassesUsingStringsResult(
+        FindClassesResult.serializer(),
+        execution.toFindClassesResult(
             handleProvider = handleProvider,
             fields = fields,
             brief = brief,
         ),
     )
 
-internal fun McpApp.findMethodsUsingStringsResult(
-    execution: FindMethodsUsingStringsUseCaseResult,
-    handleProvider: ((MethodHit) -> String)?,
+internal fun McpApp.findFieldsResult(
+    execution: FindFieldsUseCaseResult,
     fields: Set<String>?,
     brief: Boolean,
 ): CallToolResult =
     successResult(
-        FindMethodsUsingStringsResult.serializer(),
-        execution.toFindMethodsUsingStringsResult(
-            handleProvider = handleProvider,
+        FindFieldsResult.serializer(),
+        execution.toFindFieldsResult(
             fields = fields,
             brief = brief,
         ),

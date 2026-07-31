@@ -9,8 +9,6 @@ import io.github.dexclub.core.api.workspace.WorkspaceContext
 import io.github.dexclub.core.impl.workspace.model.MaterialInventory
 import io.github.dexclub.core.impl.workspace.store.WorkspaceStore
 import io.github.dexclub.dexkit.DexKitBridge
-import io.github.dexclub.dexkit.query.BatchFindClassUsingStrings
-import io.github.dexclub.dexkit.query.BatchFindMethodUsingStrings
 import io.github.dexclub.dexkit.query.FindClass
 import io.github.dexclub.dexkit.query.FindField
 import io.github.dexclub.dexkit.query.FindMethod
@@ -70,45 +68,6 @@ internal class DefaultDexSearchExecutor(
                 result.toResolvedFieldHit(context, classSourceCache, ::resolveClassSource)
             }
             if (query.findFirst) hits.firstOrNull()?.let(::listOf).orEmpty() else hits
-        }
-    }
-
-    override fun findClassesUsingStrings(
-        workspace: WorkspaceContext,
-        inventory: MaterialInventory,
-        query: BatchFindClassUsingStrings,
-    ): List<ClassHit> {
-        ensureDexKitLoaded()
-        val workdirPath = Paths.get(workspace.workdir)
-        return withTargetDexContext(workspace, workdirPath, inventory) { context ->
-            context.bridge.batchFindClassUsingStrings(query)
-                .values
-                .asSequence()
-                .flatten()
-                .map { result -> context.toClassHit(result) }
-                .distinct()
-                .toList()
-        }
-    }
-
-    override fun findMethodsUsingStrings(
-        workspace: WorkspaceContext,
-        inventory: MaterialInventory,
-        query: BatchFindMethodUsingStrings,
-    ): List<MethodHit> {
-        ensureDexKitLoaded()
-        val workdirPath = Paths.get(workspace.workdir)
-        return withTargetDexContext(workspace, workdirPath, inventory) { context ->
-            val classSourceCache = mutableMapOf<String, MemberSource?>()
-            context.bridge.batchFindMethodUsingStrings(query)
-                .values
-                .asSequence()
-                .flatten()
-                .map { result ->
-                    result.toResolvedMethodHit(context, classSourceCache, ::resolveClassSource)
-                }
-                .distinct()
-                .toList()
         }
     }
 

@@ -11,11 +11,12 @@ internal class DexSearchCommandAdapter(
     fun findClass(request: CliRequest.FindClass): CommandResult {
         val workspace = targetWorkspaceRuntime.openWorkspace(request.workdir)
         val queryText = queryTextLoader.load(request.query, CliUsages.findClass)
-        val result = appUseCases.dex.findClassesByQueryUseCase.execute(
-            io.github.dexclub.core.app.dex.FindClassesByQueryUseCaseRequest(
+        val result = appUseCases.dex.findClassesUseCase.execute(
+            io.github.dexclub.core.app.dex.FindClassesUseCaseRequest(
                 workspace = workspace,
                 queryText = queryText,
-                window = request.window,
+                offset = request.window.offset,
+                limit = request.window.limit,
             ),
         )
         return CommandResult(
@@ -28,11 +29,12 @@ internal class DexSearchCommandAdapter(
     fun findMethod(request: CliRequest.FindMethod): CommandResult {
         val workspace = targetWorkspaceRuntime.openWorkspace(request.workdir)
         val queryText = queryTextLoader.load(request.query, CliUsages.findMethod)
-        val result = appUseCases.dex.findMethodsByQueryUseCase.execute(
-            io.github.dexclub.core.app.dex.FindMethodsByQueryUseCaseRequest(
+        val result = appUseCases.dex.findMethodsUseCase.execute(
+            io.github.dexclub.core.app.dex.FindMethodsUseCaseRequest(
                 workspace = workspace,
                 queryText = queryText,
-                window = request.window,
+                offset = request.window.offset,
+                limit = request.window.limit,
             ),
         )
         return CommandResult(
@@ -45,11 +47,12 @@ internal class DexSearchCommandAdapter(
     fun findField(request: CliRequest.FindField): CommandResult {
         val workspace = targetWorkspaceRuntime.openWorkspace(request.workdir)
         val queryText = queryTextLoader.load(request.query, CliUsages.findField)
-        val result = appUseCases.dex.findFieldsByQueryUseCase.execute(
-            io.github.dexclub.core.app.dex.FindFieldsByQueryUseCaseRequest(
+        val result = appUseCases.dex.findFieldsUseCase.execute(
+            io.github.dexclub.core.app.dex.FindFieldsUseCaseRequest(
                 workspace = workspace,
                 queryText = queryText,
-                window = request.window,
+                offset = request.window.offset,
+                limit = request.window.limit,
             ),
         )
         return CommandResult(
@@ -59,37 +62,4 @@ internal class DexSearchCommandAdapter(
         )
     }
 
-    fun findClassUsingStrings(request: CliRequest.FindClassUsingStrings): CommandResult {
-        val workspace = targetWorkspaceRuntime.openWorkspace(request.workdir)
-        val queryText = queryTextLoader.load(request.query, CliUsages.findClassUsingStrings)
-        val result = appUseCases.dex.findClassesUsingStringsByQueryUseCase.execute(
-            io.github.dexclub.core.app.dex.FindClassesUsingStringsByQueryUseCaseRequest(
-                workspace = workspace,
-                queryText = queryText,
-                window = request.window,
-            ),
-        )
-        return CommandResult(
-            payload = RenderPayload.ClassHits(result.items.map { ClassHitView.from(it.toProjection()) }),
-            outputFormat = request.outputFormat,
-            exitCode = 0,
-        )
-    }
-
-    fun findMethodUsingStrings(request: CliRequest.FindMethodUsingStrings): CommandResult {
-        val workspace = targetWorkspaceRuntime.openWorkspace(request.workdir)
-        val queryText = queryTextLoader.load(request.query, CliUsages.findMethodUsingStrings)
-        val result = appUseCases.dex.findMethodsUsingStringsByQueryUseCase.execute(
-            io.github.dexclub.core.app.dex.FindMethodsUsingStringsByQueryUseCaseRequest(
-                workspace = workspace,
-                queryText = queryText,
-                window = request.window,
-            ),
-        )
-        return CommandResult(
-            payload = RenderPayload.MethodHits(result.items.map { MethodHitView.from(it.toProjection()) }),
-            outputFormat = request.outputFormat,
-            exitCode = 0,
-        )
-    }
 }

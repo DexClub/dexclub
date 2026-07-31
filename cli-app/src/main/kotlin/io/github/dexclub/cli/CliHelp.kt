@@ -73,42 +73,6 @@ internal object CliHelp {
             ),
         ),
         CommandHelpSpec(
-            command = "find-class-using-strings",
-            usage = CliUsages.findClassUsingStrings,
-            description = "Search classes using grouped string matcher batches.",
-            arguments = listOf("[workdir]  Optional workspace directory. Defaults to the current directory."),
-            options = listOf(
-                "--query-json <json>  Inline JSON query text.",
-                "--query-file <file>  UTF-8 JSON query file.",
-                "--offset <n>  Zero-based result offset.",
-                "--limit <n>  Positive page size.",
-                "--json  Render hits as JSON.",
-            ),
-            output = "Text prints a stable, tab-separated hit table. JSON prints the hit array directly.",
-            notes = listOf(
-                "Batch query groups are merged before rendering.",
-                "Result rows do not expose group identity.",
-            ),
-        ),
-        CommandHelpSpec(
-            command = "find-method-using-strings",
-            usage = CliUsages.findMethodUsingStrings,
-            description = "Search methods using grouped string matcher batches.",
-            arguments = listOf("[workdir]  Optional workspace directory. Defaults to the current directory."),
-            options = listOf(
-                "--query-json <json>  Inline JSON query text.",
-                "--query-file <file>  UTF-8 JSON query file.",
-                "--offset <n>  Zero-based result offset.",
-                "--limit <n>  Positive page size.",
-                "--json  Render hits as JSON.",
-            ),
-            output = "Text prints a stable, tab-separated hit table. JSON prints the hit array directly.",
-            notes = listOf(
-                "Batch query groups are merged before rendering.",
-                "Result rows do not expose group identity.",
-            ),
-        ),
-        CommandHelpSpec(
             command = "inspect-method",
             usage = CliUsages.inspectMethod,
             description = "Inspect one uniquely resolved method and return its relation details.",
@@ -282,16 +246,17 @@ internal object CliHelp {
                 "--name <name>  Resource name selector.",
                 "--json  Render the structured resource value as JSON.",
             ),
-            output = "Text prints resourceId, type, name, and value lines.",
+            output = "Text prints resource identity followed by JSON-encoded configuration variants. JSON preserves the structured variants.",
             notes = listOf(
                 "--id and --type/--name are mutually exclusive.",
-                "Scalar values are rendered directly; plurals are returned as structured quantity items.",
+                "The default configuration variant is returned, falling back to the first available variant.",
+                "Each variant contains either a typed value or a generic bag such as a style, array, attribute, or plurals bag.",
             ),
         ),
         CommandHelpSpec(
             command = "find-res-values",
             usage = CliUsages.findResValues,
-            description = "Search resource entries by direct value using a JSON query.",
+            description = "Search resource configuration variants and bag items using a JSON query.",
             arguments = listOf("[workdir]  Optional workspace directory. Defaults to the current directory."),
             options = listOf(
                 "--query-json <json>  Inline JSON query text.",
@@ -303,7 +268,8 @@ internal object CliHelp {
             output = "Text prints a stable, tab-separated hit table. JSON prints the hit array directly.",
             notes = listOf(
                 "--query-json and --query-file are required and mutually exclusive.",
-                "Only direct values or direct reference forms are searched in the first version.",
+                "The query requires resourceType and value; optional fields are contains, ignoreCase, packageName, qualifier, valueKind, and matchTarget.",
+                "matchTarget accepts decoded_value, raw_data, reference, bag_key, or any.",
             ),
         ),
         ).associateBy(CommandHelpSpec::command))
@@ -337,9 +303,6 @@ internal object CliHelp {
             appendLine("  find-class               Search classes with a DexKit query.")
             appendLine("  find-method              Search methods with a DexKit query.")
             appendLine("  find-field               Search fields with a DexKit query.")
-            appendLine("  find-class-using-strings Search classes with grouped string matchers.")
-            appendLine("  find-method-using-strings")
-            appendLine("                           Search methods with grouped string matchers.")
             appendLine("  inspect-method           Inspect relation details for one method.")
             appendLine("  export-class-dex         Export a uniquely resolved class as dex.")
             appendLine("  export-class-smali       Export a uniquely resolved class as smali.")

@@ -1,10 +1,8 @@
 package io.github.dexclub.core.impl.dex
 
 import io.github.dexclub.core.api.dex.FindClassesRequest
-import io.github.dexclub.core.api.dex.FindClassesUsingStringsRequest
 import io.github.dexclub.core.api.dex.FindFieldsRequest
 import io.github.dexclub.core.api.dex.FindMethodsRequest
-import io.github.dexclub.core.api.dex.FindMethodsUsingStringsRequest
 import io.github.dexclub.core.api.shared.CapabilityError
 import io.github.dexclub.core.api.shared.Operation
 import io.github.dexclub.core.api.shared.PageWindow
@@ -135,85 +133,6 @@ class DefaultDexAnalysisSearchTest {
         assertTrue(
             hits.any {
                 it.fieldName == "NEEDLE" &&
-                    it.sourcePath == "fixture.apk" &&
-                    it.sourceEntry == "classes.dex"
-            },
-        )
-        assertApkDexCacheContainsOnly(fixture.apkWorkspaceDir, workspace, "classes.dex")
-    }
-
-    @Test
-    fun findClassUsingStringsDeduplicatesAcrossGroupsBeforeWindow() {
-        val fixture = DexAnalysisFixture.generated()
-        val services = createDefaultServices()
-        services.workspace.initialize(fixture.dexFile.absolutePath)
-        val workspace = services.workspace.open(WorkspaceRef(fixture.dexWorkspaceDir.absolutePath))
-
-        val hits = services.dex.findClassesUsingStrings(
-            workspace = workspace,
-            request = FindClassesUsingStringsRequest(
-                queryText = QUERY_CLASS_USING_STRINGS_DUP_GROUPS,
-                window = PageWindow(offset = 1, limit = 1),
-            ),
-        )
-
-        assertEquals(1, hits.size)
-        assertEquals("Lfixture/samples/SampleSearchTarget;", hits.single().className)
-        assertEquals("fixture.dex", hits.single().sourcePath)
-    }
-
-    @Test
-    fun findClassUsingStringsOnApkReportsSourceEntry() {
-        val fixture = DexAnalysisFixture.generated()
-        val services = createDefaultServices()
-        services.workspace.initialize(fixture.apkFile.absolutePath)
-        val workspace = services.workspace.open(WorkspaceRef(fixture.apkWorkspaceDir.absolutePath))
-
-        val hits = services.dex.findClassesUsingStrings(
-            workspace = workspace,
-            request = FindClassesUsingStringsRequest(queryText = QUERY_CLASS_USING_STRINGS_SINGLE_GROUP),
-        )
-
-        assertTrue(hits.any { it.sourcePath == "fixture.apk" && it.sourceEntry == "classes.dex" })
-        assertApkDexCacheContainsOnly(fixture.apkWorkspaceDir, workspace, "classes.dex")
-    }
-
-    @Test
-    fun findMethodUsingStringsDeduplicatesAcrossGroupsBeforeWindow() {
-        val fixture = DexAnalysisFixture.generated()
-        val services = createDefaultServices()
-        services.workspace.initialize(fixture.dexFile.absolutePath)
-        val workspace = services.workspace.open(WorkspaceRef(fixture.dexWorkspaceDir.absolutePath))
-
-        val hits = services.dex.findMethodsUsingStrings(
-            workspace = workspace,
-            request = FindMethodsUsingStringsRequest(
-                queryText = QUERY_METHOD_USING_STRINGS_DUP_GROUPS,
-                window = PageWindow(offset = 1, limit = 1),
-            ),
-        )
-
-        assertEquals(1, hits.size)
-        assertEquals("fixture.samples.SampleSearchTarget", hits.single().className)
-        assertEquals("exposeNeedle", hits.single().methodName)
-        assertEquals("fixture.dex", hits.single().sourcePath)
-    }
-
-    @Test
-    fun findMethodUsingStringsOnApkReportsSourceEntry() {
-        val fixture = DexAnalysisFixture.generated()
-        val services = createDefaultServices()
-        services.workspace.initialize(fixture.apkFile.absolutePath)
-        val workspace = services.workspace.open(WorkspaceRef(fixture.apkWorkspaceDir.absolutePath))
-
-        val hits = services.dex.findMethodsUsingStrings(
-            workspace = workspace,
-            request = FindMethodsUsingStringsRequest(queryText = QUERY_METHOD_USING_STRINGS_SINGLE_GROUP),
-        )
-
-        assertTrue(
-            hits.any {
-                it.methodName == "exposeNeedle" &&
                     it.sourcePath == "fixture.apk" &&
                     it.sourceEntry == "classes.dex"
             },

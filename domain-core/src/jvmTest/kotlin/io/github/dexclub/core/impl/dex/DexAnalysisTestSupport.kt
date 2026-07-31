@@ -254,15 +254,3 @@ internal const val QUERY_EXPOSE_METHOD =
 
 internal const val QUERY_NEEDLE_FIELD =
     """{"matcher":{"name":{"value":"NEEDLE","matchType":"Equals"}}}"""
-
-internal const val QUERY_CLASS_USING_STRINGS_SINGLE_GROUP =
-    """{"groups":{"needle":[{"value":"dexclub-needle-string","matchType":"Equals"}]}}"""
-
-internal const val QUERY_CLASS_USING_STRINGS_DUP_GROUPS =
-    """{"groups":{"needle-a":[{"value":"dexclub-needle-string","matchType":"Equals"}],"needle-b":[{"value":"dexclub-needle-string","matchType":"Equals"}]}}"""
-
-internal const val QUERY_METHOD_USING_STRINGS_SINGLE_GROUP =
-    """{"groups":{"needle":[{"value":"dexclub-needle-string","matchType":"Equals"}]}}"""
-
-internal const val QUERY_METHOD_USING_STRINGS_DUP_GROUPS =
-    """{"groups":{"needle-a":[{"value":"dexclub-needle-string","matchType":"Equals"}],"needle-b":[{"value":"dexclub-needle-string","matchType":"Equals"}]}}"""

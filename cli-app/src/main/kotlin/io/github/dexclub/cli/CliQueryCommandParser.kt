@@ -120,31 +120,5 @@ internal class CliQueryCommandParser {
             outputFormat = parsed.outputFormat,
         )
     }
-
-    fun parseFindClassUsingStrings(tokens: List<String>): CliRequest {
-        if (tokens.size == 1 && CliHelp.isHelpFlag(tokens.single())) {
-            return CliRequest.Help("find-class-using-strings")
-        }
-        val parsed = CliParserSupport.parseQueryCommand(tokens, CliUsages.findClassUsingStrings)
-        return CliRequest.FindClassUsingStrings(
-            workdir = parsed.workdir,
-            query = parsed.query,
-            window = parsed.window,
-            outputFormat = parsed.outputFormat,
-        )
-    }
-
-    fun parseFindMethodUsingStrings(tokens: List<String>): CliRequest {
-        if (tokens.size == 1 && CliHelp.isHelpFlag(tokens.single())) {
-            return CliRequest.Help("find-method-using-strings")
-        }
-        val parsed = CliParserSupport.parseQueryCommand(tokens, CliUsages.findMethodUsingStrings)
-        return CliRequest.FindMethodUsingStrings(
-            workdir = parsed.workdir,
-            query = parsed.query,
-            window = parsed.window,
-            outputFormat = parsed.outputFormat,
-        )
-    }
 }
 

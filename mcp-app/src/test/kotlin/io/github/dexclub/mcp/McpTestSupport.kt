@@ -13,10 +13,8 @@ import io.github.dexclub.core.api.dex.ExportMethodSmaliRequest
 import io.github.dexclub.core.api.dex.ExportResult
 import io.github.dexclub.core.api.dex.FieldHit
 import io.github.dexclub.core.api.dex.FindClassesRequest
-import io.github.dexclub.core.api.dex.FindClassesUsingStringsRequest
 import io.github.dexclub.core.api.dex.FindFieldsRequest
 import io.github.dexclub.core.api.dex.FindMethodsRequest
-import io.github.dexclub.core.api.dex.FindMethodsUsingStringsRequest
 import io.github.dexclub.core.api.dex.InspectMethodRequest
 import io.github.dexclub.core.api.dex.MethodDetail
 import io.github.dexclub.core.api.dex.MethodHit
@@ -183,28 +181,30 @@ class FakeDexAnalysisService(
             descriptor = "Lsample/Test;->foo()V",
         ),
     ),
+    private val findClassesResponse: List<ClassHit> = emptyList(),
     private val findMethodsResponse: List<MethodHit> = emptyList(),
-    private val findClassesUsingStringsResponses: List<List<ClassHit>> = emptyList(),
-    private val findMethodsUsingStringsResponses: List<List<MethodHit>> = emptyList(),
+    private val findFieldsResponse: List<FieldHit> = emptyList(),
 ) : DexAnalysisService {
     val releasedDexContexts = mutableListOf<WorkspaceContext>()
     var lastWorkspace: WorkspaceContext? = null
     var lastInspectRequest: InspectMethodRequest? = null
     var lastFindMethodsRequest: FindMethodsRequest? = null
-    var lastFindClassesUsingStringsRequest: FindClassesUsingStringsRequest? = null
-    var lastFindMethodsUsingStringsRequest: FindMethodsUsingStringsRequest? = null
+    var lastFindClassesRequest: FindClassesRequest? = null
+    var lastFindFieldsRequest: FindFieldsRequest? = null
     var lastExportClassSmaliRequest: ExportClassSmaliRequest? = null
     var lastExportClassJavaRequest: ExportClassJavaRequest? = null
     var lastExportMethodSmaliRequest: ExportMethodSmaliRequest? = null
     var lastExportMethodJavaRequest: ExportMethodJavaRequest? = null
-    val findClassesUsingStringsRequests = mutableListOf<FindClassesUsingStringsRequest>()
-    val findMethodsUsingStringsRequests = mutableListOf<FindMethodsUsingStringsRequest>()
 
     override fun releaseDexContext(workspace: WorkspaceContext) {
         releasedDexContexts += workspace
     }
 
-    override fun findClasses(workspace: WorkspaceContext, request: FindClassesRequest): List<ClassHit> = emptyList()
+    override fun findClasses(workspace: WorkspaceContext, request: FindClassesRequest): List<ClassHit> {
+        lastWorkspace = workspace
+        lastFindClassesRequest = request
+        return findClassesResponse
+    }
 
     override fun findMethods(workspace: WorkspaceContext, request: FindMethodsRequest): List<MethodHit> {
         lastWorkspace = workspace
@@ -212,28 +212,10 @@ class FakeDexAnalysisService(
         return findMethodsResponse
     }
 
-    override fun findFields(workspace: WorkspaceContext, request: FindFieldsRequest): List<FieldHit> = emptyList()
-
-    override fun findClassesUsingStrings(
-        workspace: WorkspaceContext,
-        request: FindClassesUsingStringsRequest,
-    ): List<ClassHit> {
+    override fun findFields(workspace: WorkspaceContext, request: FindFieldsRequest): List<FieldHit> {
         lastWorkspace = workspace
-        lastFindClassesUsingStringsRequest = request
-        findClassesUsingStringsRequests += request
-        val nextIndex = findClassesUsingStringsRequests.size - 1
-        return findClassesUsingStringsResponses.getOrElse(nextIndex) { emptyList() }
-    }
-
-    override fun findMethodsUsingStrings(
-        workspace: WorkspaceContext,
-        request: FindMethodsUsingStringsRequest,
-    ): List<MethodHit> {
-        lastWorkspace = workspace
-        lastFindMethodsUsingStringsRequest = request
-        findMethodsUsingStringsRequests += request
-        val nextIndex = findMethodsUsingStringsRequests.size - 1
-        return findMethodsUsingStringsResponses.getOrElse(nextIndex) { emptyList() }
+        lastFindFieldsRequest = request
+        return findFieldsResponse
     }
 
     override fun inspectMethod(workspace: WorkspaceContext, request: InspectMethodRequest): MethodDetail {

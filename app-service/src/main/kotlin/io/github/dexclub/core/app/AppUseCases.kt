@@ -8,14 +8,9 @@ import io.github.dexclub.core.app.dex.ExportClassArtifactUseCase
 import io.github.dexclub.core.app.dex.ExportClassTextUseCase
 import io.github.dexclub.core.app.dex.ExportMethodArtifactUseCase
 import io.github.dexclub.core.app.dex.ExportMethodTextUseCase
-import io.github.dexclub.core.app.dex.FindClassesByQueryUseCase
-import io.github.dexclub.core.app.dex.FindClassesUsingStringsByQueryUseCase
-import io.github.dexclub.core.app.dex.FindClassesUsingStringsUseCase
-import io.github.dexclub.core.app.dex.FindFieldsByQueryUseCase
-import io.github.dexclub.core.app.dex.FindMethodsByQueryUseCase
+import io.github.dexclub.core.app.dex.FindClassesUseCase
+import io.github.dexclub.core.app.dex.FindFieldsUseCase
 import io.github.dexclub.core.app.dex.FindMethodsUseCase
-import io.github.dexclub.core.app.dex.FindMethodsUsingStringsByQueryUseCase
-import io.github.dexclub.core.app.dex.FindMethodsUsingStringsUseCase
 import io.github.dexclub.core.app.dex.InspectMethodUseCase
 import io.github.dexclub.core.app.resource.DecodeXmlUseCase
 import io.github.dexclub.core.app.resource.DumpResourceTableUseCase
@@ -80,37 +75,7 @@ class DexUseCases(
         sessionService = sessionService,
     )
 
-    val findClassesByQueryUseCase = FindClassesByQueryUseCase(
-        workspaceService = workspaceService,
-        dexService = dexService,
-        sessionService = sessionService,
-    )
-
-    val findMethodsByQueryUseCase = FindMethodsByQueryUseCase(
-        workspaceService = workspaceService,
-        dexService = dexService,
-        sessionService = sessionService,
-    )
-
-    val findFieldsByQueryUseCase = FindFieldsByQueryUseCase(
-        workspaceService = workspaceService,
-        dexService = dexService,
-        sessionService = sessionService,
-    )
-
-    val findClassesUsingStringsByQueryUseCase = FindClassesUsingStringsByQueryUseCase(
-        workspaceService = workspaceService,
-        dexService = dexService,
-        sessionService = sessionService,
-    )
-
-    val findMethodsUsingStringsByQueryUseCase = FindMethodsUsingStringsByQueryUseCase(
-        workspaceService = workspaceService,
-        dexService = dexService,
-        sessionService = sessionService,
-    )
-
-    val findClassesUsingStringsUseCase = FindClassesUsingStringsUseCase(
+    val findClassesUseCase = FindClassesUseCase(
         workspaceService = workspaceService,
         dexService = dexService,
         sessionService = sessionService,
@@ -122,7 +87,7 @@ class DexUseCases(
         sessionService = sessionService,
     )
 
-    val findMethodsUsingStringsUseCase = FindMethodsUsingStringsUseCase(
+    val findFieldsUseCase = FindFieldsUseCase(
         workspaceService = workspaceService,
         dexService = dexService,
         sessionService = sessionService,

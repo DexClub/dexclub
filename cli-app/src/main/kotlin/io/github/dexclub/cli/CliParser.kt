@@ -20,8 +20,6 @@ internal class CliParser {
         "find-method" to queryParser::parseFindMethod,
         "inspect-method" to queryParser::parseInspectMethod,
         "find-field" to queryParser::parseFindField,
-        "find-class-using-strings" to queryParser::parseFindClassUsingStrings,
-        "find-method-using-strings" to queryParser::parseFindMethodUsingStrings,
         "export-class-dex" to exportParser::parseExportClassDex,
         "export-class-java" to exportParser::parseExportClassJava,
         "export-class-smali" to exportParser::parseExportClassSmali,
@@ -190,10 +188,6 @@ internal object CliUsages {
         "cli inspect-method [workdir] --descriptor <method-descriptor> [--include <sections>] [--json]"
     const val findField: String =
         "cli find-field [workdir] (--query-json <json> | --query-file <file>) [--offset <n>] [--limit <n>] [--json]"
-    const val findClassUsingStrings: String =
-        "cli find-class-using-strings [workdir] (--query-json <json> | --query-file <file>) [--offset <n>] [--limit <n>] [--json]"
-    const val findMethodUsingStrings: String =
-        "cli find-method-using-strings [workdir] (--query-json <json> | --query-file <file>) [--offset <n>] [--limit <n>] [--json]"
     const val exportClassDex: String =
         "cli export-class-dex [workdir] --class <class-name> [--source-path <path>] [--source-entry <entry>] --output <file>"
     const val exportClassJava: String =
@@ -226,8 +220,6 @@ internal object CliUsages {
             "find-method" -> findMethod
             "inspect-method" -> inspectMethod
             "find-field" -> findField
-            "find-class-using-strings" -> findClassUsingStrings
-            "find-method-using-strings" -> findMethodUsingStrings
             "export-class-dex" -> exportClassDex
             "export-class-java" -> exportClassJava
             "export-class-smali" -> exportClassSmali

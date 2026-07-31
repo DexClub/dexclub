@@ -15,16 +15,6 @@ interface DexAnalysisService {
 
     fun findFields(workspace: WorkspaceContext, request: FindFieldsRequest): List<FieldHit>
 
-    fun findClassesUsingStrings(
-        workspace: WorkspaceContext,
-        request: FindClassesUsingStringsRequest,
-    ): List<ClassHit>
-
-    fun findMethodsUsingStrings(
-        workspace: WorkspaceContext,
-        request: FindMethodsUsingStringsRequest,
-    ): List<MethodHit>
-
     fun inspectMethod(workspace: WorkspaceContext, request: InspectMethodRequest): MethodDetail
 
     fun exportClassDex(workspace: WorkspaceContext, request: ExportClassDexRequest): ExportResult

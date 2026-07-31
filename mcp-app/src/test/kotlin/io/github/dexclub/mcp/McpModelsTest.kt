@@ -3,7 +3,7 @@ package io.github.dexclub.mcp
 import io.github.dexclub.core.api.dex.ClassHit
 import io.github.dexclub.core.api.dex.MethodDetail
 import io.github.dexclub.core.api.dex.MethodHit
-import io.github.dexclub.core.app.dex.FindClassesUsingStringsUseCaseResult
+import io.github.dexclub.core.app.dex.FindClassesUseCaseResult
 import io.github.dexclub.core.app.dex.FindMethodsUseCaseResult
 import io.github.dexclub.core.app.dex.InspectMethodUseCaseResult
 import io.github.dexclub.core.app.session.TargetSessionService
@@ -152,9 +152,9 @@ class McpModelsTest {
     }
 
     @Test
-    fun findClassesUsingStringsResultCanProjectClassHandle() {
+    fun findClassesResultCanProjectClassHandle() {
         val session = TargetSessionService().openTargetSession(fakeWorkspaceContext())
-        val result = FindClassesUsingStringsUseCaseResult(
+        val result = FindClassesUseCaseResult(
             session = session,
             workspace = session.workspace,
             total = 1,
@@ -166,7 +166,7 @@ class McpModelsTest {
                     className = "Lfixture/samples/SampleSearchTarget;",
                 ),
             ),
-        ).toFindClassesUsingStringsResult(
+        ).toFindClassesResult(
             handleProvider = { "class-handle-1" },
             fields = setOf("classHandle"),
         )

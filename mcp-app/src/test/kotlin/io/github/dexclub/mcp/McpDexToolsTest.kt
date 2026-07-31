@@ -1,19 +1,19 @@
 package io.github.dexclub.mcp
 
 import io.github.dexclub.core.api.dex.ClassHit
-import io.github.dexclub.core.api.dex.FindClassesUsingStringsRequest
-import io.github.dexclub.core.api.dex.FindMethodsUsingStringsRequest
+import io.github.dexclub.core.api.dex.DexQueryError
+import io.github.dexclub.core.api.dex.DexQueryErrorReason
+import io.github.dexclub.core.api.dex.FieldHit
 import io.github.dexclub.core.api.dex.MethodDetail
 import io.github.dexclub.core.api.dex.MethodDetailSection
 import io.github.dexclub.core.api.dex.MethodHit
-import io.github.dexclub.core.api.shared.SourceLocator
 import io.github.dexclub.core.api.shared.MethodSmaliMode
-import io.github.dexclub.core.app.session.TargetSessionService
+import io.github.dexclub.core.api.shared.SourceLocator
 import io.github.dexclub.core.api.workspace.WorkspaceRef
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -22,53 +22,117 @@ import kotlin.test.assertTrue
 
 class McpDexToolsTest {
     @Test
-    fun findMethodsSupportsWorkdirFallbackWithoutSession() {
+    fun findMethodsForwardsCompleteQueryAndAppliesWindow() {
         val workspace = fakeWorkspaceContext()
-        val workspaceService = FakeWorkspaceService(workspace)
         val dexService = FakeDexAnalysisService(
             findMethodsResponse = listOf(
-                MethodHit(
-                    className = "fixture.samples.SampleSearchTarget",
-                    methodName = "exposeNeedle",
-                    descriptor = "Lfixture/samples/SampleSearchTarget;->exposeNeedle()Ljava/lang/String;",
-                ),
+                MethodHit("Lsample/A;", "first", "Lsample/A;->first()V"),
+                MethodHit("Lsample/A;", "second", "Lsample/A;->second()V"),
             ),
         )
-        val app = createTestApp(
-            workspace = workspace,
-            workspaceService = workspaceService,
-            dexService = dexService,
-        )
+        val app = createTestApp(workspace = workspace, dexService = dexService)
+        val query = buildJsonObject {
+            put("matcher", buildJsonObject {
+                put("name", buildJsonObject { put("value", "second") })
+            })
+        }
 
-        val hits = app.findMethods(
-            workspace = workspace,
-            classNameContains = "SampleSearch",
-            methodNameContains = "expose",
-        )
-        val result = hits.toFindMethodsResult(
-            handleProvider = null,
-            fields = setOf("descriptor"),
-        )
+        val result = app.findMethods(workspace, query, offset = 1, limit = 1)
 
-        assertEquals(null, workspaceService.openedRef)
-        assertEquals(null, result.sessionId)
-        assertEquals(setOf("descriptor"), result.items.single().keys)
+        val forwarded = app.json.parseToJsonElement(dexService.lastFindMethodsRequest!!.queryText).jsonObject
+        assertEquals("second", forwarded["matcher"]!!.jsonObject["name"]!!.jsonObject["value"]!!.jsonPrimitive.content)
+        assertEquals(2, result.total)
+        assertEquals("second", result.items.single().methodName)
+        assertEquals(false, result.hasMore)
     }
 
     @Test
-    fun exportMethodJavaTextSupportsWorkspaceFallback() {
+    fun findClassesAndFieldsUseTheirDedicatedUseCases() {
         val workspace = fakeWorkspaceContext()
-        val dexService = FakeDexAnalysisService()
-        val app = createTestApp(workspace = workspace, dexService = dexService)
-
-        val text = app.exportMethodJavaText(
-            workspace = workspace,
-            descriptor = "Lsample/Test;->foo()V",
-            source = SourceLocator(sourcePath = "sample.apk", sourceEntry = "classes.dex"),
+        val dexService = FakeDexAnalysisService(
+            findClassesResponse = listOf(ClassHit("Lsample/A;")),
+            findFieldsResponse = listOf(FieldHit("Lsample/A;", "VALUE", "I")),
         )
+        val app = createTestApp(workspace = workspace, dexService = dexService)
+        val query = buildJsonObject { }
 
-        assertEquals("Lsample/Test;->foo()V", dexService.lastExportMethodJavaRequest?.methodSignature)
-        assertEquals("method-java:Lsample/Test;->foo()V", text)
+        val classes = app.findClasses(workspace, query)
+        val fields = app.findFields(workspace, query)
+
+        assertEquals("Lsample/A;", classes.items.single().className)
+        assertEquals("VALUE", fields.items.single().fieldName)
+        assertEquals("{}", dexService.lastFindClassesRequest!!.queryText)
+        assertEquals("{}", dexService.lastFindFieldsRequest!!.queryText)
+    }
+
+    @Test
+    fun findWindowDefaultsAndEnforcesMaximum() {
+        val defaultRequest = callToolRequest("find_methods", buildJsonObject {})
+        val tooLargeRequest = callToolRequest("find_methods", buildJsonObject { put("limit", 201) })
+
+        assertEquals(0, defaultRequest.findOffset())
+        assertEquals(50, defaultRequest.findLimit())
+        assertEquals(
+            "limit must be between 1 and 200",
+            assertFailsWith<IllegalArgumentException> { tooLargeRequest.findLimit() }.message,
+        )
+    }
+
+    @Test
+    fun findWindowRejectsExplicitNonIntegerValues() {
+        val stringOffset = callToolRequest("find_methods", buildJsonObject { put("offset", "1") })
+        val decimalLimit = callToolRequest("find_methods", buildJsonObject { put("limit", 1.5) })
+
+        assertEquals(
+            "offset must be an integer",
+            assertFailsWith<IllegalArgumentException> { stringOffset.findOffset() }.message,
+        )
+        assertEquals(
+            "limit must be an integer",
+            assertFailsWith<IllegalArgumentException> { decimalLimit.findLimit() }.message,
+        )
+    }
+
+    @Test
+    fun requiredQueryMustBeJsonObject() {
+        val request = callToolRequest("find_methods", buildJsonObject { put("query", "{}") })
+
+        assertEquals(
+            "query must be a JSON object",
+            assertFailsWith<IllegalArgumentException> { request.requiredJsonObjectArgument("query") }.message,
+        )
+    }
+
+    @Test
+    fun invalidDexQueryReturnsQueryErrorInsteadOfInternalError() {
+        val app = createTestApp()
+
+        val result = app.runToolCatching {
+            throw DexQueryError(DexQueryErrorReason.InvalidQuery, "Invalid find-method query JSON")
+        }
+
+        assertEquals(true, result.isError)
+        val payload = app.json.parseToJsonElement(
+            (result.content.single() as io.modelcontextprotocol.kotlin.sdk.types.TextContent).text.orEmpty(),
+        ).jsonObject
+        assertEquals("invalid_query", payload["error"]!!.jsonObject["code"]!!.jsonPrimitive.content)
+        assertEquals(
+            "Invalid find-method query JSON",
+            payload["error"]!!.jsonObject["message"]!!.jsonPrimitive.content,
+        )
+    }
+
+    @Test
+    fun parseMethodDetailSectionsSupportsCliStyleNames() {
+        assertEquals(
+            MethodDetailSection.entries.toSet(),
+            parseMethodDetailSections(listOf("using-fields", "callers", "invokes", "strings", "annotations")),
+        )
+    }
+
+    @Test
+    fun parseMethodDetailSectionsFallsBackToAllWhenMissing() {
+        assertEquals(MethodDetailSection.entries.toSet(), parseMethodDetailSections(null))
     }
 
     @Test
@@ -135,299 +199,6 @@ class McpDexToolsTest {
     }
 
     @Test
-    fun parseMethodDetailSectionsSupportsCliStyleNames() {
-        val sections = parseMethodDetailSections(listOf("using-fields", "callers", "invokes", "strings", "annotations"))
-
-        assertEquals(
-            setOf(
-                MethodDetailSection.UsingFields,
-                MethodDetailSection.Callers,
-                MethodDetailSection.Invokes,
-                MethodDetailSection.Strings,
-                MethodDetailSection.Annotations,
-            ),
-            sections,
-        )
-    }
-
-    @Test
-    fun parseMethodDetailSectionsFallsBackToAllWhenMissing() {
-        val sections = parseMethodDetailSections(null)
-
-        assertEquals(MethodDetailSection.entries.toSet(), sections)
-    }
-
-    @Test
-    fun findMethodsUsingStringsUsesSessionWorkspaceAndMapsShortInputs() {
-        val workspace = fakeWorkspaceContext()
-        val dexService = FakeDexAnalysisService(
-            findMethodsUsingStringsResponses = listOf(
-                listOf(
-                    MethodHit(
-                        className = "fixture.samples.SampleSearchTarget",
-                        methodName = "exposeNeedle",
-                        descriptor = "Lfixture/samples/SampleSearchTarget;->exposeNeedle()Ljava/lang/String;",
-                        sourcePath = "fixture.dex",
-                        sourceEntry = null,
-                    ),
-                    MethodHit(
-                        className = "fixture.samples.OtherTarget",
-                        methodName = "secondary",
-                        descriptor = "Lfixture/samples/OtherTarget;->secondary()V",
-                        sourcePath = "fixture.dex",
-                        sourceEntry = null,
-                    ),
-                ),
-                listOf(
-                    MethodHit(
-                        className = "fixture.samples.SampleSearchTarget",
-                        methodName = "exposeNeedle",
-                        descriptor = "Lfixture/samples/SampleSearchTarget;->exposeNeedle()Ljava/lang/String;",
-                        sourcePath = "fixture.dex",
-                        sourceEntry = null,
-                    ),
-                ),
-            ),
-        )
-        val app = createTestApp(workspace = workspace, dexService = dexService)
-        val session = app.openTargetSession("sample.apk")
-
-        val hits = app.findMethodsUsingStrings(
-            workspace = session.workspace,
-            containsAnyStrings = listOf("needle-a", "needle-b"),
-            containsAllStrings = listOf("must-have"),
-            offset = 1,
-            limit = 5,
-        )
-
-        assertEquals(workspace, dexService.lastWorkspace)
-        assertEquals(2, dexService.findMethodsUsingStringsRequests.size)
-        val anyQuery = Json.parseToJsonElement(dexService.findMethodsUsingStringsRequests[0].queryText).jsonObject["groups"]!!.jsonObject
-        assertEquals(1, anyQuery["any-0"]!!.jsonArray.size)
-        assertEquals("needle-a", anyQuery["any-0"]!!.jsonArray[0].jsonObject["value"]!!.jsonPrimitive.content)
-        assertEquals("needle-b", anyQuery["any-1"]!!.jsonArray[0].jsonObject["value"]!!.jsonPrimitive.content)
-        val allQuery = Json.parseToJsonElement(dexService.findMethodsUsingStringsRequests[1].queryText).jsonObject["groups"]!!.jsonObject
-        assertEquals(1, allQuery["all"]!!.jsonArray.size)
-        assertEquals("must-have", allQuery["all"]!!.jsonArray[0].jsonObject["value"]!!.jsonPrimitive.content)
-        assertEquals(1, hits.total)
-        assertEquals(1, hits.offset)
-        assertEquals(5, hits.limit)
-        assertEquals(false, hits.hasMore)
-        assertTrue(hits.items.isEmpty())
-    }
-
-    @Test
-    fun findMethodsUsesSessionWorkspaceAndMapsShortInputs() {
-        val workspace = fakeWorkspaceContext()
-        val dexService = FakeDexAnalysisService(
-            findMethodsResponse = listOf(
-                MethodHit(
-                    className = "fixture.samples.SampleSearchTarget",
-                    methodName = "exposeNeedle",
-                    descriptor = "Lfixture/samples/SampleSearchTarget;->exposeNeedle()Ljava/lang/String;",
-                    sourcePath = "fixture.dex",
-                    sourceEntry = null,
-                ),
-                MethodHit(
-                    className = "fixture.samples.SampleSearchTarget",
-                    methodName = "secondary",
-                    descriptor = "Lfixture/samples/SampleSearchTarget;->secondary()V",
-                    sourcePath = "fixture.dex",
-                    sourceEntry = null,
-                ),
-            ),
-        )
-        val app = createTestApp(workspace = workspace, dexService = dexService)
-        val session = app.openTargetSession("sample.apk")
-
-        val hits = app.findMethods(
-            workspace = session.workspace,
-            classNameContains = "SampleSearch",
-            methodNameContains = "expose",
-            descriptorContains = "Needle",
-            offset = 0,
-            limit = 10,
-        )
-
-        assertEquals(workspace, dexService.lastWorkspace)
-        val query = Json.parseToJsonElement(dexService.lastFindMethodsRequest!!.queryText).jsonObject
-        val matcher = query["matcher"]!!.jsonObject
-        assertEquals(
-            "SampleSearch",
-            matcher["declaredClass"]!!.jsonObject["className"]!!.jsonObject["value"]!!.jsonPrimitive.content,
-        )
-        assertEquals(
-            "expose",
-            matcher["name"]!!.jsonObject["value"]!!.jsonPrimitive.content,
-        )
-        assertEquals(1, hits.total)
-        assertEquals(0, hits.offset)
-        assertEquals(10, hits.limit)
-        assertEquals(false, hits.hasMore)
-        assertEquals("Lfixture/samples/SampleSearchTarget;->exposeNeedle()Ljava/lang/String;", hits.items.single().descriptor)
-    }
-
-    @Test
-    fun buildFindMethodsRequestRejectsEmptyFilters() {
-        val app = createTestApp()
-        val session = app.openTargetSession("sample.apk")
-
-        val error = kotlin.test.assertFailsWith<IllegalArgumentException> {
-            app.findMethods(
-                workspace = session.workspace,
-                classNameContains = null,
-                methodNameContains = null,
-            )
-        }
-
-        assertEquals(
-            "At least one of class_name_contains or method_name_contains is required; descriptor_contains is only applied as a secondary filter",
-            error.message,
-        )
-    }
-
-    @Test
-    fun buildFindMethodsRequestRejectsDescriptorOnlyFilters() {
-        val app = createTestApp()
-        val session = app.openTargetSession("sample.apk")
-
-        val error = kotlin.test.assertFailsWith<IllegalArgumentException> {
-            app.findMethods(
-                workspace = session.workspace,
-                descriptorContains = "Needle",
-            )
-        }
-
-        assertEquals(
-            "At least one of class_name_contains or method_name_contains is required; descriptor_contains is only applied as a secondary filter",
-            error.message,
-        )
-    }
-
-    @Test
-    fun buildFindMethodsUsingStringsRequestRejectsEmptyFilters() {
-        val app = createTestApp()
-        val session = app.openTargetSession("sample.apk")
-
-        val error = kotlin.test.assertFailsWith<IllegalArgumentException> {
-            app.findMethodsUsingStrings(
-                workspace = session.workspace,
-                containsAnyStrings = emptyList(),
-                containsAllStrings = emptyList(),
-            )
-        }
-
-        assertEquals("At least one non-blank string filter is required", error.message)
-    }
-
-    @Test
-    fun sessionStoreCanReuseMethodHandleAcrossInspectAndExport() {
-        val store = TargetSessionService()
-        val session = store.openTargetSession(fakeWorkspaceContext())
-
-        val handle = store.putMethodHandle(
-            sessionId = session.sessionId,
-            descriptor = "Lsample/Test;->foo()V",
-            sourcePath = "sample.apk",
-            sourceEntry = "classes.dex",
-        )
-
-        val resolved = store.getMethodHandle(session.sessionId, handle)
-
-        assertEquals("Lsample/Test;->foo()V", resolved?.descriptor)
-        assertEquals("sample.apk", resolved?.sourcePath)
-        assertEquals("classes.dex", resolved?.sourceEntry)
-    }
-
-    @Test
-    fun sessionStoreCanReuseClassHandleAcrossExport() {
-        val store = TargetSessionService()
-        val session = store.openTargetSession(fakeWorkspaceContext())
-
-        val handle = store.putClassHandle(
-            sessionId = session.sessionId,
-            descriptor = "Lsample/Test;",
-            sourcePath = "sample.apk",
-            sourceEntry = "classes.dex",
-        )
-
-        val resolved = store.getClassHandle(session.sessionId, handle)
-
-        assertEquals("Lsample/Test;", resolved?.descriptor)
-        assertEquals("sample.apk", resolved?.sourcePath)
-        assertEquals("classes.dex", resolved?.sourceEntry)
-    }
-
-    @Test
-    fun findClassesUsingStringsUsesSessionWorkspaceAndMapsShortInputs() {
-        val workspace = fakeWorkspaceContext()
-        val dexService = FakeDexAnalysisService(
-            findClassesUsingStringsResponses = listOf(
-                listOf(
-                    ClassHit(
-                        className = "Lfixture/samples/SampleSearchTarget;",
-                        sourcePath = "fixture.dex",
-                        sourceEntry = null,
-                    ),
-                    ClassHit(
-                        className = "Lfixture/samples/OtherTarget;",
-                        sourcePath = "fixture.dex",
-                        sourceEntry = null,
-                    ),
-                ),
-                listOf(
-                    ClassHit(
-                        className = "Lfixture/samples/SampleSearchTarget;",
-                        sourcePath = "fixture.dex",
-                        sourceEntry = null,
-                    ),
-                ),
-            ),
-        )
-        val app = createTestApp(workspace = workspace, dexService = dexService)
-        val session = app.openTargetSession("sample.apk")
-
-        val hits = app.findClassesUsingStrings(
-            workspace = session.workspace,
-            containsAnyStrings = listOf("needle-a", "needle-b"),
-            containsAllStrings = listOf("must-have"),
-            offset = 1,
-            limit = 5,
-        )
-
-        assertEquals(workspace, dexService.lastWorkspace)
-        assertEquals(2, dexService.findClassesUsingStringsRequests.size)
-        val anyQuery = Json.parseToJsonElement(dexService.findClassesUsingStringsRequests[0].queryText).jsonObject["groups"]!!.jsonObject
-        assertEquals(1, anyQuery["any-0"]!!.jsonArray.size)
-        assertEquals("needle-a", anyQuery["any-0"]!!.jsonArray[0].jsonObject["value"]!!.jsonPrimitive.content)
-        assertEquals("needle-b", anyQuery["any-1"]!!.jsonArray[0].jsonObject["value"]!!.jsonPrimitive.content)
-        val allQuery = Json.parseToJsonElement(dexService.findClassesUsingStringsRequests[1].queryText).jsonObject["groups"]!!.jsonObject
-        assertEquals(1, allQuery["all"]!!.jsonArray.size)
-        assertEquals("must-have", allQuery["all"]!!.jsonArray[0].jsonObject["value"]!!.jsonPrimitive.content)
-        assertEquals(1, hits.total)
-        assertEquals(1, hits.offset)
-        assertEquals(5, hits.limit)
-        assertEquals(false, hits.hasMore)
-        assertTrue(hits.items.isEmpty())
-    }
-
-    @Test
-    fun buildFindClassesUsingStringsRequestRejectsEmptyFilters() {
-        val app = createTestApp()
-        val session = app.openTargetSession("sample.apk")
-
-        val error = kotlin.test.assertFailsWith<IllegalArgumentException> {
-            app.findClassesUsingStrings(
-                workspace = session.workspace,
-                containsAnyStrings = emptyList(),
-                containsAllStrings = emptyList(),
-            )
-        }
-
-        assertEquals("At least one non-blank string filter is required", error.message)
-    }
-
-    @Test
     fun exportMethodJavaTextUsesSessionWorkspaceAndReturnsFileContent() {
         val workspace = fakeWorkspaceContext()
         val dexService = FakeDexAnalysisService()
@@ -477,7 +248,7 @@ class McpDexToolsTest {
         val app = createTestApp()
         val session = app.openTargetSession("sample.apk")
 
-        val error = kotlin.test.assertFailsWith<IllegalArgumentException> {
+        val error = assertFailsWith<IllegalArgumentException> {
             app.exportMethodSmaliText(
                 workspace = session.workspace,
                 descriptor = "Lsample/Test;->foo()V",

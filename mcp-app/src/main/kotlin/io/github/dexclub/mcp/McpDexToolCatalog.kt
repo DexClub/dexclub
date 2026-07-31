@@ -1,6 +1,14 @@
 package io.github.dexclub.mcp
 
+import io.github.dexclub.core.api.dex.FindClassQuery
+import io.github.dexclub.core.api.dex.FindFieldQuery
+import io.github.dexclub.core.api.dex.FindMethodQuery
+
 internal object McpDexToolCatalog {
+    private val findClassSchema = jsonSchemaFor(FindClassQuery.serializer().descriptor)
+    private val findMethodSchema = jsonSchemaFor(FindMethodQuery.serializer().descriptor)
+    private val findFieldSchema = jsonSchemaFor(FindFieldQuery.serializer().descriptor)
+
     val tools: List<McpToolMetadata> = listOf(
         McpToolMetadata(
             name = "inspect_method",
@@ -53,42 +61,23 @@ internal object McpDexToolCatalog {
                 McpToolInputProperties.string("source_entry"),
             ),
         ),
-        McpToolMetadata(
+        findTool(
+            name = "find_classes",
+            description = "Find class candidates with the complete public FindClassQuery and Matcher JSON structure. classHandle is only available with session_id.",
+            schema = findClassSchema,
+            fields = classFieldNamesWithHandle,
+        ),
+        findTool(
             name = "find_methods",
-            description = "Find method candidates by class name or method name, with optional descriptor_contains filtering applied afterward. Prefer brief=true and fields to narrow results before inspect or export. methodHandle is only available with session_id.",
-            inputProperties = contextualInputProperties(
-                McpToolInputProperties.string("class_name_contains"),
-                McpToolInputProperties.string("method_name_contains"),
-                McpToolInputProperties.string("descriptor_contains"),
-                McpToolInputProperties.integer("offset"),
-                McpToolInputProperties.integer("limit"),
-                McpToolInputProperties.enumStringArray("fields", methodFieldNamesWithHandle),
-                McpToolInputProperties.boolean("brief"),
-            ),
+            description = "Find method candidates with the complete public FindMethodQuery and Matcher JSON structure. methodHandle is only available with session_id.",
+            schema = findMethodSchema,
+            fields = methodFieldNamesWithHandle,
         ),
-        McpToolMetadata(
-            name = "find_classes_using_strings",
-            description = "Find class candidates using string anchors. Prefer brief=true and fields to narrow results before export_class_* or find_methods. classHandle is only available with session_id.",
-            inputProperties = contextualInputProperties(
-                McpToolInputProperties.stringArray("contains_any_strings"),
-                McpToolInputProperties.stringArray("contains_all_strings"),
-                McpToolInputProperties.integer("offset"),
-                McpToolInputProperties.integer("limit"),
-                McpToolInputProperties.enumStringArray("fields", classFieldNamesWithHandle),
-                McpToolInputProperties.boolean("brief"),
-            ),
-        ),
-        McpToolMetadata(
-            name = "find_methods_using_strings",
-            description = "Find method candidates using string anchors. Prefer brief=true and fields to narrow results before inspect_method or export_method_*. methodHandle is only available with session_id.",
-            inputProperties = contextualInputProperties(
-                McpToolInputProperties.stringArray("contains_any_strings"),
-                McpToolInputProperties.stringArray("contains_all_strings"),
-                McpToolInputProperties.integer("offset"),
-                McpToolInputProperties.integer("limit"),
-                McpToolInputProperties.enumStringArray("fields", methodFieldNamesWithHandle),
-                McpToolInputProperties.boolean("brief"),
-            ),
+        findTool(
+            name = "find_fields",
+            description = "Find field candidates with the complete public FindFieldQuery and Matcher JSON structure.",
+            schema = findFieldSchema,
+            fields = fieldFieldNames,
         ),
     )
 
@@ -96,4 +85,26 @@ internal object McpDexToolCatalog {
 
     fun require(name: String): McpToolMetadata =
         toolsByName[name] ?: error("unknown dex tool: $name")
+
+    private fun findTool(
+        name: String,
+        description: String,
+        schema: JsonSchemaBundle,
+        fields: Set<String>,
+    ) = McpToolMetadata(
+        name = name,
+        description = description,
+        inputProperties = contextualInputProperties(
+            McpToolInputProperties.jsonObject("query", schema.root),
+            McpToolInputProperties.integer("offset", minimum = 0),
+            McpToolInputProperties.integer("limit", minimum = 1, maximum = MCP_FIND_MAX_LIMIT),
+            McpToolInputProperties.enumStringArray("fields", fields),
+            McpToolInputProperties.boolean("brief"),
+        ),
+        required = setOf("query"),
+        defs = schema.defs,
+    )
 }
+
+internal const val MCP_FIND_DEFAULT_LIMIT = 50
+internal const val MCP_FIND_MAX_LIMIT = 200

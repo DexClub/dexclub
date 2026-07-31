@@ -19,6 +19,7 @@ internal data class McpToolMetadata(
     val description: String,
     val inputProperties: List<McpToolInputProperty> = emptyList(),
     val required: Set<String> = emptySet(),
+    val defs: JsonObject? = null,
 ) {
     fun toToolSchema(): ToolSchema =
         ToolSchema(
@@ -28,6 +29,7 @@ internal data class McpToolMetadata(
                 }
             },
             required = required.toList(),
+            defs = defs,
         )
 }
 
@@ -51,6 +53,20 @@ internal object McpToolInputProperties {
             name = name,
             schema = integerSchema(),
             signature = "integer",
+        )
+
+    fun integer(name: String, minimum: Int, maximum: Int? = null): McpToolInputProperty =
+        McpToolInputProperty(
+            name = name,
+            schema = integerSchema(minimum = minimum, maximum = maximum),
+            signature = "integer",
+        )
+
+    fun jsonObject(name: String, schema: JsonObject): McpToolInputProperty =
+        McpToolInputProperty(
+            name = name,
+            schema = schema,
+            signature = "object",
         )
 
     fun stringArray(name: String): McpToolInputProperty =

@@ -36,8 +36,6 @@ internal class CommandDispatcher(
             is CliRequest.FindClass -> dexSearch.findClass(request)
             is CliRequest.FindMethod -> dexSearch.findMethod(request)
             is CliRequest.FindField -> dexSearch.findField(request)
-            is CliRequest.FindClassUsingStrings -> dexSearch.findClassUsingStrings(request)
-            is CliRequest.FindMethodUsingStrings -> dexSearch.findMethodUsingStrings(request)
             is CliRequest.ExportClassDex -> export.exportClassDex(request)
             is CliRequest.ExportClassJava -> export.exportClassJava(request)
             is CliRequest.ExportClassSmali -> export.exportClassSmali(request)

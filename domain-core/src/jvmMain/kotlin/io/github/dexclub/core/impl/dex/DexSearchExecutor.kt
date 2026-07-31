@@ -7,8 +7,6 @@ import io.github.dexclub.core.api.dex.MethodDetail
 import io.github.dexclub.core.api.dex.MethodHit
 import io.github.dexclub.core.api.workspace.WorkspaceContext
 import io.github.dexclub.core.impl.workspace.model.MaterialInventory
-import io.github.dexclub.dexkit.query.BatchFindClassUsingStrings
-import io.github.dexclub.dexkit.query.BatchFindMethodUsingStrings
 import io.github.dexclub.dexkit.query.FindClass
 import io.github.dexclub.dexkit.query.FindField
 import io.github.dexclub.dexkit.query.FindMethod
@@ -33,18 +31,6 @@ internal interface DexSearchExecutor : AutoCloseable {
         inventory: MaterialInventory,
         query: FindField,
     ): List<FieldHit>
-
-    fun findClassesUsingStrings(
-        workspace: WorkspaceContext,
-        inventory: MaterialInventory,
-        query: BatchFindClassUsingStrings,
-    ): List<ClassHit>
-
-    fun findMethodsUsingStrings(
-        workspace: WorkspaceContext,
-        inventory: MaterialInventory,
-        query: BatchFindMethodUsingStrings,
-    ): List<MethodHit>
 
     fun inspectMethod(
         workspace: WorkspaceContext,

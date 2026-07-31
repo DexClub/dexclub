@@ -5,9 +5,9 @@ import io.github.dexclub.core.app.contract.MethodHit
 import io.github.dexclub.core.app.projection.toProjection
 import io.github.dexclub.core.app.dex.ExportClassTextUseCaseResult
 import io.github.dexclub.core.app.dex.ExportMethodTextUseCaseResult
-import io.github.dexclub.core.app.dex.FindClassesUsingStringsUseCaseResult
+import io.github.dexclub.core.app.dex.FindClassesUseCaseResult
+import io.github.dexclub.core.app.dex.FindFieldsUseCaseResult
 import io.github.dexclub.core.app.dex.FindMethodsUseCaseResult
-import io.github.dexclub.core.app.dex.FindMethodsUsingStringsUseCaseResult
 import io.github.dexclub.core.app.dex.InspectMethodUseCaseResult
 import io.github.dexclub.core.app.resource.DecodeXmlUseCaseResult
 import io.github.dexclub.core.app.resource.FindResourceValuesUseCaseResult
@@ -58,12 +58,12 @@ internal fun InspectManifestUseCaseResult.toManifestDecodeResult(): ManifestDeco
         manifest = manifest.toView(),
     )
 
-internal fun FindClassesUsingStringsUseCaseResult.toFindClassesUsingStringsResult(
+internal fun FindClassesUseCaseResult.toFindClassesResult(
     handleProvider: ((ClassHit) -> String)? = null,
     fields: Set<String>? = null,
     brief: Boolean = false,
-): FindClassesUsingStringsResult =
-    FindClassesUsingStringsResult(
+): FindClassesResult =
+    FindClassesResult(
         sessionId = session?.sessionIdOrNull(),
         total = total,
         offset = offset,
@@ -90,18 +90,17 @@ internal fun ExportClassTextUseCaseResult.toExportTextResult(
     text = text.stabilizeMcpExportText(),
 )
 
-internal fun FindMethodsUsingStringsUseCaseResult.toFindMethodsUsingStringsResult(
-    handleProvider: ((MethodHit) -> String)? = null,
+internal fun FindFieldsUseCaseResult.toFindFieldsResult(
     fields: Set<String>? = null,
     brief: Boolean = false,
-): FindMethodsUsingStringsResult =
-    FindMethodsUsingStringsResult(
+): FindFieldsResult =
+    FindFieldsResult(
         sessionId = session?.sessionIdOrNull(),
         total = total,
         offset = offset,
         limit = limit,
         hasMore = hasMore,
-        items = items.map { it.toProjectedJson(effectiveMethodFields(fields, brief, handleProvider != null), handleProvider) },
+        items = items.map { it.toProjectedJson(effectiveFieldFields(fields, brief)) },
     )
 
 internal fun FindMethodsUseCaseResult.toFindMethodsResult(

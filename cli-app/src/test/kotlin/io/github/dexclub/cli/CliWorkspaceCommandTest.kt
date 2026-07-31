@@ -11,10 +11,8 @@ import io.github.dexclub.core.api.dex.ExportMethodSmaliRequest
 import io.github.dexclub.core.api.dex.ExportResult
 import io.github.dexclub.core.api.dex.FieldHit
 import io.github.dexclub.core.api.dex.FindClassesRequest
-import io.github.dexclub.core.api.dex.FindClassesUsingStringsRequest
 import io.github.dexclub.core.api.dex.FindFieldsRequest
 import io.github.dexclub.core.api.dex.FindMethodsRequest
-import io.github.dexclub.core.api.dex.FindMethodsUsingStringsRequest
 import io.github.dexclub.core.api.dex.InspectMethodRequest
 import io.github.dexclub.core.api.dex.MethodDetail
 import io.github.dexclub.core.api.dex.MethodHit
@@ -358,16 +356,6 @@ private class FailingDexAnalysisService : DexAnalysisService {
 
     override fun findFields(workspace: WorkspaceContext, request: FindFieldsRequest): List<FieldHit> =
         fail()
-
-    override fun findClassesUsingStrings(
-        workspace: WorkspaceContext,
-        request: FindClassesUsingStringsRequest,
-    ): List<ClassHit> = fail()
-
-    override fun findMethodsUsingStrings(
-        workspace: WorkspaceContext,
-        request: FindMethodsUsingStringsRequest,
-    ): List<MethodHit> = fail()
 
     override fun inspectMethod(workspace: WorkspaceContext, request: InspectMethodRequest): MethodDetail = fail()
 

@@ -167,6 +167,8 @@ class McpHttpSmokeTest {
                 .map { tool -> tool.jsonObject["name"]!!.jsonPrimitive.content }
                 .toSet()
             assertEquals(readSkillToolNames(), toolNames)
+            assertTrue("find_classes_using_strings" !in toolNames)
+            assertTrue("find_methods_using_strings" !in toolNames)
             assertMcpToolInputContracts(tools)
 
             val openSessionResponse = it.post(baseUrl) {
@@ -287,9 +289,7 @@ class McpHttpSmokeTest {
     private fun readSkillToolNames(): Set<String> {
         val repoRoot = Paths.get(checkNotNull(System.getProperty("dexclub.repo.root")))
         val skill = repoRoot.resolve("skills/dexclub-analysis/SKILL.md").readText()
-        val toolSurface = skill
-            .substringAfter("## Useful MCP Surface")
-            .substringBefore("Use `diagnose_target_sessions`")
+        val toolSurface = skill.substringAfter("## Useful MCP Surface")
         return Regex("(?m)^- `([a-z_]+)`$")
             .findAll(toolSurface)
             .map { it.groupValues[1] }

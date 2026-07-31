@@ -142,6 +142,8 @@ val testDex by registerMcpTestTask(
     name = "testDex",
     description = "Run MCP dex query, inspect, and export tests",
     "io.github.dexclub.mcp.McpDexToolsTest",
+    "io.github.dexclub.mcp.McpFindQuerySchemaTest",
+    "io.github.dexclub.mcp.McpSkillContractTest",
 )
 
 val testResource by registerMcpTestTask(
@@ -154,7 +156,6 @@ val testModels by registerMcpTestTask(
     name = "testModels",
     description = "Run MCP result mapping, field projection, and error rendering tests",
     "io.github.dexclub.mcp.McpModelsTest",
-    "io.github.dexclub.mcp.McpSkillContractTest",
 )
 
 val testSmoke = tasks.register<Test>("testSmoke") {

@@ -62,10 +62,14 @@ Copy-Item -Recurse -Force .\skills\dexclub-analysis C:\Users\<user>\.codex\skill
 - 先 `open_target_session`
 - `open_target_session.input` 使用绝对路径，不要传相对路径
 - 首轮优先 `brief=true`，只有确有必要再显式 `fields`
-- `find_methods` 只有在已有 `class_name_contains` 或 `method_name_contains` 这类主过滤线索时才作为入口
+- 根据字符串、类、方法、字段、manifest 或 resource 线索选择对应入口
+- `find_classes`、`find_methods`、`find_fields` 的 `query` 使用完整 JSON object
+- 不使用已删除的 using-strings 工具、旧简化参数或 `searchIn*`
 - 先 `inspect_method` 后 `export_*`
 
 ## 相关文件
 
 - [dexclub-analysis/SKILL.md](dexclub-analysis/SKILL.md)
 - [dexclub-analysis/agents/openai.yaml](dexclub-analysis/agents/openai.yaml)
+- [dexclub-analysis/references/find-queries.md](dexclub-analysis/references/find-queries.md)
+- [dexclub-analysis/references/find-query-fields.md](dexclub-analysis/references/find-query-fields.md)

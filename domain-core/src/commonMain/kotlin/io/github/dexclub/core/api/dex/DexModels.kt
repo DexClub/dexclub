@@ -68,16 +68,6 @@ data class FindFieldsRequest(
     val window: PageWindow = PageWindow(),
 )
 
-data class FindClassesUsingStringsRequest(
-    val queryText: String,
-    val window: PageWindow = PageWindow(),
-)
-
-data class FindMethodsUsingStringsRequest(
-    val queryText: String,
-    val window: PageWindow = PageWindow(),
-)
-
 data class InspectMethodRequest(
     val descriptor: String,
     val source: SourceLocator = SourceLocator(),

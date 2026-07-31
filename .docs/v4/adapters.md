@@ -74,8 +74,6 @@
   - `find-class`
   - `find-method`
   - `find-field`
-  - `find-class-using-strings`
-  - `find-method-using-strings`
 - 暂时仍保留直连 `services.*` 的链路
   - 无
 
@@ -129,6 +127,10 @@
 - tool 名称与 schema 组织
 - HTTP 或 MCP 协议相关诊断
 - 参数摘要、调用日志与协议侧观测
+
+Dex 查询入口统一为 `find_classes`、`find_methods`、`find_fields`。三者直接接收公共 `Find*Query` 的 JSON object，并通过递归 `$defs/$ref` schema 暴露完整 `Matcher*` 结构；公共合同明确排除依赖 native result pointer 的 `searchIn*` 字段。详细合同见 [dex-query-contract.md](dex-query-contract.md)。
+
+资源查询的完整语义同样位于 domain/app 层：资源 identity 包含 `resourceId/packageName/type/name`，值模型保留全部 configuration variants、typed scalar/reference 与通用 bag。MCP 只负责把 `resource_id`、`resource_type`、`qualifier`、`value_kind`、`match_target` 等协议参数转换为应用层请求，并把歧义候选投影到 `error.details.candidates`。Manifest 的组件过滤与 namespace-aware attributes 也由共享链路实现，不在协议层做结果后过滤。
 
 当前代码里，这些职责已经基本形成固定归属，例如：
 

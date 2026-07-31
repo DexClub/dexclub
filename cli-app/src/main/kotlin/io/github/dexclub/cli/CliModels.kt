@@ -125,20 +125,6 @@ sealed interface CliRequest {
         override val outputFormat: OutputFormat,
     ) : CliRequest
 
-    data class FindClassUsingStrings(
-        val workdir: String?,
-        val query: QueryInput,
-        val window: PageWindow,
-        override val outputFormat: OutputFormat,
-    ) : CliRequest
-
-    data class FindMethodUsingStrings(
-        val workdir: String?,
-        val query: QueryInput,
-        val window: PageWindow,
-        override val outputFormat: OutputFormat,
-    ) : CliRequest
-
     data class ExportClassSmali(
         val workdir: String?,
         val className: String,

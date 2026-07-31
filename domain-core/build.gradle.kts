@@ -121,6 +121,7 @@ val testDex by registerCoreJvmTestTask(
     "io.github.dexclub.core.impl.dex.DefaultDexAnalysisInspectTest",
     "io.github.dexclub.core.impl.dex.DefaultDexAnalysisExportTest",
     "io.github.dexclub.core.impl.dex.ScopedContextCacheTest",
+    "io.github.dexclub.core.impl.dex.DexQueryParserTest",
     requiresDexKitNative = true,
 )
 

@@ -10,10 +10,8 @@ import io.github.dexclub.core.api.dex.ExportMethodJavaRequest
 import io.github.dexclub.core.api.dex.ExportMethodSmaliRequest
 import io.github.dexclub.core.api.dex.ExportResult
 import io.github.dexclub.core.api.dex.FindClassesRequest
-import io.github.dexclub.core.api.dex.FindClassesUsingStringsRequest
 import io.github.dexclub.core.api.dex.InspectMethodRequest
 import io.github.dexclub.core.api.dex.FindMethodsRequest
-import io.github.dexclub.core.api.dex.FindMethodsUsingStringsRequest
 import io.github.dexclub.core.api.dex.FindFieldsRequest
 import io.github.dexclub.core.api.shared.Operation
 import io.github.dexclub.core.api.shared.applyPageWindow
@@ -60,28 +58,6 @@ internal class DefaultDexAnalysisService(
                 query = queryParser.parseFindField(request.queryText),
             )
         }
-
-    override fun findClassesUsingStrings(
-        workspace: WorkspaceContext,
-        request: FindClassesUsingStringsRequest,
-    ) = runSearch(workspace, Operation.FindClass, request.window, DexAnalysisResultSorter::sortClassHits) { inventory ->
-        searchExecutor.findClassesUsingStrings(
-            workspace = workspace,
-            inventory = inventory,
-            query = queryParser.parseFindClassUsingStrings(request.queryText),
-        )
-    }
-
-    override fun findMethodsUsingStrings(
-        workspace: WorkspaceContext,
-        request: FindMethodsUsingStringsRequest,
-    ) = runSearch(workspace, Operation.FindMethod, request.window, DexAnalysisResultSorter::sortMethodHits) { inventory ->
-        searchExecutor.findMethodsUsingStrings(
-            workspace = workspace,
-            inventory = inventory,
-            query = queryParser.parseFindMethodUsingStrings(request.queryText),
-        )
-    }
 
     override fun inspectMethod(
         workspace: WorkspaceContext,

@@ -146,68 +146,16 @@ class CliDexQueryCommandTest {
     }
 
     @Test
-    fun findClassUsingStringsRunsThroughCliPipeline() {
-        val fixture = CliDexFixture.generated()
+    fun batchFindCommandsAreRemoved() {
         val app = CliApp(
             services = createDefaultAppServices(),
-            cwdProvider = { fixture.dexWorkspaceDir.absolutePath },
         )
 
-        val initOut = runCli(app, listOf("init", fixture.dexFile.absolutePath))
-        assertEquals(0, initOut.exitCode)
-
-        val output = runCli(
-            app,
-            listOf(
-                "find-class-using-strings",
-                "--query-json",
-                """{"groups":{"needle-a":[{"value":"dexclub-needle-string","matchType":"Equals"}],"needle-b":[{"value":"dexclub-needle-string","matchType":"Equals"}]}}""",
-                "--offset",
-                "1",
-                "--limit",
-                "1",
-                "--json",
-            ),
-        )
-
-        assertEquals(0, output.exitCode, output.stderr)
-        val parsed = Json.parseToJsonElement(output.stdout).jsonArray
-        assertEquals(1, parsed.size)
-        val hit = parsed.single().jsonObject
-        assertEquals("Lfixture/samples/SampleSearchTarget;", hit.getValue("className").jsonPrimitive.content)
-        assertEquals("fixture.dex", hit.getValue("sourcePath").jsonPrimitive.content)
-    }
-
-    @Test
-    fun findMethodUsingStringsRunsThroughCliPipeline() {
-        val fixture = CliDexFixture.generated()
-        val app = CliApp(
-            services = createDefaultAppServices(),
-            cwdProvider = { fixture.dexWorkspaceDir.absolutePath },
-        )
-
-        val initOut = runCli(app, listOf("init", fixture.dexFile.absolutePath))
-        assertEquals(0, initOut.exitCode)
-
-        val output = runCli(
-            app,
-            listOf(
-                "find-method-using-strings",
-                "--query-json",
-                """{"groups":{"needle-a":[{"value":"dexclub-needle-string","matchType":"Equals"}],"needle-b":[{"value":"dexclub-needle-string","matchType":"Equals"}]}}""",
-                "--json",
-            ),
-        )
-
-        assertEquals(0, output.exitCode, output.stderr)
-        val parsed = Json.parseToJsonElement(output.stdout).jsonArray
-        val hit = parsed.firstOrNull { element ->
-            val method = element.jsonObject
-            method["className"]?.jsonPrimitive?.content == "fixture.samples.SampleSearchTarget" &&
-                method["methodName"]?.jsonPrimitive?.content == "exposeNeedle"
-        }?.jsonObject
-        assertTrue(hit != null, output.stdout)
-        assertEquals("fixture.dex", hit.getValue("sourcePath").jsonPrimitive.content)
+        listOf("find-class-using-strings", "find-method-using-strings").forEach { command ->
+            val output = runCli(app, listOf(command))
+            assertEquals(1, output.exitCode)
+            assertTrue(output.stderr.contains("unknown command: $command"))
+        }
     }
 
     @Test

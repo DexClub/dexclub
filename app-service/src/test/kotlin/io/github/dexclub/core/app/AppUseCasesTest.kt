@@ -11,10 +11,8 @@ import io.github.dexclub.core.api.dex.ExportMethodSmaliRequest
 import io.github.dexclub.core.api.dex.ExportResult
 import io.github.dexclub.core.api.dex.FieldHit
 import io.github.dexclub.core.api.dex.FindClassesRequest
-import io.github.dexclub.core.api.dex.FindClassesUsingStringsRequest
 import io.github.dexclub.core.api.dex.FindFieldsRequest
 import io.github.dexclub.core.api.dex.FindMethodsRequest
-import io.github.dexclub.core.api.dex.FindMethodsUsingStringsRequest
 import io.github.dexclub.core.api.dex.InspectMethodRequest
 import io.github.dexclub.core.api.dex.MethodDetail
 import io.github.dexclub.core.api.dex.MethodHit
@@ -65,7 +63,7 @@ class AppUseCasesTest {
         val result = appUseCases.dex.findMethodsUseCase.execute(
             FindMethodsUseCaseRequest(
                 sessionId = session.sessionId,
-                methodNameContains = "main",
+                queryText = "{}",
             ),
         )
 
@@ -212,16 +210,6 @@ private class FakeDexAnalysisService : DexAnalysisService {
 
     override fun findFields(workspace: WorkspaceContext, request: FindFieldsRequest): List<FieldHit> =
         TODO("unused in AppUseCasesTest")
-
-    override fun findClassesUsingStrings(
-        workspace: WorkspaceContext,
-        request: FindClassesUsingStringsRequest,
-    ): List<ClassHit> = TODO("unused in AppUseCasesTest")
-
-    override fun findMethodsUsingStrings(
-        workspace: WorkspaceContext,
-        request: FindMethodsUsingStringsRequest,
-    ): List<MethodHit> = TODO("unused in AppUseCasesTest")
 
     override fun inspectMethod(workspace: WorkspaceContext, request: InspectMethodRequest): MethodDetail =
         TODO("unused in AppUseCasesTest")
