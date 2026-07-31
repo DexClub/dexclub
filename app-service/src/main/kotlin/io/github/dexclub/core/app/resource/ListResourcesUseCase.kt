@@ -13,7 +13,12 @@ data class ListResourcesUseCaseRequest(
     val workspace: WorkspaceContext? = null,
     val sessionId: String? = null,
     val workdir: String? = null,
+    val resourceId: String? = null,
+    val packageName: String? = null,
     val type: String? = null,
+    val name: String? = null,
+    val filePath: String? = null,
+    val resolution: ResourceResolution? = null,
     val offset: Int? = null,
     val limit: Int? = null,
 )
@@ -42,9 +47,18 @@ class ListResourcesUseCase(
             workdir = request.workdir,
         )
         val normalizedType = request.type?.trim()?.ifEmpty { null }
+        val normalizedResourceId = request.resourceId?.trim()?.ifEmpty { null }
+        val normalizedPackageName = request.packageName?.trim()?.ifEmpty { null }
+        val normalizedName = request.name?.trim()?.ifEmpty { null }
+        val normalizedFilePath = request.filePath?.trim()?.replace('\\', '/')?.ifEmpty { null }
         val filtered = resourceService.listResourceEntries(executionContext.workspace)
             .asSequence()
+            .filter { normalizedResourceId == null || it.resourceId.equals(normalizedResourceId, ignoreCase = true) }
+            .filter { normalizedPackageName == null || it.packageName == normalizedPackageName }
             .filter { normalizedType == null || it.type == normalizedType }
+            .filter { normalizedName == null || it.name == normalizedName }
+            .filter { normalizedFilePath == null || it.filePath?.replace('\\', '/') == normalizedFilePath }
+            .filter { request.resolution == null || it.resolution == request.resolution }
             .sortedWith(resourceEntryListOrder)
             .toList()
         val slice = applyWindowSlice(filtered, request.offset, request.limit)
@@ -63,6 +77,7 @@ class ListResourcesUseCase(
 private val resourceEntryListOrder =
     compareBy<ResourceEntry>(
         { it.type.orEmpty() },
+        { it.packageName.orEmpty() },
         { listOrderResolutionRank(it.resolution) },
         { -listOrderCompleteness(it) },
         { it.name.orEmpty() },
@@ -80,5 +95,5 @@ private fun listOrderResolutionRank(resolution: ResourceResolution): Int =
     }
 
 private fun listOrderCompleteness(entry: ResourceEntry): Int =
-    listOf(entry.name, entry.filePath, entry.sourcePath, entry.sourceEntry, entry.resourceId)
+    listOf(entry.packageName, entry.name, entry.filePath, entry.sourcePath, entry.sourceEntry, entry.resourceId)
         .count { !it.isNullOrBlank() }

@@ -1,8 +1,12 @@
 package io.github.dexclub.mcp
 
 import io.github.dexclub.core.api.resource.ManifestInspectionSection
+import io.github.dexclub.core.api.resource.ManifestComponentType
 import io.github.dexclub.core.api.resource.ResourceEntry
 import io.github.dexclub.core.api.resource.ResourceEntryValueHit
+import io.github.dexclub.core.api.resource.ResourceDecodeError
+import io.github.dexclub.core.api.resource.ResourceDecodeErrorReason
+import io.github.dexclub.core.api.resource.ResourceValueCandidate
 import io.github.dexclub.core.api.resource.ResourceResolution
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
@@ -16,6 +20,48 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class McpResourceToolsTest {
+    @Test
+    fun findResourceValuesSchemaRequiresCanonicalTypeAndValue() {
+        assertEquals(
+            setOf("resource_type", "value"),
+            McpResourceToolCatalog.require("find_resource_values").required,
+        )
+        listOf("list_res", "find_resource_values", "get_resource_value").forEach { toolName ->
+            assertTrue(McpResourceToolCatalog.require(toolName).inputProperties.none { it.name == "type" })
+        }
+    }
+
+    @Test
+    fun resourceAmbiguityErrorCarriesStructuredCandidates() {
+        val app = createTestApp()
+        val result = app.resourceErrorResult(
+            ResourceDecodeError(
+                reason = ResourceDecodeErrorReason.ResourceValueAmbiguous,
+                sourcePath = "sample.apk",
+                candidates = listOf(
+                    ResourceValueCandidate(
+                        resourceId = "0x7f010001",
+                        packageName = "fixture.one",
+                        type = "string",
+                        name = "title",
+                        sourcePath = "sample.apk",
+                        sourceEntry = "resources.arsc",
+                    ),
+                ),
+                message = "Resource is ambiguous: string/title",
+            ),
+        )
+
+        val payload = Json.parseToJsonElement(
+            (result.content.single() as io.modelcontextprotocol.kotlin.sdk.types.TextContent).text.orEmpty(),
+        ).jsonObject
+        val error = payload["error"]!!.jsonObject
+        assertEquals("resource_value_ambiguous", error["code"]!!.jsonPrimitive.content)
+        val candidate = error["details"]!!.jsonObject["candidates"]!!.jsonArray.single().jsonObject
+        assertEquals("0x7f010001", candidate["resourceId"]!!.jsonPrimitive.content)
+        assertEquals("fixture.one", candidate["packageName"]!!.jsonPrimitive.content)
+    }
+
     @Test
     fun getResourceValueToolReturnsStructuredErrorWhenContextIsMissing() {
         val app = createTestApp()
@@ -31,6 +77,28 @@ class McpResourceToolsTest {
 
         assertEquals(true, result.isError)
         assertEquals(app.missingSessionOrWorkdirResult().content, result.content)
+    }
+
+    @Test
+    fun getResourceValueToolUsesCanonicalSelectorNamesInErrors() {
+        val workspace = fakeWorkspaceContext()
+        val app = createTestApp(workspace = workspace)
+        val session = app.openTargetSession("sample.apk")
+
+        val result = app.getResourceValueTool(
+            callToolRequest(
+                "get_resource_value",
+                buildJsonObject { put("session_id", session.sessionId) },
+            ),
+        )
+
+        val payload = Json.parseToJsonElement(
+            (result.content.single() as io.modelcontextprotocol.kotlin.sdk.types.TextContent).text.orEmpty(),
+        ).jsonObject
+        assertEquals(
+            "resource_id or resource_type+name is required",
+            payload["error"]!!.jsonObject["message"]!!.jsonPrimitive.content,
+        )
     }
 
     @Test
@@ -62,14 +130,40 @@ class McpResourceToolsTest {
             workspace = session.workspace,
             includes = ManifestInspectionSection.entries.toSet(),
             includeText = true,
+            componentName = ".MainActivity",
+            componentType = ManifestComponentType.Activity,
         )
 
         assertEquals(workspace, resourceService.lastWorkspace)
         assertEquals(ManifestInspectionSection.entries.toSet(), resourceService.lastInspectManifestRequest?.includes)
         assertEquals(true, resourceService.lastInspectManifestRequest?.includeText)
+        assertEquals(".MainActivity", resourceService.lastInspectManifestRequest?.componentName)
+        assertEquals(ManifestComponentType.Activity, resourceService.lastInspectManifestRequest?.componentType)
         assertEquals("fixture.sample", manifest.packageName)
         assertEquals("fixture.sample.MainActivity", manifest.activities?.single()?.name)
         assertEquals("<manifest package=\"fixture.sample\"/>", manifest.text)
+    }
+
+    @Test
+    fun manifestToolMapsComponentFilters() {
+        val workspace = fakeWorkspaceContext()
+        val resourceService = FakeResourceService()
+        val app = createTestApp(workspace = workspace, resourceService = resourceService)
+        val session = app.openTargetSession("sample.apk")
+
+        app.manifestTool(
+            callToolRequest(
+                "manifest",
+                buildJsonObject {
+                    put("session_id", session.sessionId)
+                    put("component_name", ".MainActivity")
+                    put("component_type", "activity")
+                },
+            ),
+        )
+
+        assertEquals(".MainActivity", resourceService.lastInspectManifestRequest?.componentName)
+        assertEquals(ManifestComponentType.Activity, resourceService.lastInspectManifestRequest?.componentType)
     }
 
     @Test
@@ -137,13 +231,19 @@ class McpResourceToolsTest {
         val resource = app.getResourceValue(
             workspace = session.workspace,
             resourceId = "0x7f010001",
+            packageName = "fixture.sample",
+            qualifier = "-fr",
+            includeAllVariants = true,
         )
 
         assertEquals(workspace, resourceService.lastWorkspace)
         assertEquals("0x7f010001", resourceService.lastResolveResourceRequest?.resourceId)
+        assertEquals("fixture.sample", resourceService.lastResolveResourceRequest?.packageName)
+        assertEquals("-fr", resourceService.lastResolveResourceRequest?.qualifier)
+        assertEquals(true, resourceService.lastResolveResourceRequest?.includeAllVariants)
         assertEquals("string", resource.type)
         assertEquals("fixture_name", resource.name)
-        assertEquals("Fixture Name", resource.value)
+        assertEquals("Fixture Name", resource.variants.single().value?.decodedValue)
     }
 
     @Test
@@ -167,17 +267,33 @@ class McpResourceToolsTest {
     }
 
     @Test
-    fun resolveResourceCarriesStructuredPluralItems() {
+    fun resolveResourceCarriesStructuredPluralVariants() {
         val workspace = fakeWorkspaceContext()
         val resourceService = FakeResourceService(
             resourceValue = io.github.dexclub.core.api.resource.ResourceValue(
                 resourceId = "0x7f100000",
+                packageName = "fixture.sample",
                 type = "plurals",
                 name = "comment_count",
-                value = null,
-                pluralItems = listOf(
-                    io.github.dexclub.core.api.resource.ResourcePluralItem(quantity = "one", value = "%d comment"),
-                    io.github.dexclub.core.api.resource.ResourcePluralItem(quantity = "other", value = "%d comments"),
+                variants = listOf(
+                    io.github.dexclub.core.api.resource.ResourceValueVariant(
+                        configuration = io.github.dexclub.core.api.resource.ResourceConfiguration("", true),
+                        bag = io.github.dexclub.core.api.resource.ResourceBag(
+                            kind = io.github.dexclub.core.api.resource.ResourceBagKind.Plurals,
+                            items = listOf(
+                                io.github.dexclub.core.api.resource.ResourceBagItem(
+                                    rawKey = "0x01000006",
+                                    quantity = "other",
+                                    value = io.github.dexclub.core.api.resource.ResourceTypedValue(
+                                        valueType = "STRING",
+                                        rawData = 3,
+                                        rawDataHex = "0x00000003",
+                                        decodedValue = "%d comments",
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
                 ),
             ),
         )
@@ -198,11 +314,14 @@ class McpResourceToolsTest {
         val resource = payload["resource"]!!.jsonObject
         assertEquals("plurals", resource["type"]!!.jsonPrimitive.content)
         assertEquals("comment_count", resource["name"]!!.jsonPrimitive.content)
-        val pluralItems = resource["pluralItems"]!!.jsonArray
-        assertEquals("one", pluralItems[0].jsonObject["quantity"]!!.jsonPrimitive.content)
-        assertEquals("%d comment", pluralItems[0].jsonObject["value"]!!.jsonPrimitive.content)
-        assertEquals("other", pluralItems[1].jsonObject["quantity"]!!.jsonPrimitive.content)
-        assertEquals("%d comments", pluralItems[1].jsonObject["value"]!!.jsonPrimitive.content)
+        assertEquals("fixture.sample", resource["packageName"]!!.jsonPrimitive.content)
+        assertTrue("value" !in resource)
+        assertTrue("pluralItems" !in resource)
+        val variant = resource["variants"]!!.jsonArray.single().jsonObject
+        assertEquals(true, variant["configuration"]!!.jsonObject["isDefault"]!!.jsonPrimitive.content.toBoolean())
+        val bag = variant["bag"]!!.jsonObject
+        assertEquals("Plurals", bag["kind"]!!.jsonPrimitive.content)
+        assertEquals("other", bag["items"]!!.jsonArray.single().jsonObject["quantity"]!!.jsonPrimitive.content)
     }
 
     @Test
@@ -259,15 +378,61 @@ class McpResourceToolsTest {
     }
 
     @Test
+    fun listResourcesAppliesIdentityFiltersBeforeWindowing() {
+        val workspace = fakeWorkspaceContext()
+        val resourceService = FakeResourceService(
+            resourceEntries = listOf(
+                ResourceEntry(
+                    resourceId = "0x7f010001",
+                    packageName = "fixture.one",
+                    type = "string",
+                    name = "title",
+                    filePath = "res/values/strings.xml",
+                    resolution = ResourceResolution.TableValue,
+                ),
+                ResourceEntry(
+                    resourceId = "0x80010001",
+                    packageName = "fixture.two",
+                    type = "string",
+                    name = "title",
+                    filePath = "res/values/strings.xml",
+                    resolution = ResourceResolution.TableValue,
+                ),
+            ),
+        )
+        val app = createTestApp(workspace = workspace, resourceService = resourceService)
+        val session = app.openTargetSession("sample.apk")
+
+        val result = app.listResources(
+            workspace = session.workspace,
+            resourceId = "0x80010001",
+            packageName = "fixture.two",
+            type = "string",
+            name = "title",
+            filePath = "res/values/strings.xml",
+            resolution = ResourceResolution.TableValue,
+            offset = 0,
+            limit = 1,
+        )
+
+        assertEquals(1, result.total)
+        assertEquals("fixture.two", result.items.single().packageName)
+    }
+
+    @Test
     fun findResourcesUsesSessionWorkspaceAndMapsShortInputs() {
         val workspace = fakeWorkspaceContext()
         val resourceService = FakeResourceService(
             resourceValueHits = listOf(
                 ResourceEntryValueHit(
                     resourceId = "0x7f010001",
+                    packageName = "fixture.sample",
                     type = "string",
                     name = "alpha",
                     value = "Needle Alpha",
+                    qualifier = "-fr",
+                    valueKind = "STRING",
+                    matchTarget = "decoded_value",
                     sourcePath = "sample.apk",
                     sourceEntry = "resources.arsc",
                 ),
@@ -290,16 +455,24 @@ class McpResourceToolsTest {
             value = "Needle",
             contains = true,
             ignoreCase = true,
+            packageName = "fixture.sample",
+            qualifier = "-fr",
+            valueKind = "STRING",
+            matchTarget = "decoded_value",
             offset = 1,
             limit = 1,
         )
 
         assertEquals(workspace, resourceService.lastWorkspace)
         val query = Json.parseToJsonElement(resourceService.lastFindResourcesRequest!!.queryText).jsonObject
-        assertEquals("string", query["type"]!!.jsonPrimitive.content)
+        assertEquals("string", query["resourceType"]!!.jsonPrimitive.content)
         assertEquals("Needle", query["value"]!!.jsonPrimitive.content)
         assertEquals(true, query["contains"]!!.jsonPrimitive.content.toBoolean())
         assertEquals(true, query["ignoreCase"]!!.jsonPrimitive.content.toBoolean())
+        assertEquals("fixture.sample", query["packageName"]!!.jsonPrimitive.content)
+        assertEquals("-fr", query["qualifier"]!!.jsonPrimitive.content)
+        assertEquals("STRING", query["valueKind"]!!.jsonPrimitive.content)
+        assertEquals("decoded_value", query["matchTarget"]!!.jsonPrimitive.content)
         assertEquals(2, result.total)
         assertEquals(1, result.offset)
         assertEquals(1, result.limit)

@@ -12,10 +12,10 @@
 - 查询类、方法、字段
 - 通过 `inspect_method` 检查方法详情
 - 通过 `export_*` 导出 dex、smali、Java 证据
-- 解析 `AndroidManifest.xml`
-- 读取 `resources.arsc`
+- 结构化解析 `AndroidManifest.xml`，并按组件名称与类型定点查询
+- 读取 `resources.arsc`，保留配置变体、typed value 与通用 bag
 - 解码二进制 XML
-- 列出、解析、搜索资源条目
+- 按资源身份、配置、值类型与命中位置列出、解析和搜索资源条目
 - 通过 MCP 暴露 target session、dex、resource 相关工具
 
 ## 模块结构

@@ -27,7 +27,11 @@ fun <T> applyWindowSlice(
         )
     }
 
-    val toIndex = if (limit == null) items.size else minOf(items.size, normalizedOffset + limit)
+    val toIndex = if (limit == null) {
+        items.size
+    } else {
+        minOf(items.size.toLong(), normalizedOffset.toLong() + limit.toLong()).toInt()
+    }
     val slice = items.subList(normalizedOffset, toIndex)
     return WindowSlice(
         total = items.size,

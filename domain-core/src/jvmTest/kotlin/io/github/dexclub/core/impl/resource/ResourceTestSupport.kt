@@ -42,16 +42,33 @@ internal fun compileResourceApk(
     manifestText: String,
     resourceXml: String,
     layoutXml: String? = null,
+    packageId: String? = null,
+) {
+    val resourceFiles = buildMap {
+        put("values/strings.xml", resourceXml)
+        if (layoutXml != null) {
+            put("layout/activity_main.xml", layoutXml)
+        }
+    }
+    compileResourceApk(outputApk, manifestText, resourceFiles, packageId)
+}
+
+internal fun compileResourceApk(
+    outputApk: File,
+    manifestText: String,
+    resourceFiles: Map<String, String>,
+    packageId: String? = null,
 ) {
     val root = outputApk.parentFile
     val manifestFile = File(root, "AndroidManifest.xml").apply {
         writeText(manifestText, Charsets.UTF_8)
     }
-    val valuesDir = File(root, "res/values").apply { mkdirs() }
-    File(valuesDir, "strings.xml").writeText(resourceXml, Charsets.UTF_8)
-    if (layoutXml != null) {
-        val layoutDir = File(root, "res/layout").apply { mkdirs() }
-        File(layoutDir, "activity_main.xml").writeText(layoutXml, Charsets.UTF_8)
+    val resDir = File(root, "res").apply { mkdirs() }
+    resourceFiles.forEach { (relativePath, text) ->
+        File(resDir, relativePath).apply {
+            parentFile.mkdirs()
+            writeText(text, Charsets.UTF_8)
+        }
     }
     val compiledDir = File(root, "compiled-res").apply { mkdirs() }
     runCommand(
@@ -59,7 +76,7 @@ internal fun compileResourceApk(
             resolveAapt2Command(),
             "compile",
             "--dir",
-            valuesDir.parentFile.absolutePath,
+            resDir.absolutePath,
             "-o",
             compiledDir.absolutePath,
         ),
@@ -80,6 +97,10 @@ internal fun compileResourceApk(
             add(manifestFile.absolutePath)
             add("-I")
             add(resolveAndroidJar().absolutePath)
+            if (packageId != null) {
+                add("--package-id")
+                add(packageId)
+            }
             add("--auto-add-overlay")
             compiledRes.forEach { compiled ->
                 add("-R")

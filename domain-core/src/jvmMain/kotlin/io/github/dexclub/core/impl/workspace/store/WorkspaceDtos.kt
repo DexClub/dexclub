@@ -4,7 +4,6 @@ import io.github.dexclub.core.api.shared.CapabilitySet
 import io.github.dexclub.core.api.shared.InputType
 import io.github.dexclub.core.api.shared.WorkspaceKind
 import io.github.dexclub.core.api.resource.ResourceEntry
-import io.github.dexclub.core.api.resource.ResourcePluralItem
 import io.github.dexclub.core.api.resource.ResourceResolution
 import io.github.dexclub.core.impl.workspace.model.ClassSourceMapRecord
 import io.github.dexclub.core.impl.workspace.model.ClassSourceRefRecord
@@ -12,10 +11,13 @@ import io.github.dexclub.core.impl.workspace.model.ManifestCacheRecord
 import io.github.dexclub.core.impl.workspace.model.DecodedXmlCacheRecord
 import io.github.dexclub.core.impl.workspace.model.MaterialInventory
 import io.github.dexclub.core.impl.workspace.model.ResourceEntryIndexRecord
+import io.github.dexclub.core.impl.workspace.model.ResourceBagItemRecord
+import io.github.dexclub.core.impl.workspace.model.ResourceBagRecord
 import io.github.dexclub.core.impl.workspace.model.ResourceTableCacheRecord
-import io.github.dexclub.core.impl.workspace.model.ResourcePluralItemRecord
 import io.github.dexclub.core.impl.workspace.model.ResourceTablePayloadRecord
 import io.github.dexclub.core.impl.workspace.model.ResourceTableValueRecord
+import io.github.dexclub.core.impl.workspace.model.ResourceTypedValueRecord
+import io.github.dexclub.core.impl.workspace.model.ResourceValueVariantRecord
 import io.github.dexclub.core.impl.workspace.model.SnapshotRecord
 import io.github.dexclub.core.impl.workspace.model.TargetRecord
 import io.github.dexclub.core.impl.workspace.model.WorkspaceRecord
@@ -114,6 +116,7 @@ internal data class ManifestCacheDto(
 @Serializable
 internal data class ResourceEntryDto(
     val resourceId: String? = null,
+    val packageName: String? = null,
     val type: String? = null,
     val name: String? = null,
     val filePath: String? = null,
@@ -133,16 +136,47 @@ internal data class ResourceTablePayloadDto(
 @Serializable
 internal data class ResourceTableValueDto(
     val resourceId: String? = null,
+    val packageName: String? = null,
     val type: String? = null,
     val name: String? = null,
-    val value: String? = null,
-    val pluralItems: List<ResourcePluralItemDto>? = null,
+    val variants: List<ResourceValueVariantDto> = emptyList(),
 )
 
 @Serializable
-internal data class ResourcePluralItemDto(
-    val quantity: String,
-    val value: String,
+internal data class ResourceValueVariantDto(
+    val qualifiers: String,
+    val isDefault: Boolean,
+    val value: ResourceTypedValueDto? = null,
+    val bag: ResourceBagDto? = null,
+)
+
+@Serializable
+internal data class ResourceTypedValueDto(
+    val valueType: String,
+    val rawData: Int,
+    val rawDataHex: String,
+    val decodedValue: String? = null,
+    val referencedResourceId: String? = null,
+)
+
+@Serializable
+internal data class ResourceBagDto(
+    val kind: String,
+    val parentResourceId: String? = null,
+    val parentResourceName: String? = null,
+    val items: List<ResourceBagItemDto> = emptyList(),
+)
+
+@Serializable
+internal data class ResourceBagItemDto(
+    val rawKey: String,
+    val keyResourceId: String? = null,
+    val keyName: String? = null,
+    val index: Int? = null,
+    val quantity: String? = null,
+    val attributeType: String? = null,
+    val attributeFormats: List<String>? = null,
+    val value: ResourceTypedValueDto,
 )
 
 @Serializable
@@ -365,6 +399,7 @@ internal fun ManifestCacheRecord.toDto(): ManifestCacheDto =
 internal fun ResourceEntryDto.toModel(): ResourceEntry =
     ResourceEntry(
         resourceId = resourceId,
+        packageName = packageName,
         type = type,
         name = name,
         filePath = filePath,
@@ -376,6 +411,7 @@ internal fun ResourceEntryDto.toModel(): ResourceEntry =
 internal fun ResourceEntry.toDto(): ResourceEntryDto =
     ResourceEntryDto(
         resourceId = resourceId,
+        packageName = packageName,
         type = type,
         name = name,
         filePath = filePath,
@@ -403,31 +439,47 @@ internal fun ResourceTablePayloadRecord.toDto(): ResourceTablePayloadDto =
 internal fun ResourceTableValueDto.toModel(): ResourceTableValueRecord =
     ResourceTableValueRecord(
         resourceId = resourceId,
+        packageName = packageName,
         type = type,
         name = name,
-        value = value,
-        pluralItems = pluralItems?.map(ResourcePluralItemDto::toModel),
+        variants = variants.map(ResourceValueVariantDto::toModel),
     )
 
 internal fun ResourceTableValueRecord.toDto(): ResourceTableValueDto =
     ResourceTableValueDto(
         resourceId = resourceId,
+        packageName = packageName,
         type = type,
         name = name,
-        value = value,
-        pluralItems = pluralItems?.map(ResourcePluralItemRecord::toDto),
+        variants = variants.map(ResourceValueVariantRecord::toDto),
     )
 
-internal fun ResourcePluralItemDto.toModel(): ResourcePluralItemRecord =
-    ResourcePluralItemRecord(
-        quantity = quantity,
-        value = value,
+internal fun ResourceValueVariantDto.toModel(): ResourceValueVariantRecord =
+    ResourceValueVariantRecord(qualifiers, isDefault, value?.toModel(), bag?.toModel())
+
+internal fun ResourceValueVariantRecord.toDto(): ResourceValueVariantDto =
+    ResourceValueVariantDto(qualifiers, isDefault, value?.toDto(), bag?.toDto())
+
+internal fun ResourceTypedValueDto.toModel(): ResourceTypedValueRecord =
+    ResourceTypedValueRecord(valueType, rawData, rawDataHex, decodedValue, referencedResourceId)
+
+internal fun ResourceTypedValueRecord.toDto(): ResourceTypedValueDto =
+    ResourceTypedValueDto(valueType, rawData, rawDataHex, decodedValue, referencedResourceId)
+
+internal fun ResourceBagDto.toModel(): ResourceBagRecord =
+    ResourceBagRecord(kind, parentResourceId, parentResourceName, items.map(ResourceBagItemDto::toModel))
+
+internal fun ResourceBagRecord.toDto(): ResourceBagDto =
+    ResourceBagDto(kind, parentResourceId, parentResourceName, items.map(ResourceBagItemRecord::toDto))
+
+internal fun ResourceBagItemDto.toModel(): ResourceBagItemRecord =
+    ResourceBagItemRecord(
+        rawKey, keyResourceId, keyName, index, quantity, attributeType, attributeFormats, value.toModel(),
     )
 
-internal fun ResourcePluralItemRecord.toDto(): ResourcePluralItemDto =
-    ResourcePluralItemDto(
-        quantity = quantity,
-        value = value,
+internal fun ResourceBagItemRecord.toDto(): ResourceBagItemDto =
+    ResourceBagItemDto(
+        rawKey, keyResourceId, keyName, index, quantity, attributeType, attributeFormats, value.toDto(),
     )
 
 internal fun ResourceTableCacheDto.toRecord(): ResourceTableCacheRecord =

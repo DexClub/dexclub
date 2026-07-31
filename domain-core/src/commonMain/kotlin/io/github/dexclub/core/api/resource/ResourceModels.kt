@@ -32,6 +32,18 @@ enum class ManifestInspectionSection {
 data class InspectManifestRequest(
     val includes: Set<ManifestInspectionSection> = ManifestInspectionSection.entries.toSet(),
     val includeText: Boolean = false,
+    val componentName: String? = null,
+    val componentType: ManifestComponentType? = null,
+)
+
+enum class ManifestComponentType { Activity, ActivityAlias, Service, Receiver, Provider }
+
+data class ManifestAttribute(
+    val namespaceUri: String? = null,
+    val prefix: String? = null,
+    val localName: String,
+    val rawName: String,
+    val value: String,
 )
 
 data class ManifestInspectionResult(
@@ -72,6 +84,8 @@ data class ManifestApplicationInfo(
     val allowBackup: Boolean? = null,
     val usesCleartextTraffic: Boolean? = null,
     val networkSecurityConfig: String? = null,
+    val theme: String? = null,
+    val attributes: List<ManifestAttribute> = emptyList(),
     val metaData: List<ManifestMetaData> = emptyList(),
 )
 
@@ -84,6 +98,9 @@ data class ManifestComponentInfo(
     val process: String? = null,
     val authorities: String? = null,
     val targetActivity: String? = null,
+    val theme: String? = null,
+    val windowSoftInputMode: String? = null,
+    val attributes: List<ManifestAttribute> = emptyList(),
     val intentFilters: List<ManifestIntentFilter> = emptyList(),
     val metaData: List<ManifestMetaData> = emptyList(),
 )
@@ -119,6 +136,7 @@ data class ManifestUsesFeature(
 
 data class ResourceEntry(
     val resourceId: String? = null,
+    val packageName: String? = null,
     val type: String? = null,
     val name: String? = null,
     val filePath: String? = null,
@@ -164,21 +182,64 @@ data class DecodedXmlResult(
 
 data class ResolveResourceRequest(
     val resourceId: String? = null,
+    val packageName: String? = null,
     val type: String? = null,
     val name: String? = null,
+    val qualifier: String? = null,
+    val includeAllVariants: Boolean = true,
 )
 
 data class ResourceValue(
     val resourceId: String? = null,
+    val packageName: String? = null,
     val type: String,
     val name: String,
-    val value: String? = null,
-    val pluralItems: List<ResourcePluralItem>? = null,
+    val variants: List<ResourceValueVariant> = emptyList(),
 )
 
-data class ResourcePluralItem(
-    val quantity: String,
-    val value: String,
+data class ResourceValueVariant(
+    val configuration: ResourceConfiguration,
+    val value: ResourceTypedValue? = null,
+    val bag: ResourceBag? = null,
+)
+
+data class ResourceConfiguration(
+    val qualifiers: String,
+    val isDefault: Boolean,
+)
+
+data class ResourceTypedValue(
+    val valueType: String,
+    val rawData: Int,
+    val rawDataHex: String,
+    val decodedValue: String? = null,
+    val referencedResourceId: String? = null,
+)
+
+enum class ResourceBagKind {
+    Style,
+    Array,
+    Attribute,
+    Plurals,
+    Unknown,
+}
+
+data class ResourceBag(
+    val kind: ResourceBagKind,
+    val parentResourceId: String? = null,
+    val parentResourceName: String? = null,
+    val items: List<ResourceBagItem> = emptyList(),
+)
+
+data class ResourceBagItem(
+    val rawKey: String,
+    val keyResourceId: String? = null,
+    val keyName: String? = null,
+    val index: Int? = null,
+    val quantity: String? = null,
+    val attributeType: String? = null,
+    val attributeFormats: List<String>? = null,
+    val value: ResourceTypedValue,
 )
 
 data class FindResourcesRequest(
@@ -188,9 +249,15 @@ data class FindResourcesRequest(
 
 data class ResourceEntryValueHit(
     val resourceId: String? = null,
+    val packageName: String? = null,
     val type: String? = null,
     val name: String? = null,
     val value: String? = null,
+    val qualifier: String? = null,
+    val valueKind: String? = null,
+    val matchTarget: String? = null,
+    val bagIndex: Int? = null,
+    val bagKey: String? = null,
     val sourcePath: String? = null,
     val sourceEntry: String? = null,
 )

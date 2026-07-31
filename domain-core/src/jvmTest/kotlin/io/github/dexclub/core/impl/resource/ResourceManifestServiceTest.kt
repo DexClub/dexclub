@@ -1,6 +1,7 @@
 package io.github.dexclub.core.impl.resource
 
 import io.github.dexclub.core.api.resource.InspectManifestRequest
+import io.github.dexclub.core.api.resource.ManifestComponentType
 import io.github.dexclub.core.api.resource.ResourceDecodeError
 import io.github.dexclub.core.api.resource.ResourceDecodeErrorReason
 import io.github.dexclub.core.api.shared.CapabilityError
@@ -136,6 +137,7 @@ class ResourceManifestServiceTest {
         manifestFile.writeText(
             """
                 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+                    xmlns:tools="http://schemas.android.com/tools"
                     package="fixture.inspect"
                     android:versionCode="42"
                     android:versionName="1.2.3">
@@ -145,10 +147,14 @@ class ResourceManifestServiceTest {
                     <application
                         android:name=".FixtureApp"
                         android:label="@string/app_name"
+                        android:theme="@style/AppTheme"
                         android:debuggable="true">
                         <meta-data android:name="feature_toggle" android:value="on" />
                         <activity
                             android:name=".MainActivity"
+                            android:theme="@style/MainTheme"
+                            tools:theme="preview-only"
+                            android:windowSoftInputMode="adjustResize"
                             android:exported="true">
                             <intent-filter>
                                 <action android:name="android.intent.action.MAIN" />
@@ -189,11 +195,17 @@ class ResourceManifestServiceTest {
         assertEquals("24", result.usesSdk?.minSdkVersion)
         assertEquals("35", result.usesSdk?.targetSdkVersion)
         assertEquals("fixture.inspect.FixtureApp", result.application?.name)
+        assertEquals("@style/AppTheme", result.application?.theme)
         assertEquals("feature_toggle", result.application?.metaData?.single()?.name)
         assertEquals(listOf("android.permission.INTERNET"), result.usesPermissions)
         assertEquals(listOf("fixture.inspect.permission.SYNC"), result.definedPermissions)
         assertEquals("fixture.inspect.MainActivity", result.activities?.single()?.name)
         assertEquals(true, result.activities?.single()?.exported)
+        assertEquals("@style/MainTheme", result.activities?.single()?.theme)
+        assertEquals("adjustResize", result.activities?.single()?.windowSoftInputMode)
+        val themeAttributes = result.activities?.single()?.attributes?.filter { it.localName == "theme" }.orEmpty()
+        assertEquals(2, themeAttributes.size)
+        assertEquals(setOf("http://schemas.android.com/apk/res/android", "http://schemas.android.com/tools"), themeAttributes.map { it.namespaceUri }.toSet())
         assertEquals("android.intent.action.MAIN", result.activities?.single()?.intentFilters?.single()?.actions?.single())
         assertEquals("fixture", result.activities?.single()?.intentFilters?.single()?.data?.single()?.scheme)
         assertEquals("fixture.inspect.SyncService", result.services?.single()?.name)
@@ -205,6 +217,17 @@ class ResourceManifestServiceTest {
         assertEquals("android.intent.action.VIEW", result.queriesIntents?.single()?.actions?.single())
         assertEquals("https", result.queriesIntents?.single()?.data?.single()?.scheme)
         assertTrue(result.text?.contains("""package="fixture.inspect"""") == true)
+
+        val filtered = services.resource.inspectManifest(
+            workspace,
+            InspectManifestRequest(
+                componentName = ".MainActivity",
+                componentType = ManifestComponentType.Activity,
+            ),
+        )
+        assertEquals(listOf("fixture.inspect.MainActivity"), filtered.activities?.map { it.name })
+        assertTrue(filtered.services.orEmpty().isEmpty())
+        assertTrue(filtered.receivers.orEmpty().isEmpty())
     }
 
     @Test

@@ -3,15 +3,23 @@ package io.github.dexclub.core.impl.resource
 import com.reandroid.apk.ApkModule
 import com.reandroid.arsc.chunk.TableBlock
 import io.github.dexclub.core.api.resource.ResourceEntry
-import io.github.dexclub.core.api.resource.ResourcePluralItem
+import io.github.dexclub.core.api.resource.ResourceBag
+import io.github.dexclub.core.api.resource.ResourceBagItem
+import io.github.dexclub.core.api.resource.ResourceTypedValue
+import io.github.dexclub.core.api.resource.ResourceValueVariant
 import io.github.dexclub.core.api.resource.ResourceResolution
 import io.github.dexclub.core.api.resource.ResourceTableResult
 import io.github.dexclub.core.api.resource.normalizedResolution
 import io.github.dexclub.core.api.workspace.WorkspaceContext
 import io.github.dexclub.core.impl.workspace.model.ResourceTableCacheRecord
-import io.github.dexclub.core.impl.workspace.model.ResourcePluralItemRecord
+import io.github.dexclub.core.impl.workspace.model.ResourceBagItemRecord
+import io.github.dexclub.core.impl.workspace.model.ResourceBagRecord
 import io.github.dexclub.core.impl.workspace.model.ResourceTablePayloadRecord
 import io.github.dexclub.core.impl.workspace.model.ResourceTableValueRecord
+import io.github.dexclub.core.impl.workspace.model.ResourceTypedValueRecord
+import io.github.dexclub.core.impl.workspace.model.ResourceValueVariantRecord
+import io.github.dexclub.core.impl.workspace.model.resourceTableCacheSchemaVersion
+import io.github.dexclub.core.impl.workspace.model.resourceTableFormat
 import io.github.dexclub.core.impl.workspace.model.MaterialInventory
 import io.github.dexclub.core.impl.workspace.store.WorkspaceStore
 
@@ -28,7 +36,9 @@ internal class DefaultResourceTableExecutor(
         val sourceFingerprint = resourceSourceFingerprint(workspace.workdir, source.sourcePath)
         store.loadResourceTableCache(workspace.workdir, workspace.activeTargetId)
             ?.takeIf {
-                it.toolVersion == toolVersion &&
+                it.schemaVersion == resourceTableCacheSchemaVersion &&
+                    it.format == resourceTableFormat &&
+                    it.toolVersion == toolVersion &&
                 it.sourcePath == source.sourcePath &&
                     it.sourceEntry == source.sourceEntry &&
                     it.sourceFingerprint == sourceFingerprint
@@ -65,21 +75,20 @@ internal class DefaultResourceTableExecutor(
                     values = loaded.tableBlock.resources
                         .asSequence()
                         .mapNotNull { resource ->
-                            val decoded = resource.any()?.toDecodedResourceValue(resource.type) ?: return@mapNotNull null
-                            if (decoded.value == null && decoded.pluralItems == null) {
-                                return@mapNotNull null
-                            }
+                            val decoded = resource.toResourceValue()
+                            if (decoded.variants.isEmpty()) return@mapNotNull null
                             ResourceTableValueRecord(
-                                resourceId = resource.hexId,
-                                type = resource.type,
-                                name = resource.name,
-                                value = decoded.value,
-                                pluralItems = decoded.pluralItems?.map(::toRecord),
+                                resourceId = decoded.resourceId,
+                                packageName = decoded.packageName,
+                                type = decoded.type,
+                                name = decoded.name,
+                                variants = decoded.variants.map { it.toRecord() },
                             )
                         }
                         .sortedWith(
                             compareBy<ResourceTableValueRecord>(
                                 { it.resourceId.orEmpty() },
+                                { it.packageName.orEmpty() },
                                 { it.type.orEmpty() },
                                 { it.name.orEmpty() },
                             ),
@@ -101,17 +110,19 @@ internal class DefaultResourceTableExecutor(
             .map { resource ->
                 ResourceEntry(
                     resourceId = resource.hexId,
+                    packageName = resource.packageName,
                     type = resource.type,
                     name = resource.name,
                     filePath = null,
                     sourcePath = sourcePath,
                     sourceEntry = sourceEntry,
-                    resolution = if (resource.any() != null) ResourceResolution.TableValue else ResourceResolution.TableHole,
+                    resolution = if (resource.iterator().hasNext()) ResourceResolution.TableValue else ResourceResolution.TableHole,
                 )
             }
             .sortedWith(
                 compareBy<ResourceEntry>(
                     { it.resourceId.orEmpty() },
+                    { it.packageName.orEmpty() },
                     { it.type.orEmpty() },
                     { it.name.orEmpty() },
                 ),
@@ -142,9 +153,27 @@ internal class DefaultResourceTableExecutor(
             entries = cache.payload.entries.map(ResourceEntry::normalizedResolution),
         )
 
-    private fun toRecord(item: ResourcePluralItem): ResourcePluralItemRecord =
-        ResourcePluralItemRecord(
-            quantity = item.quantity,
-            value = item.value,
+    private fun ResourceValueVariant.toRecord(): ResourceValueVariantRecord =
+        ResourceValueVariantRecord(
+            qualifiers = configuration.qualifiers,
+            isDefault = configuration.isDefault,
+            value = value?.toRecord(),
+            bag = bag?.toRecord(),
+        )
+
+    private fun ResourceTypedValue.toRecord(): ResourceTypedValueRecord =
+        ResourceTypedValueRecord(valueType, rawData, rawDataHex, decodedValue, referencedResourceId)
+
+    private fun ResourceBag.toRecord(): ResourceBagRecord =
+        ResourceBagRecord(
+            kind = kind.name,
+            parentResourceId = parentResourceId,
+            parentResourceName = parentResourceName,
+            items = items.map { it.toRecord() },
+        )
+
+    private fun ResourceBagItem.toRecord(): ResourceBagItemRecord =
+        ResourceBagItemRecord(
+            rawKey, keyResourceId, keyName, index, quantity, attributeType, attributeFormats, value.toRecord(),
         )
 }

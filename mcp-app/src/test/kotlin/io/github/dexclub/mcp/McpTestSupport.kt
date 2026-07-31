@@ -351,7 +351,17 @@ class FakeResourceService(
             resourceId = request.resourceId ?: "0x7f010001",
             type = request.type ?: "string",
             name = request.name ?: "fixture_name",
-            value = "Fixture Name",
+            variants = listOf(
+                io.github.dexclub.core.api.resource.ResourceValueVariant(
+                    configuration = io.github.dexclub.core.api.resource.ResourceConfiguration("", true),
+                    value = io.github.dexclub.core.api.resource.ResourceTypedValue(
+                        valueType = "STRING",
+                        rawData = 0,
+                        rawDataHex = "0x00000000",
+                        decodedValue = "Fixture Name",
+                    ),
+                ),
+            ),
         )).also {
             lastWorkspace = workspace
             lastResolveResourceRequest = request

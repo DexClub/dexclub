@@ -13,8 +13,11 @@ data class GetResourceValueUseCaseRequest(
     val sessionId: String? = null,
     val workdir: String? = null,
     val resourceId: String? = null,
+    val packageName: String? = null,
     val type: String? = null,
     val name: String? = null,
+    val qualifier: String? = null,
+    val includeAllVariants: Boolean = false,
 )
 
 data class GetResourceValueUseCaseResult(
@@ -40,8 +43,11 @@ class GetResourceValueUseCase(
             workspace = executionContext.workspace,
             request = ResolveResourceRequest(
                 resourceId = request.resourceId,
+                packageName = request.packageName,
                 type = request.type,
                 name = request.name,
+                qualifier = request.qualifier,
+                includeAllVariants = request.includeAllVariants,
             ),
         )
         return GetResourceValueUseCaseResult(

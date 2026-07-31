@@ -2,7 +2,9 @@ package io.github.dexclub.core.impl.resource
 
 import io.github.dexclub.core.api.resource.InspectManifestRequest
 import io.github.dexclub.core.api.resource.ManifestApplicationInfo
+import io.github.dexclub.core.api.resource.ManifestAttribute
 import io.github.dexclub.core.api.resource.ManifestComponentInfo
+import io.github.dexclub.core.api.resource.ManifestComponentType
 import io.github.dexclub.core.api.resource.ManifestInspectionResult
 import io.github.dexclub.core.api.resource.ManifestInspectionSection
 import io.github.dexclub.core.api.resource.ManifestIntentData
@@ -99,15 +101,15 @@ internal class ManifestInspectionParser {
             queriesPackages = queriesPackages,
             queriesProviders = queriesProviders,
             queriesIntents = queriesIntents,
-            activities = application.childComponents(root, "activity")
+            activities = application.childComponents(root, "activity", ManifestComponentType.Activity, request)
                 .takeIf { includes.contains(ManifestInspectionSection.Activities) },
-            activityAliases = application.childComponents(root, "activity-alias")
+            activityAliases = application.childComponents(root, "activity-alias", ManifestComponentType.ActivityAlias, request)
                 .takeIf { includes.contains(ManifestInspectionSection.ActivityAliases) },
-            services = application.childComponents(root, "service")
+            services = application.childComponents(root, "service", ManifestComponentType.Service, request)
                 .takeIf { includes.contains(ManifestInspectionSection.Services) },
-            receivers = application.childComponents(root, "receiver")
+            receivers = application.childComponents(root, "receiver", ManifestComponentType.Receiver, request)
                 .takeIf { includes.contains(ManifestInspectionSection.Receivers) },
-            providers = application.childComponents(root, "provider")
+            providers = application.childComponents(root, "provider", ManifestComponentType.Provider, request)
                 .takeIf { includes.contains(ManifestInspectionSection.Providers) },
             text = manifest.text.takeIf { request.includeText },
         )
@@ -130,14 +132,28 @@ internal class ManifestInspectionParser {
             allowBackup = androidBooleanAttr("allowBackup"),
             usesCleartextTraffic = androidBooleanAttr("usesCleartextTraffic"),
             networkSecurityConfig = androidAttr("networkSecurityConfig"),
+            theme = androidAttr("theme"),
+            attributes = manifestAttributes(),
             metaData = firstChildElements("meta-data")
                 .mapNotNull { it.toMetaData() }
                 .sortedBy { it.name },
         )
 
-    private fun Element?.childComponents(root: Element, tagName: String): List<ManifestComponentInfo> =
-        this?.firstChildElements(tagName)
+    private fun Element?.childComponents(
+        root: Element,
+        tagName: String,
+        componentType: ManifestComponentType,
+        request: InspectManifestRequest,
+    ): List<ManifestComponentInfo> =
+        if (request.componentType != null && request.componentType != componentType) {
+            emptyList()
+        } else this?.firstChildElements(tagName)
             ?.mapNotNull { it.toComponentInfo(root) }
+            ?.filter { component ->
+                val requested = request.componentName ?: return@filter true
+                val normalized = normalizeComponentName(root, requested) ?: requested
+                component.name == normalized || component.rawName == requested
+            }
             ?.sortedBy { it.name }
             .orEmpty()
 
@@ -152,6 +168,9 @@ internal class ManifestInspectionParser {
             process = androidAttr("process"),
             authorities = androidAttr("authorities"),
             targetActivity = androidAttr("targetActivity")?.let { normalizeComponentName(root, it) },
+            theme = androidAttr("theme"),
+            windowSoftInputMode = androidAttr("windowSoftInputMode"),
+            attributes = manifestAttributes(),
             intentFilters = firstChildElements("intent-filter")
                 .map { it.toIntentFilter() },
             metaData = firstChildElements("meta-data")
@@ -248,6 +267,22 @@ internal class ManifestInspectionParser {
             "false" -> false
             else -> null
         }
+
+    private fun Element.manifestAttributes(): List<ManifestAttribute> =
+        buildList {
+            for (index in 0 until attributes.length) {
+                val attribute = attributes.item(index)
+                add(
+                    ManifestAttribute(
+                        namespaceUri = attribute.namespaceURI,
+                        prefix = attribute.prefix,
+                        localName = attribute.localName ?: attribute.nodeName.substringAfter(':'),
+                        rawName = attribute.nodeName,
+                        value = attribute.nodeValue,
+                    ),
+                )
+            }
+        }.sortedWith(compareBy({ it.namespaceUri.orEmpty() }, { it.localName }, { it.rawName }))
 
     private companion object {
         const val ANDROID_NS = "http://schemas.android.com/apk/res/android"

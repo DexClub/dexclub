@@ -2,7 +2,9 @@ package io.github.dexclub.core.app.contract
 
 typealias DecodedXmlResult = io.github.dexclub.core.api.resource.DecodedXmlResult
 typealias ManifestApplicationInfo = io.github.dexclub.core.api.resource.ManifestApplicationInfo
+typealias ManifestAttribute = io.github.dexclub.core.api.resource.ManifestAttribute
 typealias ManifestComponentInfo = io.github.dexclub.core.api.resource.ManifestComponentInfo
+typealias ManifestComponentType = io.github.dexclub.core.api.resource.ManifestComponentType
 typealias ManifestInspectionResult = io.github.dexclub.core.api.resource.ManifestInspectionResult
 typealias ManifestInspectionSection = io.github.dexclub.core.api.resource.ManifestInspectionSection
 typealias ManifestIntentData = io.github.dexclub.core.api.resource.ManifestIntentData
@@ -14,7 +16,6 @@ typealias ManifestUsesSdk = io.github.dexclub.core.api.resource.ManifestUsesSdk
 typealias ResourceDecodeError = io.github.dexclub.core.api.resource.ResourceDecodeError
 typealias ResourceEntry = io.github.dexclub.core.api.resource.ResourceEntry
 typealias ResourceEntryValueHit = io.github.dexclub.core.api.resource.ResourceEntryValueHit
-typealias ResourcePluralItem = io.github.dexclub.core.api.resource.ResourcePluralItem
 typealias ResourceResolution = io.github.dexclub.core.api.resource.ResourceResolution
 typealias ResourceTableResult = io.github.dexclub.core.api.resource.ResourceTableResult
 typealias ResourceValue = io.github.dexclub.core.api.resource.ResourceValue

@@ -207,31 +207,39 @@ internal class Renderer {
             if (view.resourceId != null) {
                 appendLine("resourceId=${view.resourceId}")
             }
+            if (view.packageName != null) {
+                appendLine("packageName=${view.packageName}")
+            }
             appendLine("type=${view.type}")
             appendLine("name=${view.name}")
-            if (view.pluralItems != null) {
-                if (view.value != null) {
-                    appendLine("value=${view.value}")
-                }
-                append("pluralItems=")
-                append(view.pluralItems.joinToString(",") { "${it.quantity}=${it.value}" })
-            } else {
-                append("value=${view.value.orEmpty()}")
-            }
+            append("variants=")
+            append(json.encodeToString(view.variants))
         }
 
     private fun renderResourceValueHits(hits: List<ResourceEntryValueHitView>): String =
         buildString {
-            append("resourceId\ttype\tname\tvalue\tsourcePath\tsourceEntry")
+            append("resourceId\tpackageName\ttype\tname\tqualifier\tvalueKind\tmatchTarget\tvalue\tbagIndex\tbagKey\tsourcePath\tsourceEntry")
             hits.forEach { hit ->
                 appendLine()
                 append(hit.resourceId.orEmpty())
+                append('\t')
+                append(hit.packageName.orEmpty())
                 append('\t')
                 append(hit.type.orEmpty())
                 append('\t')
                 append(hit.name.orEmpty())
                 append('\t')
+                append(hit.qualifier.orEmpty())
+                append('\t')
+                append(hit.valueKind.orEmpty())
+                append('\t')
+                append(hit.matchTarget.orEmpty())
+                append('\t')
                 append(hit.value.orEmpty())
+                append('\t')
+                append(hit.bagIndex?.toString().orEmpty())
+                append('\t')
+                append(hit.bagKey.orEmpty())
                 append('\t')
                 append(hit.sourcePath.orEmpty())
                 append('\t')

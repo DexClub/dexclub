@@ -28,6 +28,8 @@ internal inline fun McpApp.runToolCatching(block: () -> CallToolResult): CallToo
     } catch (cause: NoSuchElementException) {
         val session = cause.message?.removePrefix("session_id not found: ").orEmpty()
         missingSessionResult(session)
+    } catch (cause: io.github.dexclub.core.app.contract.ResourceDecodeError) {
+        resourceErrorResult(cause)
     } catch (cause: IllegalArgumentException) {
         errorResult(cause.message.orEmpty(), code = "invalid_argument")
     } catch (cause: Exception) {

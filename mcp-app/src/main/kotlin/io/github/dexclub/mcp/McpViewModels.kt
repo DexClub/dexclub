@@ -125,21 +125,55 @@ internal data class MethodFieldUsageView(
 @Serializable
 internal data class ResourceValueView(
     val resourceId: String? = null,
+    val packageName: String? = null,
     val type: String,
     val name: String,
-    val value: String? = null,
-    val pluralItems: List<ResourcePluralItemView>? = null,
+    val variants: List<ResourceValueVariantView> = emptyList(),
 )
 
 @Serializable
-internal data class ResourcePluralItemView(
-    val quantity: String,
-    val value: String,
+internal data class ResourceValueVariantView(
+    val configuration: ResourceConfigurationView,
+    val value: ResourceTypedValueView? = null,
+    val bag: ResourceBagView? = null,
+)
+
+@Serializable
+internal data class ResourceConfigurationView(val qualifiers: String, val isDefault: Boolean)
+
+@Serializable
+internal data class ResourceTypedValueView(
+    val valueType: String,
+    val rawData: Int,
+    val rawDataHex: String,
+    val decodedValue: String? = null,
+    val referencedResourceId: String? = null,
+)
+
+@Serializable
+internal data class ResourceBagView(
+    val kind: String,
+    val parentResourceId: String? = null,
+    val parentResourceName: String? = null,
+    val items: List<ResourceBagItemView> = emptyList(),
+)
+
+@Serializable
+internal data class ResourceBagItemView(
+    val rawKey: String,
+    val keyResourceId: String? = null,
+    val keyName: String? = null,
+    val index: Int? = null,
+    val quantity: String? = null,
+    val attributeType: String? = null,
+    val attributeFormats: List<String>? = null,
+    val value: ResourceTypedValueView,
 )
 
 @Serializable
 internal data class ResourceEntryView(
     val resourceId: String? = null,
+    val packageName: String? = null,
     val type: String? = null,
     val name: String? = null,
     val filePath: String? = null,
@@ -151,9 +185,15 @@ internal data class ResourceEntryView(
 @Serializable
 internal data class ResourceEntryValueHitView(
     val resourceId: String? = null,
+    val packageName: String? = null,
     val type: String? = null,
     val name: String? = null,
     val value: String? = null,
+    val qualifier: String? = null,
+    val valueKind: String? = null,
+    val matchTarget: String? = null,
+    val bagIndex: Int? = null,
+    val bagKey: String? = null,
     val sourcePath: String? = null,
     val sourceEntry: String? = null,
 )
@@ -206,6 +246,8 @@ internal data class ManifestApplicationView(
     val allowBackup: Boolean? = null,
     val usesCleartextTraffic: Boolean? = null,
     val networkSecurityConfig: String? = null,
+    val theme: String? = null,
+    val attributes: List<ManifestAttributeView> = emptyList(),
     val metaData: List<ManifestMetaDataView> = emptyList(),
 )
 
@@ -219,8 +261,20 @@ internal data class ManifestComponentView(
     val process: String? = null,
     val authorities: String? = null,
     val targetActivity: String? = null,
+    val theme: String? = null,
+    val windowSoftInputMode: String? = null,
+    val attributes: List<ManifestAttributeView> = emptyList(),
     val intentFilters: List<ManifestIntentFilterView> = emptyList(),
     val metaData: List<ManifestMetaDataView> = emptyList(),
+)
+
+@Serializable
+internal data class ManifestAttributeView(
+    val namespaceUri: String? = null,
+    val prefix: String? = null,
+    val localName: String,
+    val rawName: String,
+    val value: String,
 )
 
 @Serializable

@@ -6,6 +6,7 @@ import io.github.dexclub.core.app.AppUseCases
 import io.github.dexclub.core.app.projection.toProjection
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -109,6 +110,10 @@ internal class ResourceCommandAdapter(
                 value = parsedQuery.value,
                 contains = parsedQuery.contains,
                 ignoreCase = parsedQuery.ignoreCase,
+                packageName = parsedQuery.packageName,
+                qualifier = parsedQuery.qualifier,
+                valueKind = parsedQuery.valueKind,
+                matchTarget = parsedQuery.matchTarget,
                 offset = request.window.offset,
                 limit = request.window.limit,
             ),
@@ -122,11 +127,11 @@ internal class ResourceCommandAdapter(
 
     private fun parseResourceSearchQuery(queryText: String): ResourceSearchQuery {
         val root = json.parseToJsonElement(queryText).jsonObject
-        val type = root["type"]?.jsonPrimitive?.content?.trim().orEmpty()
+        val type = root["resourceType"]?.jsonPrimitive?.content?.trim().orEmpty()
         val value = root["value"]?.jsonPrimitive?.content?.trim().orEmpty()
         if (type.isEmpty() || value.isEmpty()) {
             throw CliUsageError(
-                message = "query JSON must include non-empty type and value",
+                message = "query JSON must include non-empty resourceType and value",
                 usage = CliUsages.findResValues,
             )
         }
@@ -135,8 +140,15 @@ internal class ResourceCommandAdapter(
             value = value,
             contains = root["contains"]?.jsonPrimitive?.booleanOrNull ?: false,
             ignoreCase = root["ignoreCase"]?.jsonPrimitive?.booleanOrNull ?: false,
+            packageName = root.optionalString("packageName"),
+            qualifier = root.optionalString("qualifier"),
+            valueKind = root.optionalString("valueKind"),
+            matchTarget = root.optionalString("matchTarget"),
         )
     }
+
+    private fun kotlinx.serialization.json.JsonObject.optionalString(name: String): String? =
+        get(name)?.jsonPrimitive?.contentOrNull?.trim()?.takeIf(String::isNotEmpty)
 }
 
 private data class ResourceSearchQuery(
@@ -144,5 +156,9 @@ private data class ResourceSearchQuery(
     val value: String,
     val contains: Boolean,
     val ignoreCase: Boolean,
+    val packageName: String?,
+    val qualifier: String?,
+    val valueKind: String?,
+    val matchTarget: String?,
 )
 

@@ -268,11 +268,12 @@ class CliResourceCommandTest {
         val parsed = Json.parseToJsonElement(output.stdout).jsonObject
         assertEquals("string", parsed.getValue("type").jsonPrimitive.content)
         assertEquals("app_name", parsed.getValue("name").jsonPrimitive.content)
-        assertEquals("DexClub Fixture", parsed.getValue("value").jsonPrimitive.content)
+        val scalar = parsed.getValue("variants").jsonArray.single().jsonObject.getValue("value").jsonObject
+        assertEquals("DexClub Fixture", scalar.getValue("decodedValue").jsonPrimitive.content)
     }
 
     @Test
-    fun getResValueReturnsStructuredPluralItemsThroughCliPipeline() {
+    fun getResValueReturnsStructuredPluralVariantsThroughCliPipeline() {
         val workspaceDir = createTempDirectory("dexclub-get-res-value-plurals")
         val apkFile = workspaceDir.resolve("app.apk").toFile()
         compileResourceApk(
@@ -304,11 +305,20 @@ class CliResourceCommandTest {
         val parsed = Json.parseToJsonElement(output.stdout).jsonObject
         assertEquals("plurals", parsed.getValue("type").jsonPrimitive.content)
         assertEquals("comment_count", parsed.getValue("name").jsonPrimitive.content)
-        val pluralItems = parsed.getValue("pluralItems").jsonArray
+        assertTrue("value" !in parsed)
+        assertTrue("pluralItems" !in parsed)
+        val pluralItems = parsed.getValue("variants").jsonArray.single().jsonObject
+            .getValue("bag").jsonObject.getValue("items").jsonArray
         assertEquals("one", pluralItems[0].jsonObject.getValue("quantity").jsonPrimitive.content)
-        assertEquals("%d comment", pluralItems[0].jsonObject.getValue("value").jsonPrimitive.content)
+        assertEquals(
+            "%d comment",
+            pluralItems[0].jsonObject.getValue("value").jsonObject.getValue("decodedValue").jsonPrimitive.content,
+        )
         assertEquals("other", pluralItems[1].jsonObject.getValue("quantity").jsonPrimitive.content)
-        assertEquals("%d comments", pluralItems[1].jsonObject.getValue("value").jsonPrimitive.content)
+        assertEquals(
+            "%d comments",
+            pluralItems[1].jsonObject.getValue("value").jsonObject.getValue("decodedValue").jsonPrimitive.content,
+        )
     }
 
     @Test
@@ -373,7 +383,7 @@ class CliResourceCommandTest {
             listOf(
                 "find-res-values",
                 "--query-json",
-                """{"type":"string","value":"login","contains":true,"ignoreCase":true}""",
+                """{"resourceType":"string","value":"login","contains":true,"ignoreCase":true}""",
                 "--offset",
                 "1",
                 "--limit",
@@ -388,6 +398,59 @@ class CliResourceCommandTest {
         assertEquals("login_title", hit.getValue("name").jsonPrimitive.content)
         assertEquals("Login Title", hit.getValue("value").jsonPrimitive.content)
         assertEquals("app.apk", hit.getValue("sourcePath").jsonPrimitive.content)
+
+        listOf(
+            "\"packageName\":\"fixture.other\"",
+            "\"qualifier\":\"-fr\"",
+            "\"valueKind\":\"REFERENCE\"",
+            "\"matchTarget\":\"reference\"",
+        ).forEach { filter ->
+            val filtered = runCli(
+                app,
+                listOf(
+                    "find-res-values",
+                    "--query-json",
+                    """{"resourceType":"string","value":"login","contains":true,$filter}""",
+                    "--json",
+                ),
+            )
+            assertEquals(0, filtered.exitCode, filtered.stderr)
+            assertTrue(Json.parseToJsonElement(filtered.stdout).jsonArray.isEmpty(), filter)
+        }
+    }
+
+    @Test
+    fun resourceValueHitTextIncludesVariantAndBagIdentity() {
+        val output = Renderer().render(
+            CommandResult(
+                payload = RenderPayload.ResourceValueHits(
+                    listOf(
+                        ResourceEntryValueHitView(
+                            resourceId = "0x7f010001",
+                            packageName = "fixture.app",
+                            type = "array",
+                            name = "labels",
+                            value = "label",
+                            qualifier = "-fr",
+                            valueKind = "STRING",
+                            matchTarget = "bag_key",
+                            bagIndex = 2,
+                            bagKey = "item_key",
+                            sourcePath = "app.apk",
+                            sourceEntry = "resources.arsc",
+                        ),
+                    ),
+                ),
+                outputFormat = OutputFormat.Text,
+                exitCode = 0,
+            ),
+        )
+
+        assertEquals(
+            "resourceId\tpackageName\ttype\tname\tqualifier\tvalueKind\tmatchTarget\tvalue\tbagIndex\tbagKey\tsourcePath\tsourceEntry\n" +
+                "0x7f010001\tfixture.app\tarray\tlabels\t-fr\tSTRING\tbag_key\tlabel\t2\titem_key\tapp.apk\tresources.arsc",
+            output.stdout,
+        )
     }
 
     @Test
@@ -402,7 +465,7 @@ class CliResourceCommandTest {
         val initOut = runCli(app, listOf("init", workspaceDir.resolve("classes.dex").toString()))
         assertEquals(0, initOut.exitCode)
 
-        val output = runCli(app, listOf("find-res-values", "--query-json", """{"type":"string","value":"login"}"""))
+        val output = runCli(app, listOf("find-res-values", "--query-json", """{"resourceType":"string","value":"login"}"""))
         assertEquals(2, output.exitCode)
         assertTrue(output.stderr.contains("command 'find-res-values' is not supported"), output.stderr)
     }

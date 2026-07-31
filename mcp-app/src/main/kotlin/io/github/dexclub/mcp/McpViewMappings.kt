@@ -1,6 +1,7 @@
 package io.github.dexclub.mcp
 
 import io.github.dexclub.core.app.contract.ManifestApplicationInfo
+import io.github.dexclub.core.app.contract.ManifestAttribute
 import io.github.dexclub.core.app.contract.ManifestComponentInfo
 import io.github.dexclub.core.app.contract.ManifestInspectionResult
 import io.github.dexclub.core.app.contract.ManifestIntentData
@@ -18,8 +19,12 @@ import io.github.dexclub.core.app.projection.MethodDetailProjection
 import io.github.dexclub.core.app.projection.MethodFieldUsageProjection
 import io.github.dexclub.core.app.projection.MethodHitProjection
 import io.github.dexclub.core.app.projection.ResourceEntryValueHitProjection
-import io.github.dexclub.core.app.projection.ResourcePluralItemProjection
+import io.github.dexclub.core.app.projection.ResourceBagItemProjection
+import io.github.dexclub.core.app.projection.ResourceBagProjection
+import io.github.dexclub.core.app.projection.ResourceConfigurationProjection
+import io.github.dexclub.core.app.projection.ResourceTypedValueProjection
 import io.github.dexclub.core.app.projection.ResourceValueProjection
+import io.github.dexclub.core.app.projection.ResourceValueVariantProjection
 import io.github.dexclub.core.app.session.TargetSession
 import io.github.dexclub.core.app.contract.TargetHandle
 import io.github.dexclub.core.app.contract.TargetSnapshotSummary
@@ -139,24 +144,41 @@ internal fun MethodFieldUsageProjection.toView(): MethodFieldUsageView =
 internal fun ResourceValueProjection.toView(): ResourceValueView =
     ResourceValueView(
         resourceId = resourceId,
+        packageName = packageName,
         type = type,
         name = name,
-        value = value,
-        pluralItems = pluralItems?.map(ResourcePluralItemProjection::toView),
+        variants = variants.map { it.toView() },
     )
 
-internal fun ResourcePluralItemProjection.toView(): ResourcePluralItemView =
-    ResourcePluralItemView(
-        quantity = quantity,
-        value = value,
+internal fun ResourceValueVariantProjection.toView(): ResourceValueVariantView =
+    ResourceValueVariantView(configuration.toView(), value?.toView(), bag?.toView())
+
+internal fun ResourceConfigurationProjection.toView(): ResourceConfigurationView =
+    ResourceConfigurationView(qualifiers, isDefault)
+
+internal fun ResourceTypedValueProjection.toView(): ResourceTypedValueView =
+    ResourceTypedValueView(valueType, rawData, rawDataHex, decodedValue, referencedResourceId)
+
+internal fun ResourceBagProjection.toView(): ResourceBagView =
+    ResourceBagView(kind, parentResourceId, parentResourceName, items.map { it.toView() })
+
+internal fun ResourceBagItemProjection.toView(): ResourceBagItemView =
+    ResourceBagItemView(
+        rawKey, keyResourceId, keyName, index, quantity, attributeType, attributeFormats, value.toView(),
     )
 
 internal fun ResourceEntryValueHitProjection.toView(): ResourceEntryValueHitView =
     ResourceEntryValueHitView(
         resourceId = resourceId,
+        packageName = packageName,
         type = type,
         name = name,
         value = value,
+        qualifier = qualifier,
+        valueKind = valueKind,
+        matchTarget = matchTarget,
+        bagIndex = bagIndex,
+        bagKey = bagKey,
         sourcePath = sourcePath,
         sourceEntry = sourceEntry,
     )
@@ -209,6 +231,8 @@ internal fun ManifestApplicationInfo.toView(): ManifestApplicationView =
         allowBackup = allowBackup,
         usesCleartextTraffic = usesCleartextTraffic,
         networkSecurityConfig = networkSecurityConfig,
+        theme = theme,
+        attributes = attributes.map(ManifestAttribute::toView),
         metaData = metaData.map(ManifestMetaData::toView),
     )
 
@@ -222,9 +246,15 @@ internal fun ManifestComponentInfo.toView(): ManifestComponentView =
         process = process,
         authorities = authorities,
         targetActivity = targetActivity,
+        theme = theme,
+        windowSoftInputMode = windowSoftInputMode,
+        attributes = attributes.map(ManifestAttribute::toView),
         intentFilters = intentFilters.map(ManifestIntentFilter::toView),
         metaData = metaData.map(ManifestMetaData::toView),
     )
+
+internal fun ManifestAttribute.toView(): ManifestAttributeView =
+    ManifestAttributeView(namespaceUri, prefix, localName, rawName, value)
 
 internal fun ManifestIntentFilter.toView(): ManifestIntentFilterView =
     ManifestIntentFilterView(

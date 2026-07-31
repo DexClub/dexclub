@@ -44,12 +44,14 @@ class ResourceEntryServiceTest {
         val entries = services.resource.listResourceEntries(workspace)
 
         val layoutEntry = entries.first { it.type == "layout" && it.name == "activity_main" }
+        assertEquals("fixture.listapk", layoutEntry.packageName)
         assertEquals("res/layout/activity_main.xml", layoutEntry.filePath)
         assertEquals("app.apk", layoutEntry.sourcePath)
         assertEquals("res/layout/activity_main.xml", layoutEntry.sourceEntry)
         assertEquals(ResourceResolution.TableBacked, layoutEntry.resolution)
 
         val stringEntry = entries.first { it.type == "string" && it.name == "app_name" }
+        assertEquals("fixture.listapk", stringEntry.packageName)
         assertEquals("app.apk", stringEntry.sourcePath)
         assertEquals(null, stringEntry.filePath)
         assertEquals(ResourceResolution.TableValue, stringEntry.resolution)
@@ -105,7 +107,7 @@ class ResourceEntryServiceTest {
                   "generatedAt": "2026-04-25T12:27:00Z",
                   "targetId": "$targetId",
                   "toolVersion": "test",
-                  "contentFingerprint": "stale-fingerprint",
+                  "contentFingerprint": "${workspace.snapshot.contentFingerprint}",
                   "format": "resource-entry-index-v1",
                   "entries": []
                 }
@@ -116,8 +118,14 @@ class ResourceEntryServiceTest {
         val rebuilt = services.resource.listResourceEntries(workspace)
         assertTrue(rebuilt.isNotEmpty())
         val refreshed = Json.parseToJsonElement(indexFile.readText()).jsonObject
+        assertEquals(2, refreshed.getValue("schemaVersion").jsonPrimitive.content.toInt())
+        assertEquals("resource-entry-index-v2", refreshed.getValue("format").jsonPrimitive.content)
         assertEquals(workspace.snapshot.contentFingerprint, refreshed.getValue("contentFingerprint").jsonPrimitive.content)
         assertTrue(refreshed.getValue("entries").jsonArray.isNotEmpty())
+        assertTrue(
+            refreshed.getValue("entries").jsonArray
+                .any { it.jsonObject["packageName"]?.jsonPrimitive?.content == "fixture.listindex" },
+        )
     }
 
     @Test

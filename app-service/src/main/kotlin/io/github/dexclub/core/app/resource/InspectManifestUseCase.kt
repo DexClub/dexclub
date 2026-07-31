@@ -2,6 +2,7 @@ package io.github.dexclub.core.app.resource
 
 import io.github.dexclub.core.api.resource.ManifestInspectionResult
 import io.github.dexclub.core.api.resource.ManifestInspectionSection
+import io.github.dexclub.core.api.resource.ManifestComponentType
 import io.github.dexclub.core.api.resource.ResourceService
 import io.github.dexclub.core.api.resource.InspectManifestRequest
 import io.github.dexclub.core.api.workspace.WorkspaceContext
@@ -15,6 +16,8 @@ data class InspectManifestUseCaseRequest(
     val workdir: String? = null,
     val includes: Set<ManifestInspectionSection>,
     val includeText: Boolean = false,
+    val componentName: String? = null,
+    val componentType: ManifestComponentType? = null,
 )
 
 data class InspectManifestUseCaseResult(
@@ -41,6 +44,8 @@ class InspectManifestUseCase(
             request = InspectManifestRequest(
                 includes = request.includes,
                 includeText = request.includeText,
+                componentName = request.componentName,
+                componentType = request.componentType,
             ),
         )
         return InspectManifestUseCaseResult(

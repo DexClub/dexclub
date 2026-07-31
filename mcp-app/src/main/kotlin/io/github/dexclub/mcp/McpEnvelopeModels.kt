@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonObject
 internal data class McpErrorDetail(
     val code: String,
     val message: String,
+    val details: JsonObject? = null,
 )
 
 @Serializable

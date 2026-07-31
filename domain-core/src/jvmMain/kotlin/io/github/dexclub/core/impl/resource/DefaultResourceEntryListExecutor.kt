@@ -8,6 +8,8 @@ import io.github.dexclub.core.api.resource.normalizedResolution
 import io.github.dexclub.core.api.workspace.WorkspaceContext
 import io.github.dexclub.core.impl.workspace.model.MaterialInventory
 import io.github.dexclub.core.impl.workspace.model.ResourceEntryIndexRecord
+import io.github.dexclub.core.impl.workspace.model.resourceEntryIndexFormat
+import io.github.dexclub.core.impl.workspace.model.resourceEntryIndexSchemaVersion
 import io.github.dexclub.core.impl.workspace.store.WorkspaceStore
 import java.nio.file.Path
 
@@ -21,7 +23,9 @@ internal class DefaultResourceEntryListExecutor(
     ): List<ResourceEntry> {
         store.loadResourceEntryIndex(workspace.workdir, workspace.activeTargetId)
             ?.takeIf {
-                it.toolVersion == toolVersion &&
+                it.schemaVersion == resourceEntryIndexSchemaVersion &&
+                    it.format == resourceEntryIndexFormat &&
+                    it.toolVersion == toolVersion &&
                     it.contentFingerprint == workspace.snapshot.contentFingerprint
             }
             ?.let { return it.entries.map(ResourceEntry::normalizedResolution) }
@@ -57,6 +61,7 @@ internal class DefaultResourceEntryListExecutor(
                 .map { resource ->
                     ResourceEntry(
                         resourceId = resource.hexId,
+                        packageName = resource.packageName,
                         type = resource.type,
                         name = resource.name,
                         filePath = null,
@@ -78,6 +83,7 @@ internal class DefaultResourceEntryListExecutor(
                 add(
                     ResourceEntry(
                         resourceId = resourceEntry.hexId,
+                        packageName = resourceEntry.packageName,
                         type = entry.typeName,
                         name = entry.name,
                         filePath = filePath,
@@ -116,12 +122,14 @@ internal fun normalizeResourceEntries(entries: List<ResourceEntry>): List<Resour
 internal sealed interface LogicalResourceKey {
     data class ById(
         val sourcePath: String,
+        val packageName: String?,
         val type: String,
         val resourceId: String,
     ) : LogicalResourceKey
 
     data class ByName(
         val sourcePath: String,
+        val packageName: String?,
         val type: String,
         val name: String,
     ) : LogicalResourceKey
@@ -132,6 +140,7 @@ private fun ResourceEntry.logicalGroupingKey(): LogicalResourceKey? =
         !sourcePath.isNullOrBlank() && !type.isNullOrBlank() && !resourceId.isNullOrBlank() ->
             LogicalResourceKey.ById(
                 sourcePath = sourcePath,
+                packageName = packageName,
                 type = type,
                 resourceId = resourceId,
             )
@@ -139,6 +148,7 @@ private fun ResourceEntry.logicalGroupingKey(): LogicalResourceKey? =
         !sourcePath.isNullOrBlank() && !type.isNullOrBlank() && !name.isNullOrBlank() ->
             LogicalResourceKey.ByName(
                 sourcePath = sourcePath,
+                packageName = packageName,
                 type = type,
                 name = name,
             )
@@ -148,6 +158,7 @@ private fun ResourceEntry.logicalGroupingKey(): LogicalResourceKey? =
 
 private val resourceEntrySortOrder =
     compareBy<ResourceEntry>(
+        { it.packageName.orEmpty() },
         { it.type.orEmpty() },
         { it.name.orEmpty() },
         { it.filePath.orEmpty() },
@@ -177,7 +188,7 @@ private fun resolutionRank(resolution: ResourceResolution): Int =
     }
 
 private fun resourceCompleteness(entry: ResourceEntry): Int =
-    listOf(entry.name, entry.filePath, entry.sourcePath, entry.sourceEntry, entry.resourceId)
+    listOf(entry.packageName, entry.name, entry.filePath, entry.sourcePath, entry.sourceEntry, entry.resourceId)
         .count { !it.isNullOrBlank() }
 
 private fun unresolvedResourceResolution(hasEntryPayload: Boolean): ResourceResolution =

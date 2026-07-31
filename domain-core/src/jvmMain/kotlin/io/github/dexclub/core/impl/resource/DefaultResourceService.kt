@@ -103,7 +103,12 @@ internal class DefaultResourceService(
             .sortedWith(
                 compareBy<ResourceEntryValueHit>(
                     { it.type.orEmpty() },
+                    { it.packageName.orEmpty() },
                     { it.name.orEmpty() },
+                    { it.qualifier.orEmpty() },
+                    { it.bagIndex ?: -1 },
+                    { it.bagKey.orEmpty() },
+                    { it.matchTarget.orEmpty() },
                     { it.value.orEmpty() },
                     { it.resourceId.orEmpty() },
                     { it.sourcePath.orEmpty() },

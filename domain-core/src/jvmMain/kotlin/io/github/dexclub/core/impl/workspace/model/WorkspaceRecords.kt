@@ -14,14 +14,14 @@ internal const val targetSchemaVersion: Int = 1
 internal const val snapshotSchemaVersion: Int = 1
 internal const val classSourceMapSchemaVersion: Int = 2
 internal const val manifestCacheSchemaVersion: Int = 1
-internal const val resourceTableCacheSchemaVersion: Int = 1
+internal const val resourceTableCacheSchemaVersion: Int = 2
 internal const val decodedXmlCacheSchemaVersion: Int = 1
-internal const val resourceEntryIndexSchemaVersion: Int = 1
+internal const val resourceEntryIndexSchemaVersion: Int = 2
 internal const val classSourceMapFormat: String = "class-source-map-v2"
 internal const val manifestFormat: String = "xml-text"
-internal const val resourceTableFormat: String = "resource-table-v1"
+internal const val resourceTableFormat: String = "resource-table-v2"
 internal const val decodedXmlFormat: String = "xml-text"
-internal const val resourceEntryIndexFormat: String = "resource-entry-index-v1"
+internal const val resourceEntryIndexFormat: String = "resource-entry-index-v2"
 
 internal data class WorkspaceRecord(
     val schemaVersion: Int = workspaceSchemaVersion,
@@ -142,15 +142,43 @@ internal data class ResourceTablePayloadRecord(
 
 internal data class ResourceTableValueRecord(
     val resourceId: String? = null,
+    val packageName: String? = null,
     val type: String? = null,
     val name: String? = null,
-    val value: String? = null,
-    val pluralItems: List<ResourcePluralItemRecord>? = null,
+    val variants: List<ResourceValueVariantRecord> = emptyList(),
 )
 
-internal data class ResourcePluralItemRecord(
-    val quantity: String,
-    val value: String,
+internal data class ResourceValueVariantRecord(
+    val qualifiers: String,
+    val isDefault: Boolean,
+    val value: ResourceTypedValueRecord? = null,
+    val bag: ResourceBagRecord? = null,
+)
+
+internal data class ResourceTypedValueRecord(
+    val valueType: String,
+    val rawData: Int,
+    val rawDataHex: String,
+    val decodedValue: String? = null,
+    val referencedResourceId: String? = null,
+)
+
+internal data class ResourceBagRecord(
+    val kind: String,
+    val parentResourceId: String? = null,
+    val parentResourceName: String? = null,
+    val items: List<ResourceBagItemRecord> = emptyList(),
+)
+
+internal data class ResourceBagItemRecord(
+    val rawKey: String,
+    val keyResourceId: String? = null,
+    val keyName: String? = null,
+    val index: Int? = null,
+    val quantity: String? = null,
+    val attributeType: String? = null,
+    val attributeFormats: List<String>? = null,
+    val value: ResourceTypedValueRecord,
 )
 
 internal data class DecodedXmlCacheRecord(

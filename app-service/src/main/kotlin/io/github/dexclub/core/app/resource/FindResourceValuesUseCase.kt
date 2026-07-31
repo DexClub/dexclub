@@ -16,6 +16,10 @@ data class FindResourceValuesUseCaseRequest(
     val value: String,
     val contains: Boolean = false,
     val ignoreCase: Boolean = false,
+    val packageName: String? = null,
+    val qualifier: String? = null,
+    val valueKind: String? = null,
+    val matchTarget: String? = null,
     val offset: Int? = null,
     val limit: Int? = null,
 )
@@ -52,6 +56,10 @@ class FindResourceValuesUseCase(
                 value = request.value,
                 contains = request.contains,
                 ignoreCase = request.ignoreCase,
+                packageName = request.packageName,
+                qualifier = request.qualifier,
+                valueKind = request.valueKind,
+                matchTarget = request.matchTarget,
             ),
         )
         val slice = applyWindowSlice(hits, request.offset, request.limit)

@@ -23,19 +23,17 @@ internal class ResourceSearchQueryParser {
                 cause = error,
             )
         }
-        val type = root.requiredString("type")
+        val type = root.requiredString("resourceType")
         val value = root.requiredString("value")
-        if (type !in SUPPORTED_TYPES) {
-            throw ResourceDecodeError(
-                reason = ResourceDecodeErrorReason.ResourceQueryInvalid,
-                message = "Unsupported resource query type: $type",
-            )
-        }
         return ResourceSearchQuery(
-            type = type,
+            resourceType = type,
             value = value,
             contains = root.optionalBoolean("contains") ?: false,
             ignoreCase = root.optionalBoolean("ignoreCase") ?: false,
+            packageName = root.optionalString("packageName"),
+            qualifier = root.optionalString("qualifier"),
+            valueKind = root.optionalString("valueKind"),
+            matchTarget = root.optionalString("matchTarget")?.toMatchTarget() ?: ResourceValueMatchTarget.DecodedValue,
         )
     }
 
@@ -57,7 +55,19 @@ internal class ResourceSearchQueryParser {
         )
     }
 
-    private companion object {
-        val SUPPORTED_TYPES = setOf("string", "integer", "bool", "color")
-    }
+    private fun JsonObject.optionalString(key: String): String? =
+        (this[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotEmpty() }
+
+    private fun String.toMatchTarget(): ResourceValueMatchTarget =
+        when (this) {
+            "decoded_value" -> ResourceValueMatchTarget.DecodedValue
+            "raw_data" -> ResourceValueMatchTarget.RawData
+            "reference" -> ResourceValueMatchTarget.Reference
+            "bag_key" -> ResourceValueMatchTarget.BagKey
+            "any" -> ResourceValueMatchTarget.Any
+            else -> throw ResourceDecodeError(
+                reason = ResourceDecodeErrorReason.ResourceQueryInvalid,
+                message = "Unsupported resource query matchTarget: $this",
+            )
+        }
 }

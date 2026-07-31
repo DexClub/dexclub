@@ -21,9 +21,13 @@ import io.github.dexclub.core.app.projection.FieldHitProjection
 import io.github.dexclub.core.app.projection.MethodDetailProjection
 import io.github.dexclub.core.app.projection.MethodFieldUsageProjection
 import io.github.dexclub.core.app.projection.MethodHitProjection
+import io.github.dexclub.core.app.projection.ResourceBagItemProjection
+import io.github.dexclub.core.app.projection.ResourceBagProjection
+import io.github.dexclub.core.app.projection.ResourceConfigurationProjection
 import io.github.dexclub.core.app.projection.ResourceEntryValueHitProjection
-import io.github.dexclub.core.app.projection.ResourcePluralItemProjection
+import io.github.dexclub.core.app.projection.ResourceTypedValueProjection
 import io.github.dexclub.core.app.projection.ResourceValueProjection
+import io.github.dexclub.core.app.projection.ResourceValueVariantProjection
 import kotlinx.serialization.Serializable
 
 internal sealed interface RenderPayload {
@@ -117,43 +121,106 @@ internal data class ResourceTableView(
 @Serializable
 internal data class ResourceValueView(
     val resourceId: String? = null,
+    val packageName: String? = null,
     val type: String,
     val name: String,
-    val value: String? = null,
-    val pluralItems: List<ResourcePluralItemView>? = null,
+    val variants: List<ResourceValueVariantView> = emptyList(),
 ) {
     companion object {
         fun from(result: ResourceValueProjection): ResourceValueView =
             ResourceValueView(
                 resourceId = result.resourceId,
+                packageName = result.packageName,
                 type = result.type,
                 name = result.name,
-                value = result.value,
-                pluralItems = result.pluralItems?.map(ResourcePluralItemView::from),
+                variants = result.variants.map(ResourceValueVariantView::from),
             )
     }
 }
 
 @Serializable
-internal data class ResourcePluralItemView(
-    val quantity: String,
-    val value: String,
+internal data class ResourceValueVariantView(
+    val configuration: ResourceConfigurationView,
+    val value: ResourceTypedValueView? = null,
+    val bag: ResourceBagView? = null,
 ) {
     companion object {
-        fun from(item: ResourcePluralItemProjection): ResourcePluralItemView =
-            ResourcePluralItemView(
-                quantity = item.quantity,
-                value = item.value,
+        fun from(item: ResourceValueVariantProjection): ResourceValueVariantView =
+            ResourceValueVariantView(
+                configuration = ResourceConfigurationView.from(item.configuration),
+                value = item.value?.let(ResourceTypedValueView::from),
+                bag = item.bag?.let(ResourceBagView::from),
             )
+    }
+}
+
+@Serializable
+internal data class ResourceConfigurationView(val qualifiers: String, val isDefault: Boolean) {
+    companion object {
+        fun from(item: ResourceConfigurationProjection) = ResourceConfigurationView(item.qualifiers, item.isDefault)
+    }
+}
+
+@Serializable
+internal data class ResourceTypedValueView(
+    val valueType: String,
+    val rawData: Int,
+    val rawDataHex: String,
+    val decodedValue: String? = null,
+    val referencedResourceId: String? = null,
+) {
+    companion object {
+        fun from(item: ResourceTypedValueProjection) = ResourceTypedValueView(
+            item.valueType, item.rawData, item.rawDataHex, item.decodedValue, item.referencedResourceId,
+        )
+    }
+}
+
+@Serializable
+internal data class ResourceBagView(
+    val kind: String,
+    val parentResourceId: String? = null,
+    val parentResourceName: String? = null,
+    val items: List<ResourceBagItemView> = emptyList(),
+) {
+    companion object {
+        fun from(item: ResourceBagProjection) = ResourceBagView(
+            item.kind, item.parentResourceId, item.parentResourceName, item.items.map(ResourceBagItemView::from),
+        )
+    }
+}
+
+@Serializable
+internal data class ResourceBagItemView(
+    val rawKey: String,
+    val keyResourceId: String? = null,
+    val keyName: String? = null,
+    val index: Int? = null,
+    val quantity: String? = null,
+    val attributeType: String? = null,
+    val attributeFormats: List<String>? = null,
+    val value: ResourceTypedValueView,
+) {
+    companion object {
+        fun from(item: ResourceBagItemProjection) = ResourceBagItemView(
+            item.rawKey, item.keyResourceId, item.keyName, item.index, item.quantity,
+            item.attributeType, item.attributeFormats, ResourceTypedValueView.from(item.value),
+        )
     }
 }
 
 @Serializable
 internal data class ResourceEntryValueHitView(
     val resourceId: String? = null,
+    val packageName: String? = null,
     val type: String? = null,
     val name: String? = null,
     val value: String? = null,
+    val qualifier: String? = null,
+    val valueKind: String? = null,
+    val matchTarget: String? = null,
+    val bagIndex: Int? = null,
+    val bagKey: String? = null,
     val sourcePath: String? = null,
     val sourceEntry: String? = null,
 ) {
@@ -161,9 +228,15 @@ internal data class ResourceEntryValueHitView(
         fun from(hit: ResourceEntryValueHitProjection): ResourceEntryValueHitView =
             ResourceEntryValueHitView(
                 resourceId = hit.resourceId,
+                packageName = hit.packageName,
                 type = hit.type,
                 name = hit.name,
                 value = hit.value,
+                qualifier = hit.qualifier,
+                valueKind = hit.valueKind,
+                matchTarget = hit.matchTarget,
+                bagIndex = hit.bagIndex,
+                bagKey = hit.bagKey,
                 sourcePath = hit.sourcePath,
                 sourceEntry = hit.sourceEntry,
             )

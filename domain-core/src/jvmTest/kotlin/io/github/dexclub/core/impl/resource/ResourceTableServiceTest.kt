@@ -111,6 +111,8 @@ class ResourceTableServiceTest {
 
         assertTrue(cacheFile.isFile)
         val first = Json.parseToJsonElement(cacheFile.readText()).jsonObject
+        assertEquals(2, first.getValue("schemaVersion").jsonPrimitive.content.toInt())
+        assertEquals("resource-table-v2", first.getValue("format").jsonPrimitive.content)
         assertEquals("app.apk", first.getValue("sourcePath").jsonPrimitive.content)
         assertEquals("resources.arsc", first.getValue("sourceEntry").jsonPrimitive.content)
 
@@ -140,6 +142,34 @@ class ResourceTableServiceTest {
         val refreshed = Json.parseToJsonElement(cacheFile.readText()).jsonObject
         assertTrue(refreshed.getValue("sourceFingerprint").jsonPrimitive.content != "stale-fingerprint")
         assertEquals(1, refreshed.getValue("payload").jsonObject.getValue("entries").jsonArray.size)
+    }
+
+    @Test
+    fun dumpResourceTableRejectsDeserializableCacheWithStaleSchemaOrFormat() {
+        val workdir = createTempDirectory("dexclub-resource-cache-contract")
+        val apkFile = workdir.resolve("app.apk").toFile()
+        compileResourceApk(
+            outputApk = apkFile,
+            manifestText = """<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="fixture.cachecontract"><application /></manifest>""",
+            resourceXml = """<resources><string name="app_name">Fixture</string></resources>""",
+        )
+        val services = createDefaultServices()
+        services.workspace.initialize(apkFile.toString())
+        val workspace = services.workspace.open(WorkspaceRef(workdir.toString()))
+        services.resource.dumpResourceTable(workspace)
+        val cacheFile = workdir.resolve(".dexclub/targets/${workspace.activeTargetId}/cache/decoded/resource-table.json").toFile()
+
+        cacheFile.writeText(
+            cacheFile.readText().replace("\"schemaVersion\": 2", "\"schemaVersion\": 1")
+                .replace("\"typeCount\": 1", "\"typeCount\": 0"),
+        )
+        assertEquals(1, services.resource.dumpResourceTable(workspace).typeCount)
+
+        cacheFile.writeText(
+            cacheFile.readText().replace("resource-table-v2", "resource-table-v1")
+                .replace("\"typeCount\": 1", "\"typeCount\": 0"),
+        )
+        assertEquals(1, services.resource.dumpResourceTable(workspace).typeCount)
     }
 
     @Test

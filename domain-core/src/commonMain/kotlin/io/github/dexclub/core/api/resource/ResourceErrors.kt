@@ -23,6 +23,16 @@ enum class ResourceDecodeErrorReason {
 class ResourceDecodeError(
     val reason: ResourceDecodeErrorReason,
     val sourcePath: String? = null,
+    val candidates: List<ResourceValueCandidate> = emptyList(),
     override val message: String,
     cause: Throwable? = null,
 ) : RuntimeException(message, cause)
+
+data class ResourceValueCandidate(
+    val resourceId: String? = null,
+    val packageName: String? = null,
+    val type: String? = null,
+    val name: String? = null,
+    val sourcePath: String? = null,
+    val sourceEntry: String? = null,
+)
