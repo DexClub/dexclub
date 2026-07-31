@@ -87,14 +87,14 @@ internal class DefaultResourceValueExecutor(
             message = buildNotFoundMessage(request),
         )
 
-        if (!resource.iterator().hasNext()) {
+        val resourceValue = resource.toResourceValueOrNull() ?: run {
             throw ResourceDecodeError(
                 reason = ResourceDecodeErrorReason.ResourceValueNotFound,
                 sourcePath = loaded.sourcePath,
                 message = buildNotFoundMessage(request),
             )
         }
-        return resource.toResourceValue().selectVariants(request, loaded.sourcePath)
+        return resourceValue.selectVariants(request, loaded.sourcePath)
     }
 
     override fun findResourceValues(
@@ -112,8 +112,9 @@ internal class DefaultResourceValueExecutor(
             .asSequence()
             .filter { resource -> resource.type == query.resourceType }
             .filter { resource -> query.packageName == null || resource.packageName == query.packageName }
+            .mapNotNull { resource -> resource.toResourceValueOrNull() }
             .flatMap { resource ->
-                findMatches(resource.toResourceValue(), query, loaded.sourcePath, loaded.sourceEntry).asSequence()
+                findMatches(resource, query, loaded.sourcePath, loaded.sourceEntry).asSequence()
             }
             .toList()
     }

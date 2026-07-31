@@ -75,7 +75,7 @@ internal class DefaultResourceTableExecutor(
                     values = loaded.tableBlock.resources
                         .asSequence()
                         .mapNotNull { resource ->
-                            val decoded = resource.toResourceValue()
+                            val decoded = resource.toResourceValueOrNull() ?: return@mapNotNull null
                             if (decoded.variants.isEmpty()) return@mapNotNull null
                             ResourceTableValueRecord(
                                 resourceId = decoded.resourceId,

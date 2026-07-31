@@ -31,6 +31,9 @@ internal fun ArscResourceEntry.toResourceValue(): ResourceValue {
     )
 }
 
+internal fun ArscResourceEntry.toResourceValueOrNull(): ResourceValue? =
+    takeIf { it.isDeclared && !it.isEmpty }?.toResourceValue()
+
 internal fun Entry.toDisplayValue(): String? = getResValue()?.toTypedValue()?.decodedValue
 
 private fun Entry.toResourceValueVariant(): ResourceValueVariant =

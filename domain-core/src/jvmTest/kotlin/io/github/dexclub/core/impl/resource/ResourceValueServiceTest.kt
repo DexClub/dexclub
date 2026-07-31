@@ -1,5 +1,7 @@
 package io.github.dexclub.core.impl.resource
 
+import com.reandroid.arsc.chunk.PackageBlock
+import com.reandroid.arsc.model.ResourceEntry as ArscResourceEntry
 import io.github.dexclub.core.api.resource.FindResourcesRequest
 import io.github.dexclub.core.api.resource.ResolveResourceRequest
 import io.github.dexclub.core.api.resource.ResourceBagKind
@@ -16,6 +18,15 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class ResourceValueServiceTest {
+    @Test
+    fun undeclaredArscResourceEntryIsSkippedBeforeValueConversion() {
+        val entry = ArscResourceEntry(PackageBlock(), 0)
+
+        assertTrue(!entry.isDeclared)
+        assertTrue(entry.isEmpty)
+        assertEquals(null, entry.toResourceValueOrNull())
+    }
+
     @Test
     fun resourceValueQueryRejectsLegacyTypeField() {
         val error = assertFailsWith<io.github.dexclub.core.api.resource.ResourceDecodeError> {
