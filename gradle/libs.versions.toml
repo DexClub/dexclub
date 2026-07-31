@@ -1,15 +1,15 @@
 [versions]
-agp = "9.2.0"
-kotlin = "2.3.21"
-kotlinx-coroutines = "1.10.2"
-kotlinx-serialization = "1.9.0"
+agp = "9.3.1"
+kotlin = "2.4.10"
+kotlinx-coroutines = "1.11.0"
+kotlinx-serialization = "1.11.0"
 smali = "3.0.9"
-jadx = "1.5.5"
+jadx = "1.5.6"
 arsclib = "1.4.0"
-slf4j = "2.0.17"
-shadow = "9.4.1"
-mcp = "0.12.0"
-ktor = "3.3.3"
+slf4j = "2.0.18"
+shadow = "9.6.1"
+mcp = "0.15.0"
+ktor = "3.5.1"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
