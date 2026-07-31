@@ -25,7 +25,7 @@ Do not fall back to shell reverse engineering, local decompiled output, or dexcl
 
 Use this order unless the task clearly justifies a shorter path:
 
-1. open an absolute input path with `open_target_session`
+1. call `open_target_session` with the absolute target path in `input`
 2. choose one entry path from the strongest clue
 3. run the smallest useful `find_*`, manifest, or resource query
 4. use `brief=true` first and project extra `fields` only when needed
@@ -41,7 +41,9 @@ If the user provides a full method descriptor such as `Lpkg/Class;->name(args)Re
 
 Treat a full descriptor as a direct object reference, not a search hint.
 
-When calling `open_target_session`, always pass an absolute existing path. Relative paths resolve against the MCP server process, not the conversational working directory.
+When calling `open_target_session`, pass the absolute existing target path in the `input` argument.
+Do not use a `path` argument. Relative paths resolve against the MCP server process, not the
+conversational working directory.
 
 Interpret snapshot `inventoryCounts` as recognized top-level target materials, not archive members.
 For an APK, `apkCount=1` with zero Dex, Manifest, or ARSC counts is expected even when those
@@ -120,6 +122,10 @@ If the underlying target changes, call `refresh_target_session`, discard old han
 After restoring a chat or restarting Codex or the MCP server, confirm previous state with `get_target_session`, `list_target_sessions`, or `diagnose_target_sessions`. Reopen the target when the session no longer exists.
 
 If a session or handle is not found, rebuild or reacquire it. Never reconstruct handles manually.
+
+Require every inspect or export handle to be a non-empty value copied from a successful result in
+the current session. When a handle call returns not found, discard that handle, rerun the narrow
+lookup, and use the newly returned handle. Never retry an unchanged missing handle.
 
 For a bounded one-shot validation, close the target session before the final report and use
 `diagnose_target_sessions` or `list_target_sessions` when cleanup itself is part of the check.
@@ -203,6 +209,10 @@ For value analysis:
 
 `list_res` supports exact `resource_id`, `package_name`, `resource_type`, `name`, `file_path`, and `resolution` filters. Apply the strongest known identity filters before paging.
 
+Deduplicate resource IDs collected from code before lookup, and resolve only the IDs needed for the
+current uncertainty or final evidence. Do not enumerate every nearby integer constant or repeat an
+exact `list_res` request already answered in the same target snapshot.
+
 `find_resource_values` separates resource identity from value matching:
 
 - `resource_type` selects the Android resource type
@@ -285,6 +295,10 @@ Distinguish clues, facts, evidence, and conclusions. Do not promote one search h
 Keep the scope of a conclusion no broader than the evidence examined. Treat a zero result from a package-, type-, API-, or branch-constrained query as scoped evidence, not a global negative. Before claiming that a feature or flow is absent, follow plausible indirection or explicitly report the inspected scope and remaining uncertainty.
 
 Do not assign semantics to an obfuscated or wrapper call from its name or argument values alone. Inspect the implementation that gives those values meaning, or report the call only as a clue.
+
+Separate discovered candidates from implementation-verified candidates when a batch inspect or
+export partly fails. Do not generalize behavior proven by successful items to failed or uninspected
+siblings; reacquire and verify them, or report them only as candidates.
 
 Do not present sibling order, ownership, or a fixed layout tree as established when only module
 registration and dynamic binding are known. Render unverified siblings as unordered or explicitly
