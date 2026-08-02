@@ -216,7 +216,9 @@ private fun ProjectsPane(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.padding(horizontal = 28.dp, vertical = 24.dp),
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 28.dp, vertical = 24.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -266,7 +268,9 @@ private fun ProjectsPane(
                 uiState = uiState,
                 onEnterWorkspace = onEnterWorkspace,
                 onDelete = onDeleteWorkspace,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
             )
         }
     }

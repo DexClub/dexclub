@@ -5,10 +5,15 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,6 +28,7 @@ import io.github.dexclub.app.model.WorkspaceSummary
 import io.github.dexclub.app.res.StringRes
 import io.github.shadcn.ui.compose.Icon
 import io.github.shadcn.ui.compose.ShadcnTheme
+import io.github.shadcn.ui.compose.VerticalScrollbar
 import io.github.shadcn.ui.compose.foundation.rememberShadcnIndication
 import io.github.shadcn.ui.compose.icons.Close
 import io.github.shadcn.ui.compose.icons.Icons
@@ -91,18 +97,38 @@ fun WorkspaceListPart(
     onDelete: (WorkspaceSummary) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+    val listState = rememberLazyListState()
+
+    Box(
         modifier = modifier,
     ) {
-        uiState.workspaceItems.forEach { item ->
-            WorkspaceListItem(
-                item = item,
-                onSelect = { summary ->
-                    onEnterWorkspace(summary)
-                },
-                onDelete = onDelete,
-            )
+        LazyColumn(
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(end = 10.dp),
+        ) {
+            items(
+                items = uiState.workspaceItems,
+                key = WorkspaceSummary::id,
+            ) { item ->
+                WorkspaceListItem(
+                    item = item,
+                    onSelect = { summary ->
+                        onEnterWorkspace(summary)
+                    },
+                    onDelete = onDelete,
+                )
+            }
         }
+
+        VerticalScrollbar(
+            state = listState,
+            autoHide = false,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(vertical = 4.dp),
+        )
     }
 }
