@@ -69,6 +69,8 @@ internal fun CodeViewPane(
     paneIndex: Int,
     kind: String,
     isSelectedTab: Boolean,
+    isActivePane: Boolean,
+    onRequestActivatePane: (Int, String) -> Unit,
     navigationRevealTarget: NavigationRevealTarget?,
     modifier: Modifier = Modifier,
     paddingValues: PaddingValues = PaddingValues.Zero,
@@ -135,10 +137,17 @@ internal fun CodeViewPane(
             selection = effectiveSelection,
         )
     }
-    val inPageSearchMatches = remember(currentText, inPageSearchState.matchQuery) {
+    val inPageSearchMatches = remember(
+        currentText,
+        inPageSearchState.matchQuery,
+        inPageSearchState.caseSensitive,
+        inPageSearchState.wholeWord,
+    ) {
         resolveInPageSearchMatches(
             text = currentText,
             query = inPageSearchState.matchQuery,
+            caseSensitive = inPageSearchState.caseSensitive,
+            wholeWord = inPageSearchState.wholeWord,
         )
     }
     val activeSearchMatchIndex = remember(inPageSearchState.activeMatchIndex, inPageSearchMatches) {
@@ -175,6 +184,12 @@ internal fun CodeViewPane(
         }
     }
     val effectiveCursorTarget = navigationCursorTarget ?: pendingSearchRevealTarget
+
+    fun ensurePaneActivated() {
+        if (!isSelectedTab) return
+        if (isActivePane) return
+        onRequestActivatePane(paneIndex, kind)
+    }
 
     fun requestSearchReveal(
         matchQuery: String,
@@ -357,12 +372,49 @@ internal fun CodeViewPane(
         activateSearchMatch(nextIndex)
     }
 
+    fun updateSearchOptions(
+        caseSensitive: Boolean = inPageSearchState.caseSensitive,
+        wholeWord: Boolean = inPageSearchState.wholeWord,
+    ) {
+        val matches = resolveInPageSearchMatches(
+            text = currentText,
+            query = inPageSearchState.matchQuery,
+            caseSensitive = caseSensitive,
+            wholeWord = wholeWord,
+        )
+        val activeMatchIndex = effectiveSelection?.let { selection ->
+            findInPageSearchMatchIndex(
+                matches = matches,
+                selection = selection,
+            )
+        } ?: 0
+        pushInPageSearchState(
+            inPageSearchState.copy(
+                caseSensitive = caseSensitive,
+                wholeWord = wholeWord,
+                activeMatchIndex = activeMatchIndex.coerceAtLeast(0),
+                isVisible = true,
+            ),
+        )
+        if (matches.isNotEmpty()) {
+            applySearchMatch(
+                match = matches[activeMatchIndex.coerceIn(0, matches.lastIndex)],
+                matchQuery = inPageSearchState.matchQuery,
+                matchIndex = activeMatchIndex.coerceIn(0, matches.lastIndex),
+            )
+        } else {
+            clearSearchSelection()
+        }
+    }
+
     fun updateSearchQuery(
         query: String,
     ) {
         val matches = resolveInPageSearchMatches(
             text = currentText,
             query = query,
+            caseSensitive = inPageSearchState.caseSensitive,
+            wholeWord = inPageSearchState.wholeWord,
         )
         pushInPageSearchState(
             inPageSearchState.copy(
@@ -385,7 +437,7 @@ internal fun CodeViewPane(
     }
 
     fun openSearchBar(selectedQueryCandidate: String? = selectedText) {
-        callbacks.onActivatePane(tab, paneIndex, kind)
+        ensurePaneActivated()
         val selectedQuery = selectedQueryCandidate?.takeIf { text ->
             text.isNotBlank() && !text.contains('\n') && !text.contains('\r')
         }
@@ -393,6 +445,8 @@ internal fun CodeViewPane(
             val matches = resolveInPageSearchMatches(
                 text = currentText,
                 query = selectedQuery,
+                caseSensitive = inPageSearchState.caseSensitive,
+                wholeWord = inPageSearchState.wholeWord,
             )
             val activeMatchIndex = effectiveSelection?.let { selection ->
                 findInPageSearchMatchIndex(
@@ -454,13 +508,21 @@ internal fun CodeViewPane(
         modifier = modifier.onPreviewKeyEvent(::handleSearchShortcut),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (inPageSearchState.isVisible) {
+            if (isActivePane && inPageSearchState.isVisible) {
                 WorkspaceInPageSearchBar(
                     queryText = inPageSearchState.queryText,
                     activeMatchIndex = activeSearchMatchIndex,
                     matchCount = inPageSearchMatches.size,
+                    caseSensitive = inPageSearchState.caseSensitive,
+                    wholeWord = inPageSearchState.wholeWord,
                     requestFocusToken = inPageSearchState.requestFocusToken,
                     onQueryChange = ::updateSearchQuery,
+                    onCaseSensitiveChange = { caseSensitive ->
+                        updateSearchOptions(caseSensitive = caseSensitive)
+                    },
+                    onWholeWordChange = { wholeWord ->
+                        updateSearchOptions(wholeWord = wholeWord)
+                    },
                     onPreviousMatch = { navigateSearchMatch(delta = -1) },
                     onNextMatch = { navigateSearchMatch(delta = 1) },
                     onClose = ::closeSearchBar,
@@ -507,11 +569,13 @@ internal fun CodeViewPane(
                 },
                 onSelectionChange = { selection ->
                     if (!isSelectedTab) return@CodeEditor
+                    ensurePaneActivated()
                     pendingSearchRevealTarget = null
                     latestSelection = selection
                 },
                 onCursorChange = { nextCursor ->
                     if (!isSelectedTab) return@CodeEditor
+                    ensurePaneActivated()
                     pendingSearchRevealTarget = null
                     latestCursor = nextCursor
                     updateCursorSelection(
@@ -521,6 +585,7 @@ internal fun CodeViewPane(
                 },
                 onAnnotationHit = { hit ->
                     if (!isSelectedTab) return@CodeEditor
+                    ensurePaneActivated()
                     val request = toNavigateRequestContext(
                         annotationHit = hit,
                         tabId = tab.tabId,
@@ -535,7 +600,7 @@ internal fun CodeViewPane(
                 },
                 onContextMenu = { hit, offset ->
                     if (!isSelectedTab) return@CodeEditor
-                    callbacks.onActivatePane(tab, paneIndex, kind)
+                    ensurePaneActivated()
                     menuPos = offset
                     menuNavigateContext = hit?.let {
                         toNavigateRequestContext(
@@ -554,7 +619,7 @@ internal fun CodeViewPane(
             CodeContextMenu(
                 selectedText = selectedText,
                 onSelectAll = {
-                    callbacks.onActivatePane(tab, paneIndex, kind)
+                    ensurePaneActivated()
                     val selection = resolveSelectAllSelection(currentText)
                     latestSelection = selection
                     latestCursor = selection?.let {

@@ -1414,6 +1414,11 @@ class WorkspaceSceneViewModel internal constructor(
         kind: String,
         state: EditorInPageSearchState,
     ) {
+        syncVisibleInPageSearchWithinTab(
+            tabId = tabId,
+            activeKind = kind,
+            isVisible = state.isVisible,
+        )
         editorStateRepository.updateInPageSearchState(tabId, kind, state)
     }
 
@@ -1423,6 +1428,11 @@ class WorkspaceSceneViewModel internal constructor(
         } ?: return
         val activeKind = selectedTab.activeKind
         val currentState = editorStateRepository.getInPageSearchState(selectedTab.tabId, activeKind)
+        syncVisibleInPageSearchWithinTab(
+            tabId = selectedTab.tabId,
+            activeKind = activeKind,
+            isVisible = true,
+        )
         editorStateRepository.updateInPageSearchState(
             tabId = selectedTab.tabId,
             kind = activeKind,
@@ -1440,6 +1450,28 @@ class WorkspaceSceneViewModel internal constructor(
 
     fun clearSearchHighlightsForTab(tabId: String) {
         editorStateRepository.clearSearchHighlightsForTab(tabId)
+    }
+
+    private fun syncVisibleInPageSearchWithinTab(
+        tabId: String,
+        activeKind: String,
+        isVisible: Boolean,
+    ) {
+        if (!isVisible) return
+        val targetTab = _openTabs.value.firstOrNull { tab -> tab.tabId == tabId } ?: return
+        val allKinds = (targetTab.contents.keys + targetTab.requiredKinds)
+            .distinct()
+
+        allKinds.forEach { kind ->
+            if (kind == activeKind) return@forEach
+            val state = editorStateRepository.getInPageSearchState(tabId, kind)
+            if (!state.isVisible) return@forEach
+            editorStateRepository.updateInPageSearchState(
+                tabId = tabId,
+                kind = kind,
+                state = state.copy(isVisible = false),
+            )
+        }
     }
 
     fun activatePane(tab: OpenTabUiModel, paneIndex: Int, kind: String) {

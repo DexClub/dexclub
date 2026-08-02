@@ -31,16 +31,22 @@ internal data class WorkspaceInPageSearchMatch(
 internal fun resolveInPageSearchMatches(
     text: String,
     query: String,
+    caseSensitive: Boolean = false,
+    wholeWord: Boolean = false,
 ): List<WorkspaceInPageSearchMatch> {
     return resolveInPageSearchMatches(
         lines = splitCodeViewLines(text),
         query = query,
+        caseSensitive = caseSensitive,
+        wholeWord = wholeWord,
     )
 }
 
 internal fun resolveInPageSearchMatches(
     lines: List<String>,
     query: String,
+    caseSensitive: Boolean = false,
+    wholeWord: Boolean = false,
 ): List<WorkspaceInPageSearchMatch> {
     if (lines.isEmpty() || query.isEmpty()) {
         return emptyList()
@@ -53,21 +59,42 @@ internal fun resolveInPageSearchMatches(
                 val matchStart = lineText.indexOf(
                     string = query,
                     startIndex = searchStart,
+                    ignoreCase = !caseSensitive,
                 )
                 if (matchStart < 0) {
                     break
+                }
+                val matchEnd = matchStart + query.length
+                if (wholeWord && !isWholeWordSearchMatch(lineText, matchStart, matchEnd)) {
+                    searchStart = matchStart + 1
+                    continue
                 }
                 add(
                     WorkspaceInPageSearchMatch(
                         line = lineIndex,
                         startOffset = matchStart,
-                        endOffset = matchStart + query.length,
+                        endOffset = matchEnd,
                     ),
                 )
-                searchStart = matchStart + query.length
+                searchStart = matchEnd
             }
         }
     }
+}
+
+private fun isWholeWordSearchMatch(
+    lineText: String,
+    matchStart: Int,
+    matchEnd: Int,
+): Boolean {
+    val beforeChar = lineText.getOrNull(matchStart - 1)
+    val afterChar = lineText.getOrNull(matchEnd)
+    return !beforeChar.isSearchTokenChar() && !afterChar.isSearchTokenChar()
+}
+
+private fun Char?.isSearchTokenChar(): Boolean {
+    val value = this ?: return false
+    return value.isLetterOrDigit() || value == '_' || value == '$'
 }
 
 internal fun findInPageSearchMatchIndex(

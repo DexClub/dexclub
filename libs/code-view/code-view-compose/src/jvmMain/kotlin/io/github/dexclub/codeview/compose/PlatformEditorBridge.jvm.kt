@@ -32,9 +32,10 @@ private object JvmPlatformEditorBridge : PlatformEditorBridge {
     override val useTouchSelectionGestures: Boolean = false
     override fun isSoftwareKeyboardVisible(): Boolean = false
 
-    // Desktop IME is driven by a dedicated AWT component rather than a hidden Compose text field.
-    // We keep a reference here so focus requests can target the real host directly.
-    private var latestInputHost: DesktopInputHostComponent? = null
+    // Desktop IME is driven by dedicated AWT components rather than a hidden Compose text field.
+    // In split view we can have multiple editors alive at once, so focus must target the host
+    // bound to the requesting editor instead of a single global "latest" host.
+    private val inputHostsByFocusRequester = mutableMapOf<FocusRequester, DesktopInputHostComponent>()
 
     override fun Modifier.bindEditorInput(
         fieldValue: TextFieldValue,
@@ -61,8 +62,7 @@ private object JvmPlatformEditorBridge : PlatformEditorBridge {
     }
 
     override fun requestInputFocus(focusRequester: FocusRequester) {
-        val inputHost = latestInputHost
-        inputHost?.requestFocusInWindow()
+        inputHostsByFocusRequester[focusRequester]?.requestFocusInWindow()
     }
 
     @Composable
@@ -84,13 +84,11 @@ private object JvmPlatformEditorBridge : PlatformEditorBridge {
         val inputHost = remember { DesktopInputHostComponent() }
         var boundsInWindow = remember { Rect.Zero }
 
-        DisposableEffect(inputHost) {
-            latestInputHost = inputHost
+        DisposableEffect(inputHost, focusRequester) {
+            inputHostsByFocusRequester[focusRequester] = inputHost
 
             onDispose {
-                if (latestInputHost === inputHost) {
-                    latestInputHost = null
-                }
+                inputHostsByFocusRequester.remove(focusRequester, inputHost)
                 detachInputHostFromWindow(inputHost)
             }
         }

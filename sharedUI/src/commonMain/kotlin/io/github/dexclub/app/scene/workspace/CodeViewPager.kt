@@ -7,10 +7,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.dexclub.app.model.OPEN_TAB_KIND_SMALI
@@ -31,8 +34,31 @@ private fun CodeViewPage(
         return
     }
 
+    fun paneKey(
+        paneIndex: Int,
+        kind: String,
+    ): String {
+        return "$paneIndex#$kind"
+    }
+
     fun paneStateOf(kind: String): WorkspaceCodePaneUiState {
         return codePanelUiState.paneState(tab.tabId, kind)
+    }
+
+    var activePaneKey by remember(tab.tabId) {
+        mutableStateOf(paneKey(tab.activePaneIndex, tab.activeKind))
+    }
+
+    LaunchedEffect(tab.activePaneIndex, tab.activeKind) {
+        activePaneKey = paneKey(tab.activePaneIndex, tab.activeKind)
+    }
+
+    fun requestActivatePane(
+        paneIndex: Int,
+        kind: String,
+    ) {
+        activePaneKey = paneKey(paneIndex, kind)
+        callbacks.onActivatePane(tab, paneIndex, kind)
     }
 
     when (tab.mode) {
@@ -61,6 +87,8 @@ private fun CodeViewPage(
                         paneIndex = compactPaneIndex,
                         kind = compactKind,
                         isSelectedTab = isSelected,
+                        isActivePane = isSelected && activePaneKey == paneKey(compactPaneIndex, compactKind),
+                        onRequestActivatePane = ::requestActivatePane,
                         navigationRevealTarget = codePanelUiState.navigationRevealTarget,
                         modifier = Modifier.fillMaxSize(),
                         paddingValues = PaddingValues(end = 4.dp),
@@ -73,6 +101,8 @@ private fun CodeViewPage(
             val rightKind = paneKinds.getOrNull(1)
                 ?: tab.requiredKinds.firstOrNull { it != leftKind }
                 ?: oppositeKind(leftKind)
+            val leftPaneIndex = tab.panes.firstOrNull { pane -> pane.kind == leftKind }?.paneIndex ?: 0
+            val rightPaneIndex = tab.panes.firstOrNull { pane -> pane.kind == rightKind }?.paneIndex ?: 1
 
             Row(modifier = Modifier.fillMaxSize()) {
                 key("${tab.tabId}#$leftKind") {
@@ -80,9 +110,11 @@ private fun CodeViewPage(
                         tab = tab,
                         paneState = paneStateOf(leftKind),
                         callbacks = callbacks,
-                        paneIndex = 0,
+                        paneIndex = leftPaneIndex,
                         kind = leftKind,
                         isSelectedTab = isSelected,
+                        isActivePane = isSelected && activePaneKey == paneKey(leftPaneIndex, leftKind),
+                        onRequestActivatePane = ::requestActivatePane,
                         navigationRevealTarget = codePanelUiState.navigationRevealTarget,
                         modifier = Modifier.weight(1f),
                         paddingValues = PaddingValues(end = 4.dp),
@@ -94,9 +126,11 @@ private fun CodeViewPage(
                         tab = tab,
                         paneState = paneStateOf(rightKind),
                         callbacks = callbacks,
-                        paneIndex = 1,
+                        paneIndex = rightPaneIndex,
                         kind = rightKind,
                         isSelectedTab = isSelected,
+                        isActivePane = isSelected && activePaneKey == paneKey(rightPaneIndex, rightKind),
+                        onRequestActivatePane = ::requestActivatePane,
                         navigationRevealTarget = codePanelUiState.navigationRevealTarget,
                         modifier = Modifier.weight(1f),
                         paddingValues = PaddingValues(end = 4.dp),
@@ -115,6 +149,8 @@ private fun CodeViewPage(
                     paneIndex = 0,
                     kind = kind,
                     isSelectedTab = isSelected,
+                    isActivePane = isSelected,
+                    onRequestActivatePane = ::requestActivatePane,
                     navigationRevealTarget = codePanelUiState.navigationRevealTarget,
                     modifier = Modifier.fillMaxSize(),
                     paddingValues = PaddingValues(end = 4.dp),

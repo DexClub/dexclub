@@ -1,6 +1,7 @@
 package io.github.dexclub.app.scene.workspace
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import io.github.shadcn.ui.compose.Checkbox
 import io.github.shadcn.ui.compose.OutlineButton
 import io.github.shadcn.ui.compose.ShadcnTheme
 import io.github.shadcn.ui.compose.TextField
@@ -40,8 +42,12 @@ internal fun WorkspaceInPageSearchBar(
     queryText: String,
     activeMatchIndex: Int,
     matchCount: Int,
+    caseSensitive: Boolean,
+    wholeWord: Boolean,
     requestFocusToken: Long,
     onQueryChange: (String) -> Unit,
+    onCaseSensitiveChange: (Boolean) -> Unit,
+    onWholeWordChange: (Boolean) -> Unit,
     onPreviousMatch: () -> Unit,
     onNextMatch: () -> Unit,
     onClose: () -> Unit,
@@ -86,94 +92,128 @@ internal fun WorkspaceInPageSearchBar(
         }
     }
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
-        TextField(
-            value = textFieldValue,
-            onValueChange = { nextValue ->
-                textFieldValue = nextValue
-                if (nextValue.text != queryText) {
-                    onQueryChange(nextValue.text)
-                }
-            },
-            placeholder = "页内搜索",
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Search,
-            ),
-            keyboardActions = KeyboardActions(
-                onSearch = { onNextMatch() },
-            ),
-            colors = defaultTextFieldColors(
-                color = if (queryText.isNotEmpty() && matchCount == 0) {
-                    TextFieldColor.Error
-                } else {
-                    TextFieldColor.Normal
-                },
-            ),
-            modifier = Modifier
-                .weight(1f)
-                .heightIn(min = 40.dp)
-                .focusRequester(focusRequester)
-                .onPreviewKeyEvent { keyEvent ->
-                    if (keyEvent.type != KeyEventType.KeyDown) {
-                        return@onPreviewKeyEvent false
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            TextField(
+                value = textFieldValue,
+                onValueChange = { nextValue ->
+                    textFieldValue = nextValue
+                    if (nextValue.text != queryText) {
+                        onQueryChange(nextValue.text)
                     }
+                },
+                placeholder = "页内搜索",
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    imeAction = ImeAction.Search,
+                ),
+                keyboardActions = KeyboardActions(
+                    onSearch = { onNextMatch() },
+                ),
+                colors = defaultTextFieldColors(
+                    color = if (queryText.isNotEmpty() && matchCount == 0) {
+                        TextFieldColor.Error
+                    } else {
+                        TextFieldColor.Normal
+                    },
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 40.dp)
+                    .focusRequester(focusRequester)
+                    .onPreviewKeyEvent { keyEvent ->
+                        if (keyEvent.type != KeyEventType.KeyDown) {
+                            return@onPreviewKeyEvent false
+                        }
 
-                    when {
-                        keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter -> {
-                            if (keyEvent.isShiftPressed) {
-                                onPreviousMatch()
-                            } else {
-                                onNextMatch()
+                        when {
+                            keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter -> {
+                                if (keyEvent.isShiftPressed) {
+                                    onPreviousMatch()
+                                } else {
+                                    onNextMatch()
+                                }
+                                true
                             }
-                            true
-                        }
 
-                        keyEvent.key == Key.Escape -> {
-                            onClose()
-                            true
-                        }
+                            keyEvent.key == Key.Escape -> {
+                                onClose()
+                                true
+                            }
 
-                        else -> false
-                    }
+                            else -> false
+                        }
+                    },
+            )
+
+            Text(
+                text = countText,
+                style = ShadcnTheme.textStyles.bodySmall.copy(
+                    color = ShadcnTheme.colors.mutedForeground.copy(alpha = 0.92f),
+                ),
+                modifier = Modifier.widthIn(min = 48.dp),
+            )
+
+            OutlineButton(
+                onClick = onPreviousMatch,
+                enabled = matchCount > 0,
+                modifier = Modifier.heightIn(min = 36.dp),
+            ) {
+                Text("上一个")
+            }
+
+            OutlineButton(
+                onClick = onNextMatch,
+                enabled = matchCount > 0,
+                modifier = Modifier.heightIn(min = 36.dp),
+            ) {
+                Text("下一个")
+            }
+
+            OutlineButton(
+                onClick = onClose,
+                modifier = Modifier.heightIn(min = 36.dp),
+            ) {
+                Text("关闭")
+            }
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp),
+        ) {
+            Checkbox(
+                checked = caseSensitive,
+                onCheckedChange = onCaseSensitiveChange,
+                label = {
+                    Text(
+                        text = "区分大小写",
+                        style = ShadcnTheme.textStyles.labelMedium,
+                    )
                 },
-        )
+            )
 
-        Text(
-            text = countText,
-            style = ShadcnTheme.textStyles.bodySmall.copy(
-                color = ShadcnTheme.colors.mutedForeground.copy(alpha = 0.92f),
-            ),
-            modifier = Modifier.widthIn(min = 48.dp),
-        )
-
-        OutlineButton(
-            onClick = onPreviousMatch,
-            enabled = matchCount > 0,
-            modifier = Modifier.heightIn(min = 36.dp),
-        ) {
-            Text("上")
-        }
-
-        OutlineButton(
-            onClick = onNextMatch,
-            enabled = matchCount > 0,
-            modifier = Modifier.heightIn(min = 36.dp),
-        ) {
-            Text("下")
-        }
-
-        OutlineButton(
-            onClick = onClose,
-            modifier = Modifier.heightIn(min = 36.dp),
-        ) {
-            Text("关闭")
+            Checkbox(
+                checked = wholeWord,
+                onCheckedChange = onWholeWordChange,
+                label = {
+                    Text(
+                        text = "全词匹配",
+                        style = ShadcnTheme.textStyles.labelMedium,
+                    )
+                },
+            )
         }
     }
 }
