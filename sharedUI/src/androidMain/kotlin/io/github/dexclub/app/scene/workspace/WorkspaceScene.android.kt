@@ -6,9 +6,12 @@ import io.github.dexclub.app.navigation.WorkspaceRouteArgs
 @Composable
 actual fun WorkspaceScene(
     onBackPressed: () -> Unit,
+    onRequestNavigateHome: () -> Unit,
+    onRequestCreateWorkspace: () -> Unit,
+    onRequestOpenWorkspace: () -> Unit,
     routeArgs: WorkspaceRouteArgs,
-    model: WorkspaceSceneViewModel,
 ) {
+    val model = rememberWorkspaceSceneViewModel(routeArgs)
     val requestExportWorkspaceLogs = rememberWorkspaceLogExportLauncher(
         initialDirectoryPath = routeArgs.absolutePath,
         onDirectoryPicked = model::exportWorkspaceLogs,
@@ -18,6 +21,9 @@ actual fun WorkspaceScene(
         model = model,
         onRequestExportWorkspaceLogs = requestExportWorkspaceLogs,
         onBackPressed = onBackPressed,
+        onRequestNavigateHome = onRequestNavigateHome,
+        onRequestCreateWorkspace = onRequestCreateWorkspace,
+        onRequestOpenWorkspace = onRequestOpenWorkspace,
         drawerGesturesEnabled = false,
     )
 }

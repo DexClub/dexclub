@@ -12,7 +12,24 @@ val ContentHorizontalPadding = 12.dp
 @Composable
 expect fun WorkspaceScene(
     onBackPressed: () -> Unit,
+    onRequestNavigateHome: () -> Unit,
+    onRequestCreateWorkspace: () -> Unit,
+    onRequestOpenWorkspace: () -> Unit,
     routeArgs: WorkspaceRouteArgs,
-    model: WorkspaceSceneViewModel = viewModel { SharedUiDependencies.createWorkspaceSceneViewModel(routeArgs) },
 )
+
+@Composable
+internal fun rememberWorkspaceSceneViewModel(
+    routeArgs: WorkspaceRouteArgs,
+): WorkspaceSceneViewModel {
+    return viewModel(
+        key = routeArgs.workspaceSceneViewModelKey(),
+    ) {
+        SharedUiDependencies.createWorkspaceSceneViewModel(routeArgs)
+    }
+}
+
+private fun WorkspaceRouteArgs.workspaceSceneViewModelKey(): String {
+    return "workspace:${workspaceId}:${absolutePath}"
+}
 

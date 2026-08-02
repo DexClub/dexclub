@@ -24,6 +24,7 @@ import io.github.shadcn.ui.compose.DropdownMenuItem
 import io.github.shadcn.ui.compose.Icon
 import io.github.shadcn.ui.compose.ShadcnTheme
 import io.github.shadcn.ui.compose.icons.Icons
+import io.github.shadcn.ui.compose.icons.Menu
 import io.github.shadcn.ui.compose.icons.MoreVert
 
 @Composable
@@ -39,10 +40,17 @@ internal fun SideHeaderBar(
             .height(HeaderBarHeight)
             .padding(horizontal = ContentHorizontalPadding),
     ) {
+        WorkspaceProjectMenu(
+            callbacks = callbacks,
+        )
+
         WorkspaceHeaderTitleBlock(
             uiState = uiState,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 4.dp),
         )
+
         WorkspaceHeaderActionMenu(
             uiState = uiState,
             callbacks = callbacks,
@@ -75,6 +83,62 @@ internal fun WorkspaceHeaderTitleBlock(
                 modifier = Modifier.padding(start = 8.dp),
             )
         }
+    }
+}
+
+@Composable
+internal fun WorkspaceProjectMenu(
+    callbacks: WorkspaceHeaderCallbacks,
+    modifier: Modifier = Modifier,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
+    DropdownMenu(
+        expanded = menuExpanded,
+        onDismissRequest = { menuExpanded = false },
+        trigger = {
+            EIconButton(
+                shape = CircleShape,
+                contentPadding = PaddingValues(4.dp),
+                indicationColor = ShadcnTheme.colors.accent,
+                onClick = {
+                    menuExpanded = true
+                },
+                modifier = modifier,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Filled.Menu,
+                    contentDescription = "项目菜单",
+                    tint = ShadcnTheme.colors.primary.copy(alpha = 0.6f),
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        },
+    ) {
+        DropdownMenuItem(
+            text = "新建项目",
+            textStyle = ShadcnTheme.textStyles.bodySmall,
+            onClick = {
+                callbacks.onCreateWorkspace()
+                menuExpanded = false
+            },
+        )
+        DropdownMenuItem(
+            text = "打开项目",
+            textStyle = ShadcnTheme.textStyles.bodySmall,
+            onClick = {
+                callbacks.onOpenWorkspace()
+                menuExpanded = false
+            },
+        )
+        DropdownMenuItem(
+            text = "关闭当前项目",
+            textStyle = ShadcnTheme.textStyles.bodySmall,
+            onClick = {
+                callbacks.onNavigateHome()
+                menuExpanded = false
+            },
+        )
     }
 }
 

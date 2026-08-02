@@ -13,9 +13,12 @@ import java.awt.Frame
 @Composable
 actual fun WorkspaceScene(
     onBackPressed: () -> Unit,
+    onRequestNavigateHome: () -> Unit,
+    onRequestCreateWorkspace: () -> Unit,
+    onRequestOpenWorkspace: () -> Unit,
     routeArgs: WorkspaceRouteArgs,
-    model: WorkspaceSceneViewModel,
 ) {
+    val model = rememberWorkspaceSceneViewModel(routeArgs)
     val window = LocalComposeWindow.current
     val requestExportWorkspaceLogs = rememberWorkspaceLogExportLauncher(
         initialDirectoryPath = routeArgs.absolutePath,
@@ -30,6 +33,9 @@ actual fun WorkspaceScene(
         model = model,
         onRequestExportWorkspaceLogs = requestExportWorkspaceLogs,
         onBackPressed = onBackPressed,
+        onRequestNavigateHome = onRequestNavigateHome,
+        onRequestCreateWorkspace = onRequestCreateWorkspace,
+        onRequestOpenWorkspace = onRequestOpenWorkspace,
         dragHandleModifier = Modifier.pointerHoverIcon(PointerIcon(Cursor(Cursor.E_RESIZE_CURSOR))),
     )
 }

@@ -406,6 +406,8 @@ private fun rememberProjectCacheDirLauncher(
 fun HomeScreen(
     model: HomeSceneViewModel = viewModel { SharedUiDependencies.createHomeSceneViewModel() },
     onEnterWorkspace: (WorkspaceRouteArgs) -> Unit,
+    launchAction: HomeLaunchAction? = null,
+    onLaunchActionConsumed: () -> Unit = {},
 ) {
     val uiState by model.uiState.collectAsState()
     val sonnerState = LocalSonner.current
@@ -419,6 +421,22 @@ fun HomeScreen(
                 is HomeUiEffect.ShowMessage -> sonnerState.sonner(effect.message)
                 is HomeUiEffect.ChooseProjectCacheDir -> chooseProjectCacheDirLauncher(effect.initialPath)
             }
+        }
+    }
+
+    LaunchedEffect(launchAction, model) {
+        when (launchAction) {
+            HomeLaunchAction.CreateWorkspace -> {
+                model.onShowNewWorkspaceDialog()
+                onLaunchActionConsumed()
+            }
+
+            HomeLaunchAction.OpenWorkspace -> {
+                openWorkspaceLauncher()
+                onLaunchActionConsumed()
+            }
+
+            null -> Unit
         }
     }
 

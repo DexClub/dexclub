@@ -3,6 +3,9 @@ package io.github.dexclub.app.scene.workspace
 import io.github.dexclub.node.ClassTreeNode
 
 internal data class WorkspaceHeaderCallbacks(
+    val onNavigateHome: () -> Unit,
+    val onCreateWorkspace: () -> Unit,
+    val onOpenWorkspace: () -> Unit,
     val onRequestExportWorkspaceLogs: () -> Unit,
     val onResetSearchDialogState: () -> Unit,
     val onSearchDialogTabSelected: (WorkspaceSearchTab) -> Unit,

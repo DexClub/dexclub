@@ -17,6 +17,9 @@ internal fun WorkspaceSceneContent(
     model: WorkspaceSceneViewModel,
     onRequestExportWorkspaceLogs: () -> Unit,
     onBackPressed: () -> Unit,
+    onRequestNavigateHome: () -> Unit,
+    onRequestCreateWorkspace: () -> Unit,
+    onRequestOpenWorkspace: () -> Unit,
     modifier: Modifier = Modifier,
     dragHandleModifier: Modifier = Modifier,
     drawerGesturesEnabled: Boolean = true,
@@ -36,8 +39,17 @@ internal fun WorkspaceSceneContent(
         }
     }
 
-    val headerCallbacks = remember(model, onRequestExportWorkspaceLogs) {
+    val headerCallbacks = remember(
+        model,
+        onRequestNavigateHome,
+        onRequestCreateWorkspace,
+        onRequestOpenWorkspace,
+        onRequestExportWorkspaceLogs,
+    ) {
         WorkspaceHeaderCallbacks(
+            onNavigateHome = onRequestNavigateHome,
+            onCreateWorkspace = onRequestCreateWorkspace,
+            onOpenWorkspace = onRequestOpenWorkspace,
             onRequestExportWorkspaceLogs = onRequestExportWorkspaceLogs,
             onResetSearchDialogState = model::resetSearchDialogState,
             onSearchDialogTabSelected = model::selectSearchDialogTab,

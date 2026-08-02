@@ -158,6 +158,11 @@ private fun WorkspaceCompactTopBar(
                 .padding(start = 4.dp),
         )
 
+        WorkspaceProjectMenu(
+            callbacks = callbacks,
+            modifier = Modifier.padding(start = 4.dp),
+        )
+
         WorkspaceHeaderActionMenu(
             uiState = uiState,
             callbacks = callbacks,
