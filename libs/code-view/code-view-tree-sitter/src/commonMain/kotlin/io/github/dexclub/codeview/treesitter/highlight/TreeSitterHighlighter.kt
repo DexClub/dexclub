@@ -21,6 +21,7 @@ class TreeSitterHighlighter(private val language: TSLanguage) {
     private val parser = Parser(language)
     private var tree: TSTree? = null
     private var previousText: String? = null
+    private val queryCache = mutableMapOf<String, Query>()
 
     fun highlight(
         text: String,
@@ -45,7 +46,9 @@ class TreeSitterHighlighter(private val language: TSLanguage) {
             null
         }
 
-        val query = Query(language, highlightsQuery)
+        val query = queryCache.getOrPut(highlightsQuery) {
+            Query(language, highlightsQuery)
+        }
         val incrementalResult = runCatching {
             parseAndCollectSpans(
                 text = text,
@@ -69,6 +72,7 @@ class TreeSitterHighlighter(private val language: TSLanguage) {
     fun close() {
         tree = null
         previousText = null
+        queryCache.clear()
         // Parser and Tree are managed by the GC; no explicit close needed in ktreesitter 0.24.x
     }
 
@@ -80,18 +84,13 @@ class TreeSitterHighlighter(private val language: TSLanguage) {
         val parsedTree = parser.parseString(previousTree, text)
         val root = parsedTree.rootNode
         val spans = mutableListOf<CodeTokenSpan>()
+        val offsetResolver = Utf8ByteOffsetResolver(text)
 
         for ((_, match) in query.captures(root)) {
             for (capture in match.captures) {
                 val kind = TreeSitterTokenMapper.map(capture.name) ?: continue
-                val start = byteOffsetToCharIndex(
-                    text = text,
-                    byteOffset = capture.node.startByte.toInt(),
-                )
-                val end = byteOffsetToCharIndex(
-                    text = text,
-                    byteOffset = capture.node.endByte.toInt(),
-                )
+                val start = offsetResolver.charIndexAt(capture.node.startByte.toInt())
+                val end = offsetResolver.charIndexAt(capture.node.endByte.toInt())
                 if (start >= end) continue
                 spans.add(CodeTokenSpan(range = TextOffsetRange(start, end), kind = kind))
             }
@@ -168,50 +167,14 @@ private fun utf8ByteOffsetAt(
     var index = 0
 
     while (index < charIndex) {
-        val char = text[index]
         byteOffset += utf8ByteLength(
             text = text,
             index = index,
         )
-        index += if (char.isHighSurrogate() && index + 1 < text.length && text[index + 1].isLowSurrogate()) {
-            2
-        } else {
-            1
-        }
+        index += charStepAt(text, index)
     }
 
     return byteOffset
-}
-
-private fun byteOffsetToCharIndex(
-    text: String,
-    byteOffset: Int,
-): Int {
-    require(byteOffset >= 0) { "byteOffset 不能为负数: $byteOffset" }
-    var consumedBytes = 0
-    var charIndex = 0
-
-    while (charIndex < text.length && consumedBytes < byteOffset) {
-        val currentByteLength = utf8ByteLength(
-            text = text,
-            index = charIndex,
-        )
-        if (consumedBytes + currentByteLength > byteOffset) {
-            break
-        }
-        consumedBytes += currentByteLength
-        charIndex += if (
-            text[charIndex].isHighSurrogate() &&
-            charIndex + 1 < text.length &&
-            text[charIndex + 1].isLowSurrogate()
-        ) {
-            2
-        } else {
-            1
-        }
-    }
-
-    return charIndex
 }
 
 private fun pointAt(
@@ -236,17 +199,54 @@ private fun pointAt(
             text = text,
             index = index,
         )
-        index += if (char.isHighSurrogate() && index + 1 < text.length && text[index + 1].isLowSurrogate()) {
-            2
-        } else {
-            1
-        }
+        index += charStepAt(text, index)
     }
 
     return Point(
         row = row.toUInt(),
         column = column.toUInt(),
     )
+}
+
+private class Utf8ByteOffsetResolver(
+    private val text: String,
+) {
+    private var currentByteOffset: Int = 0
+    private var currentCharIndex: Int = 0
+
+    fun charIndexAt(byteOffset: Int): Int {
+        require(byteOffset >= 0) { "byteOffset 不能为负数: $byteOffset" }
+        if (byteOffset < currentByteOffset) {
+            currentByteOffset = 0
+            currentCharIndex = 0
+        }
+
+        while (currentCharIndex < text.length && currentByteOffset < byteOffset) {
+            val currentByteLength = utf8ByteLength(
+                text = text,
+                index = currentCharIndex,
+            )
+            if (currentByteOffset + currentByteLength > byteOffset) {
+                break
+            }
+            currentByteOffset += currentByteLength
+            currentCharIndex += charStepAt(text, currentCharIndex)
+        }
+
+        return currentCharIndex
+    }
+}
+
+private fun charStepAt(
+    text: String,
+    index: Int,
+): Int {
+    val char = text[index]
+    return if (char.isHighSurrogate() && index + 1 < text.length && text[index + 1].isLowSurrogate()) {
+        2
+    } else {
+        1
+    }
 }
 
 private fun utf8ByteLength(

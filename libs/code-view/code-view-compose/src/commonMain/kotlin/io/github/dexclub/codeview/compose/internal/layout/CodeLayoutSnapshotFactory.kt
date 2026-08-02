@@ -120,9 +120,17 @@ internal object CodeLayoutSnapshotFactory {
         lines: List<CodeLineLayout>,
         tokens: List<CodeTokenSpan>,
     ): List<List<CodeLineTokenSpan>> {
-        val tokensByLine = List(lines.size) { mutableListOf<CodeLineTokenSpan>() }
+        if (tokens.isEmpty()) {
+            return List(lines.size) { emptyList<CodeLineTokenSpan>() }
+        }
 
-        tokens.forEach { token ->
+        val orderedTokens = tokens.sortedByStartOffsetIfNeeded()
+        val tokensByLine = arrayOfNulls<MutableList<CodeLineTokenSpan>>(lines.size)
+        val lineNeedsSort = BooleanArray(lines.size)
+        var startLineIndexHint = 0
+        var endLineIndexHint = 0
+
+        orderedTokens.forEach { token ->
             val safeStart = token.range.start.coerceIn(0, textLength)
             val safeEnd = token.range.end.coerceIn(safeStart, textLength)
             if (safeStart >= safeEnd) return@forEach
@@ -130,11 +138,15 @@ internal object CodeLayoutSnapshotFactory {
             val startLineIndex = findLineIndexForOffset(
                 lines = lines,
                 offset = safeStart,
+                hint = startLineIndexHint,
             )
+            startLineIndexHint = startLineIndex
             val endLineIndex = findLineIndexForOffset(
                 lines = lines,
                 offset = safeEnd - 1,
+                hint = maxOf(startLineIndex, endLineIndexHint),
             )
+            endLineIndexHint = endLineIndex
 
             for (lineIndex in startLineIndex..endLineIndex) {
                 val line = lines[lineIndex]
@@ -142,7 +154,7 @@ internal object CodeLayoutSnapshotFactory {
                 val segmentEnd = minOf(safeEnd, line.endOffsetExclusive)
                 if (segmentStart >= segmentEnd) continue
 
-                tokensByLine[lineIndex] += CodeLineTokenSpan(
+                val lineToken = CodeLineTokenSpan(
                     range = TextOffsetRange(
                         start = segmentStart,
                         end = segmentEnd,
@@ -151,14 +163,51 @@ internal object CodeLayoutSnapshotFactory {
                     startColumn = segmentStart - line.startOffset,
                     endColumn = segmentEnd - line.startOffset,
                 )
+                val lineTokens = tokensByLine[lineIndex] ?: mutableListOf<CodeLineTokenSpan>().also { created ->
+                    tokensByLine[lineIndex] = created
+                }
+                val previousStartColumn = lineTokens.lastOrNull()?.startColumn ?: Int.MIN_VALUE
+                if (previousStartColumn > lineToken.startColumn) {
+                    lineNeedsSort[lineIndex] = true
+                }
+                lineTokens += lineToken
             }
         }
 
-        return tokensByLine.map { lineTokens ->
-            lineTokens
-                .sortedBy(CodeLineTokenSpan::startColumn)
-                .toList()
+        return List(lines.size) { lineIndex ->
+            val lineTokens = tokensByLine[lineIndex] ?: return@List emptyList<CodeLineTokenSpan>()
+            if (lineNeedsSort[lineIndex]) {
+                lineTokens.sortBy(CodeLineTokenSpan::startColumn)
+            }
+            lineTokens.toList()
         }
+    }
+
+
+    private fun findLineIndexForOffset(
+        lines: List<CodeLineLayout>,
+        offset: Int,
+        hint: Int,
+    ): Int {
+        if (hint in lines.indices) {
+            val line = lines[hint]
+            val nextLineStart = lines.getOrNull(hint + 1)?.startOffset ?: Int.MAX_VALUE
+            if (offset in line.startOffset until nextLineStart) {
+                return hint
+            }
+            if (offset >= line.startOffset) {
+                var currentIndex = hint
+                while (currentIndex + 1 < lines.size && lines[currentIndex + 1].startOffset <= offset) {
+                    currentIndex += 1
+                }
+                return currentIndex
+            }
+        }
+
+        return findLineIndexForOffset(
+            lines = lines,
+            offset = offset,
+        )
     }
 
 
@@ -183,5 +232,28 @@ internal object CodeLayoutSnapshotFactory {
         }
 
         return high.coerceAtLeast(0)
+    }
+
+
+    private fun List<CodeTokenSpan>.sortedByStartOffsetIfNeeded(): List<CodeTokenSpan> {
+        if (size < 2) {
+            return this
+        }
+
+        for (index in 1 until size) {
+            val previous = this[index - 1]
+            val current = this[index]
+            if (
+                current.range.start < previous.range.start ||
+                (current.range.start == previous.range.start && current.range.end < previous.range.end)
+            ) {
+                return sortedWith(
+                    compareBy<CodeTokenSpan> { token -> token.range.start }
+                        .thenBy { token -> token.range.end },
+                )
+            }
+        }
+
+        return this
     }
 }
