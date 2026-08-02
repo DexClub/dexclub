@@ -48,8 +48,15 @@ internal data class CodeLayoutSnapshot(
 
     fun findAnnotationAtOffset(offset: Int): CodeAnnotation? {
         val safeOffset = offset.coerceIn(0, text.length)
+        return findSmallestAnnotationContaining(safeOffset)
+            ?: findSmallestAnnotationContaining((safeOffset - 1).coerceAtLeast(0))
+            ?: findSmallestAnnotationContaining((safeOffset + 1).coerceAtMost(text.length))
+    }
+
+
+    private fun findSmallestAnnotationContaining(offset: Int): CodeAnnotation? {
         return annotations
-            .filter { annotation -> annotation.range.contains(safeOffset) }
+            .filter { annotation -> annotation.range.contains(offset) }
             .minByOrNull { annotation -> annotation.range.end - annotation.range.start }
     }
 

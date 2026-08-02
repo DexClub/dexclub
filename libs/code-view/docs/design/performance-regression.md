@@ -66,6 +66,7 @@
 - `TreeSitterHighlighter` 已缓存 highlights `Query`，避免每次刷新重复编译 query
 - tree-sitter capture 的 UTF-8 byte -> char offset 转换已改为单次顺序扫描，避免每个 token 都从头扫描全文
 - `CodeLayoutSnapshotFactory` 构建 `tokensByLine` 时会优先复用有序 token 输入，按行提示推进定位，只在检测到乱序行时补排序
+- 超大文件当前改为“plain text token 降级 + annotation 保留”，避免方法名/类名上下文菜单因纯文本降级完全失效
 - 编辑态已避免按输入全量切行字符串、全量测所有行宽
 
 这些优化说明当前已经不再停留在“先跑起来再说”的阶段，而是在主动压热路径。

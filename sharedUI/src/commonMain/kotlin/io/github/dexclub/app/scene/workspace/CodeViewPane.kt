@@ -617,6 +617,7 @@ internal fun CodeViewPane(
 
         if (isSelectedTab) {
             CodeContextMenu(
+                currentClassName = tab.targetKey,
                 selectedText = selectedText,
                 onSelectAll = {
                     ensurePaneActivated()

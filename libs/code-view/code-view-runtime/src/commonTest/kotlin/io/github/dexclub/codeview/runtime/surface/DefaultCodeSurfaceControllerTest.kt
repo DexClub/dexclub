@@ -189,6 +189,44 @@ class DefaultCodeSurfaceControllerTest {
         }
     }
 
+    @Test
+    fun oversizedFallbackKeepsAnnotationsWhileSkippingRichHighlightTokens() = runBlocking {
+        val oversizedText = buildString(2 * 1024 * 1024 + 32) {
+            append(".class public LExample;\n")
+            append("a".repeat(2 * 1024 * 1024 + 8))
+        }
+        val annotation = CodeAnnotation(
+            range = TextOffsetRange(0, 6),
+            kind = "class",
+            schemaId = "test",
+            schemaVersion = 1,
+            payload = "payload",
+        )
+        val session = CountingFallbackLanguageSession(
+            annotationsToReturn = listOf(annotation),
+        )
+        val controller = DefaultCodeSurfaceController(
+            document = CodeDocument.create(
+                languageId = CodeLanguageId("smali"),
+                initialText = oversizedText,
+            ),
+            addons = CodeAddons.build { },
+            sessionHost = FakeLanguageSessionHost(session),
+        )
+
+        try {
+            controller.refresh()
+
+            assertEquals(CodeSurfaceState.Degraded, controller.state.value)
+            assertEquals(listOf(annotation), controller.annotations.value)
+            assertTrue(controller.tokens.value.isNotEmpty(), "超大文件降级后仍应返回 plain text token")
+            assertEquals(0, session.highlightCallCount, "超大文件降级不应再执行富高亮 token 计算")
+            assertEquals(1, session.annotationCallCount, "超大文件降级仍应保留 annotation 构建")
+        } finally {
+            controller.close()
+        }
+    }
+
     private class FakeLanguageSessionHost(
         private val session: CodeLanguageSession,
     ) : BaseFakeLanguageSessionHost() {
@@ -317,6 +355,32 @@ class DefaultCodeSurfaceControllerTest {
 
         override suspend fun annotations(snapshot: CodeDocumentSnapshot): List<CodeAnnotation> {
             return emptyList()
+        }
+
+        override fun close() = Unit
+    }
+
+    private class CountingFallbackLanguageSession(
+        private val annotationsToReturn: List<CodeAnnotation>,
+    ) : CodeLanguageSession {
+        var highlightCallCount: Int = 0
+            private set
+        var annotationCallCount: Int = 0
+            private set
+
+        override suspend fun highlightTokens(snapshot: CodeDocumentSnapshot): List<CodeTokenSpan> {
+            highlightCallCount += 1
+            return listOf(
+                CodeTokenSpan(
+                    range = TextOffsetRange(0, snapshot.text.length),
+                    kind = CodeTokenKind.Keyword,
+                )
+            )
+        }
+
+        override suspend fun annotations(snapshot: CodeDocumentSnapshot): List<CodeAnnotation> {
+            annotationCallCount += 1
+            return annotationsToReturn
         }
 
         override fun close() = Unit

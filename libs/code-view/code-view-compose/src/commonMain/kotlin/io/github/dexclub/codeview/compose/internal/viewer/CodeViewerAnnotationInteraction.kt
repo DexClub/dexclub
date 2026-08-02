@@ -20,8 +20,7 @@ internal fun Modifier.annotationInteractionModifier(
     documentKey: DocumentId,
     documentRevision: DocumentRevision,
     lineHeightPx: Float,
-    verticalScrollPx: Float,
-    contentStartPaddingPx: Float,
+    scrollController: CodeViewerScrollController,
     interactionOptions: CodeViewerInteractionOptions,
     onAnnotationHit: ((CodeAnnotationHit) -> Unit)?,
     onContextMenu: ((annotationHit: CodeAnnotationHit?, offset: Offset) -> Unit)?,
@@ -53,8 +52,7 @@ internal fun Modifier.annotationInteractionModifier(
                         documentRevision = documentRevision,
                         position = position,
                         lineHeightPx = lineHeightPx,
-                        verticalScrollPx = verticalScrollPx,
-                        contentStartPaddingPx = contentStartPaddingPx,
+                        scrollController = scrollController,
                         trigger = CodeInteractionTrigger.ContextMenu,
                     )
                     onContextMenu?.invoke(hit, position)
@@ -80,8 +78,7 @@ internal fun Modifier.annotationInteractionModifier(
                             documentRevision = documentRevision,
                             position = offset,
                             lineHeightPx = lineHeightPx,
-                            verticalScrollPx = verticalScrollPx,
-                            contentStartPaddingPx = contentStartPaddingPx,
+                            scrollController = scrollController,
                             trigger = CodeInteractionTrigger.PrimaryClick,
                         )
                         if (hit != null) {
@@ -100,8 +97,7 @@ internal fun Modifier.annotationInteractionModifier(
                             documentRevision = documentRevision,
                             position = offset,
                             lineHeightPx = lineHeightPx,
-                            verticalScrollPx = verticalScrollPx,
-                            contentStartPaddingPx = contentStartPaddingPx,
+                            scrollController = scrollController,
                             trigger = CodeInteractionTrigger.ContextMenu,
                         )
                         onContextMenu?.invoke(hit, offset)
@@ -123,16 +119,15 @@ private fun buildAnnotationHit(
     documentRevision: DocumentRevision,
     position: Offset,
     lineHeightPx: Float,
-    verticalScrollPx: Float,
-    contentStartPaddingPx: Float,
+    scrollController: CodeViewerScrollController,
     trigger: CodeInteractionTrigger,
 ): CodeAnnotationHit? {
     if (lineHeightPx <= 0f || position.x < 0f || position.y < 0f) return null
     if (layoutSnapshot.lineCount <= 0) return null
     val contentHeightPx = layoutSnapshot.lineCount * lineHeightPx
-    val contentYPx = position.y + verticalScrollPx
+    val contentYPx = position.y + scrollController.verticalScrollPx
     if (contentYPx >= contentHeightPx) return null
-    val textXPx = position.x - contentStartPaddingPx
+    val textXPx = position.x + scrollController.horizontalScrollPx - scrollController.contentStartPaddingPx
     if (textXPx < 0f) return null
 
     val lineIndex = (contentYPx / lineHeightPx).toInt().coerceIn(0, layoutSnapshot.lineCount - 1)

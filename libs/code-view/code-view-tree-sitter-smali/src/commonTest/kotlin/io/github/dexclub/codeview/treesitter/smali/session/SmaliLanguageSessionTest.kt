@@ -6,9 +6,43 @@ import io.github.dexclub.codeview.core.token.CodeTokenKind
 import io.github.dexclub.codeview.core.token.CodeTokenSpan
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class SmaliLanguageSessionTest {
+    @Test
+    fun annotationsKeepClassAndMethodRangesAlignedAfterUnicodePrefix() = runBlocking {
+        val text = """
+            # 中文注释
+            .class public Lcom/example/Demo;
+            .super Ljava/lang/Object;
+
+            .method public test()V
+                .locals 0
+                return-void
+            .end method
+        """.trimIndent()
+        val document = CodeDocument.create(
+            languageId = CodeLanguageId("smali"),
+            initialText = text,
+        )
+        val session = SmaliLanguageSession(document)
+
+        try {
+            val annotations = session.annotations(document.snapshots.value)
+            val classAnnotation = annotations.firstOrNull { annotation -> annotation.kind == "class" }
+            val methodAnnotation = annotations.firstOrNull { annotation -> annotation.kind == "method" }
+
+            requireNotNull(classAnnotation) { "应生成类名注解" }
+            requireNotNull(methodAnnotation) { "应生成方法名注解" }
+
+            assertEquals("Lcom/example/Demo;", text.substring(classAnnotation.range.start, classAnnotation.range.end))
+            assertEquals("test", text.substring(methodAnnotation.range.start, methodAnnotation.range.end))
+        } finally {
+            session.close()
+        }
+    }
+
     @Test
     fun highlightTokensReturnsSpansForBasicSmaliSnippet() = runBlocking {
         val document = CodeDocument.create(

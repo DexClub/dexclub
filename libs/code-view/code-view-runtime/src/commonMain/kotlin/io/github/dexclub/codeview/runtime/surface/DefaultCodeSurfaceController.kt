@@ -62,7 +62,7 @@ internal class DefaultCodeSurfaceController(
                     is DegradeDecision.None -> processWithSession()
                     is DegradeDecision.LargeFile -> processWithSession(degradeDecision)
                     is DegradeDecision.LongLines -> processWithSession(degradeDecision)
-                    is DegradeDecision.OversizedFile -> processFallback(degradeDecision)
+                    is DegradeDecision.OversizedFile -> processOversizedFallback(degradeDecision)
                 }
             }
         }
@@ -139,6 +139,33 @@ internal class DefaultCodeSurfaceController(
         val snapshot = document.snapshots.value
         _tokens.value = PlainTextFallback.generateTokens(snapshot)
         _annotations.value = emptyList()
+        _state.value = CodeSurfaceState.Degraded
+        emitDegradeWarning(decision)
+    }
+
+    private suspend fun processOversizedFallback(
+        decision: DegradeDecision.OversizedFile,
+    ) {
+        _state.value = CodeSurfaceState.Loading
+        val snapshot = document.snapshots.value
+        val session = sessionHost.getOrCreateSession(document, addons)
+        val requestId = reconciler.nextSequence()
+        val annotationResult = session?.let { languageSession ->
+            runCatching { languageSession.annotations(snapshot) }
+        } ?: Result.success(emptyList())
+        if (!reconciler.shouldAccept(document.documentId, snapshot.revision, requestId)) {
+            return
+        }
+
+        _tokens.value = PlainTextFallback.generateTokens(snapshot)
+        _annotations.value = annotationResult.getOrElse { error ->
+            emitDiagnostic(
+                level = CodeDiagnostic.Level.Warning,
+                code = "ANNOTATION_FAILED",
+                message = "Annotation build failed: ${error.message}",
+            )
+            emptyList()
+        }
         _state.value = CodeSurfaceState.Degraded
         emitDegradeWarning(decision)
     }

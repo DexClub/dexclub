@@ -4,12 +4,78 @@ import io.github.dexclub.codeview.core.document.CodeDocument
 import io.github.dexclub.codeview.core.language.CodeLanguageId
 import io.github.dexclub.codeview.core.token.CodeTokenKind
 import io.github.dexclub.codeview.core.token.CodeTokenSpan
+import io.github.dexclub.codeview.treesitter.semantic.SemanticNodeCodec
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class JavaLanguageSessionTest {
+    @Test
+    fun annotationsKeepClassAndMethodRangesAlignedAfterUnicodePrefix() = runBlocking {
+        val text = """
+            // 中文注释
+            class Demo {
+                void test() {}
+            }
+        """.trimIndent()
+        val document = CodeDocument.create(
+            languageId = CodeLanguageId("java"),
+            initialText = text,
+        )
+        val session = JavaLanguageSession(document)
+
+        try {
+            val annotations = session.annotations(document.snapshots.value)
+            val classAnnotation = annotations.firstOrNull { annotation -> annotation.kind == "class" }
+            val methodAnnotation = annotations.firstOrNull { annotation -> annotation.kind == "method" }
+
+            requireNotNull(classAnnotation) { "应生成类名注解" }
+            requireNotNull(methodAnnotation) { "应生成方法名注解" }
+
+            assertEquals("Demo", text.substring(classAnnotation.range.start, classAnnotation.range.end))
+            assertEquals("test", text.substring(methodAnnotation.range.start, methodAnnotation.range.end))
+        } finally {
+            session.close()
+        }
+    }
+
+    @Test
+    fun methodAnnotationsExposeJvmDescriptorSuffix() = runBlocking {
+        val text = """
+            package com.example;
+
+            import java.util.List;
+
+            class Demo {
+                String test(int count, List<String> names, long... ids) {
+                    return "";
+                }
+            }
+        """.trimIndent()
+        val document = CodeDocument.create(
+            languageId = CodeLanguageId("java"),
+            initialText = text,
+        )
+        val session = JavaLanguageSession(document)
+
+        try {
+            val annotations = session.annotations(document.snapshots.value)
+            val methodAnnotation = annotations.firstOrNull { annotation -> annotation.kind == "method" }
+
+            requireNotNull(methodAnnotation) { "method annotation should exist" }
+
+            val semanticNode = requireNotNull(SemanticNodeCodec.decode(methodAnnotation.payload)) {
+                "method semantic node should exist"
+            }
+            assertEquals("Demo", semanticNode.owner)
+            assertEquals("(ILjava/util/List;[J)Ljava/lang/String;", semanticNode.descriptor)
+        } finally {
+            session.close()
+        }
+    }
+
     @Test
     fun highlightTokensDropsStaleKeywordRangeAfterEdit() = runBlocking {
         val document = CodeDocument.create(

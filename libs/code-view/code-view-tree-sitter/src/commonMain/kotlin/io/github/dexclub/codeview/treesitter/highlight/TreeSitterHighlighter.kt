@@ -6,6 +6,7 @@ import io.github.dexclub.codeview.treesitter.bridge.TSLanguage
 import io.github.dexclub.codeview.treesitter.bridge.TSNode
 import io.github.dexclub.codeview.treesitter.bridge.TSTree
 import io.github.dexclub.codeview.treesitter.bridge.parseString
+import io.github.dexclub.codeview.treesitter.text.TreeSitterTextOffsetResolver
 import io.github.treesitter.ktreesitter.InputEdit
 import io.github.treesitter.ktreesitter.Parser
 import io.github.treesitter.ktreesitter.Point
@@ -84,7 +85,7 @@ class TreeSitterHighlighter(private val language: TSLanguage) {
         val parsedTree = parser.parseString(previousTree, text)
         val root = parsedTree.rootNode
         val spans = mutableListOf<CodeTokenSpan>()
-        val offsetResolver = Utf8ByteOffsetResolver(text)
+        val offsetResolver = TreeSitterTextOffsetResolver(text)
 
         for ((_, match) in query.captures(root)) {
             for (capture in match.captures) {
@@ -206,35 +207,6 @@ private fun pointAt(
         row = row.toUInt(),
         column = column.toUInt(),
     )
-}
-
-private class Utf8ByteOffsetResolver(
-    private val text: String,
-) {
-    private var currentByteOffset: Int = 0
-    private var currentCharIndex: Int = 0
-
-    fun charIndexAt(byteOffset: Int): Int {
-        require(byteOffset >= 0) { "byteOffset 不能为负数: $byteOffset" }
-        if (byteOffset < currentByteOffset) {
-            currentByteOffset = 0
-            currentCharIndex = 0
-        }
-
-        while (currentCharIndex < text.length && currentByteOffset < byteOffset) {
-            val currentByteLength = utf8ByteLength(
-                text = text,
-                index = currentCharIndex,
-            )
-            if (currentByteOffset + currentByteLength > byteOffset) {
-                break
-            }
-            currentByteOffset += currentByteLength
-            currentCharIndex += charStepAt(text, currentCharIndex)
-        }
-
-        return currentCharIndex
-    }
 }
 
 private fun charStepAt(
