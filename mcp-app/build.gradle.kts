@@ -72,6 +72,12 @@ fun patchGeneratedScript(file: File, expected: String, replacement: String) {
 
 tasks.named<CreateStartScripts>("startScripts") {
     doLast {
+        val windowsClasspath = windowsScript.readLines().single { it.startsWith("set CLASSPATH=") }
+        patchGeneratedScript(
+            file = windowsScript,
+            expected = windowsClasspath,
+            replacement = """set CLASSPATH=%APP_HOME%\lib\*""",
+        )
         patchGeneratedScript(
             file = windowsScript,
             expected = """set DEFAULT_JVM_OPTS="-XX:ErrorFile=hs_err_pid%%p.log" "-XX:+HeapDumpOnOutOfMemoryError" "-XX:HeapDumpPath=."""",
@@ -90,6 +96,7 @@ tasks.named<CreateStartScripts>("startScripts") {
 dependencies {
     implementation(project(":app-service"))
     implementation(platform(libs.ktor.bom))
+    implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.mcp.kotlin.sdk.server)
     implementation(libs.ktor.server.netty)
@@ -175,10 +182,13 @@ val testModels by registerMcpTestTask(
 
 val testSmoke = tasks.register<Test>("testSmoke") {
     group = "verification"
-    description = "Run MCP HTTP smoke tests"
+    description = "Run MCP HTTP and stdio smoke tests"
     testClassesDirs = mcpSmokeTestSourceSet.output.classesDirs
     classpath = mcpSmokeTestSourceSet.runtimeClasspath
     configureMcpTestRuntime()
+    doFirst {
+        systemProperty("dexclub.mcp.test.runtime.classpath", sourceSets["main"].runtimeClasspath.asPath)
+    }
 }
 
 tasks.register("testFast") {

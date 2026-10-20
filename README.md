@@ -1,6 +1,6 @@
 # dexclub
 
-`dexclub` 是一个面向 `dex / apk / Android 资源` 的 Kotlin 多模块工具集。项目通过共享的应用层提供两种入口：适合终端和脚本使用的 CLI，以及供 AI / agent 调用的 HTTP MCP server。
+`dexclub` 是一个面向 `dex / apk / Android 资源` 的 Kotlin 多模块工具集。项目通过共享的应用层提供两种入口：适合终端和脚本使用的 CLI，以及供 AI / agent 调用的 stdio / HTTP MCP server。
 
 ## 主要能力
 
@@ -27,7 +27,7 @@
 | 模块 | 职责 |
 | --- | --- |
 | `cli-app` | CLI 入口、参数解析和终端渲染 |
-| `mcp-app` | Streamable HTTP MCP server 和工具适配 |
+| `mcp-app` | stdio / Streamable HTTP MCP server 和工具适配 |
 | `app-service` | 共享 use case 和 runtime 装配 |
 | `domain-core` | 稳定模型、能力边界和底层实现基础 |
 | `dexkit-binding` | DexKit 绑定层 |

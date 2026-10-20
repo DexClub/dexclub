@@ -5,15 +5,55 @@ import io.github.dexclub.core.app.session.TargetSessionService
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.Duration
+import kotlin.system.exitProcess
+import kotlinx.coroutines.runBlocking
 
-fun main() {
+private const val MCP_USAGE = "Usage: mcp [--transport=http|stdio]"
+
+internal enum class McpTransport {
+    HTTP,
+    STDIO,
+}
+
+internal fun parseMcpTransport(args: Array<String>): McpTransport {
+    if (args.isEmpty()) return McpTransport.HTTP
+    val value = when {
+        args.size == 1 && args[0].startsWith("--transport=") -> args[0].substringAfter('=')
+        args.size == 2 && args[0] == "--transport" -> args[1]
+        else -> throw IllegalArgumentException(MCP_USAGE)
+    }
+    return when (value) {
+        "http" -> McpTransport.HTTP
+        "stdio" -> McpTransport.STDIO
+        else -> throw IllegalArgumentException("Unsupported transport '$value'. $MCP_USAGE")
+    }
+}
+
+fun main(args: Array<String>) {
+    if (args.size == 1 && args[0] in setOf("--help", "-h")) {
+        println(MCP_USAGE)
+        return
+    }
+    val transport = try {
+        parseMcpTransport(args)
+    } catch (error: IllegalArgumentException) {
+        System.err.println(error.message)
+        exitProcess(2)
+    }
+    val protocolOutput = System.out
+    if (transport == McpTransport.STDIO) {
+        // Keep library banners and ordinary println calls off the protocol stream.
+        System.setOut(System.err)
+    }
     configureSlf4jSimpleDefaults()
     disableKotlinLoggingStartupMessage()
     DexKitMcpBootstrap.configureNativeLibraryDir()
 
     val config = loadHttpServerConfig()
     McpRuntimeDiagnostics.install(config)
-    nonLoopbackHostWarning(config.host)?.let(McpRuntimeDiagnostics::startupConsole)
+    if (transport == McpTransport.HTTP) {
+        nonLoopbackHostWarning(config.host)?.let(McpRuntimeDiagnostics::startupConsole)
+    }
     val app = McpApp(
         runtime = createSessionAppRuntime(
             sessionService = TargetSessionService(
@@ -22,21 +62,33 @@ fun main() {
                 maxHandlesPerSession = config.maxHandlesPerSession,
             ),
         ),
-        queryFilePolicy = McpQueryFilePolicy.fromConfig(config),
-    )
-    val server = app.createServer()
-
-    McpRuntimeDiagnostics.startupConsole(
-        buildString {
-            appendLine("--------")
-            append("DexClub MCP listening on http://${config.host}:${config.port}${config.path} ")
-            append("(stateless streamable HTTP, trace=${config.traceEnabled})")
+        queryFilePolicy = if (transport == McpTransport.STDIO) {
+            McpQueryFilePolicy(loopback = true, allowedRoots = config.queryRoots)
+        } else {
+            McpQueryFilePolicy.fromConfig(config)
         },
     )
 
     try {
-        createHttpServer(config, server)
-            .start(wait = true)
+        val server = app.createServer()
+        when (transport) {
+            McpTransport.HTTP -> {
+                McpRuntimeDiagnostics.startupConsole(
+                    buildString {
+                        appendLine("--------")
+                        append("DexClub MCP listening on http://${config.host}:${config.port}${config.path} ")
+                        append("(stateless streamable HTTP, trace=${config.traceEnabled})")
+                    },
+                )
+                createHttpServer(config, server).start(wait = true)
+            }
+            McpTransport.STDIO -> {
+                McpRuntimeDiagnostics.startupConsole("DexClub MCP ready on stdio (trace=${config.traceEnabled})")
+                runBlocking {
+                    runStdioServer(server, output = protocolOutput)
+                }
+            }
+        }
     } finally {
         app.close()
     }
