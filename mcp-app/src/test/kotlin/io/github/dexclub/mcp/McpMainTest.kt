@@ -2,10 +2,39 @@ package io.github.dexclub.mcp
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class McpMainTest {
+    @Test
+    fun transportDefaultsToHttpForExistingLaunchers() {
+        assertEquals(McpTransport.HTTP, parseMcpTransport(emptyArray()))
+    }
+
+    @Test
+    fun transportAcceptsExplicitHttpAndStdio() {
+        assertEquals(McpTransport.HTTP, parseMcpTransport(arrayOf("--transport=http")))
+        assertEquals(McpTransport.HTTP, parseMcpTransport(arrayOf("--transport", "http")))
+        assertEquals(McpTransport.STDIO, parseMcpTransport(arrayOf("--transport=stdio")))
+        assertEquals(McpTransport.STDIO, parseMcpTransport(arrayOf("--transport", "stdio")))
+    }
+
+    @Test
+    fun invalidTransportArgumentsFailInsteadOfStartingHttp() {
+        listOf(
+            arrayOf("--transport=sse"),
+            arrayOf("--transport="),
+            arrayOf("--transport"),
+            arrayOf("--unknown"),
+            arrayOf("--transport=stdio", "--transport=http"),
+        ).forEach { args ->
+            assertFailsWith<IllegalArgumentException>(args.joinToString(" ")) {
+                parseMcpTransport(args)
+            }
+        }
+    }
+
     @Test
     fun resolveRuntimeFilesDirUsesConfiguredDirectoryWhenPresent() {
         val configuredDir = mcpAppTestDir("dexclub-mcp").resolve("bin")

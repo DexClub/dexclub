@@ -1,6 +1,6 @@
 # DexClub MCP Server
 
-`mcp-app` 通过 Streamable HTTP MCP 暴露 dexclub 的 target session、Dex 分析和 Android 资源能力，适合接入 MCP client、AI 或自动化 agent。
+`mcp-app` 通过 stdio 或 Streamable HTTP MCP 暴露 dexclub 的 target session、Dex 分析和 Android 资源能力，适合接入 MCP client、AI 或自动化 agent。
 
 ## 构建与启动
 
@@ -10,7 +10,7 @@
 ./gradlew :mcp-app:installDist
 ```
 
-启动服务：
+默认启动 HTTP 服务，兼容已有启动方式：
 
 ```bash
 ./mcp-app/build/install/mcp/bin/mcp
@@ -26,6 +26,35 @@ Windows PowerShell：
 默认端点是 `http://127.0.0.1:8787/mcp`。MCP client 的具体配置格式由 client 决定，将其 Streamable HTTP endpoint 指向该地址即可。
 
 服务本身不提供面向公网的认证边界。默认只监听回环地址；将 `DEXCLUB_MCP_HOST` 改为非回环地址时，只应部署在可信网络或已有访问控制的代理之后。
+
+### stdio 与 Codex
+
+本机 MCP client 可以直接启动 stdio 进程，无需预先启动 HTTP 服务：
+
+```bash
+./mcp-app/build/install/mcp/bin/mcp --transport=stdio
+```
+
+Windows PowerShell：
+
+```powershell
+.\mcp-app\build\install\mcp\bin\mcp.bat --transport=stdio
+```
+
+支持 `--transport=stdio`、`--transport stdio` 和显式的 `--transport=http`。省略参数时保持 HTTP 模式，`--help` 显示启动参数。
+
+在 Codex 的 `config.toml` 中配置命令型 MCP。下面的路径应替换为本机分发包的实际绝对路径：
+
+```toml
+[mcp_servers.dexclub]
+command = "cmd.exe"
+args = ["/d", "/c", "D:/Tools/dexclub/bin/mcp.bat", "--transport=stdio"]
+startup_timeout_sec = 60
+```
+
+同一服务配置使用 `command` / `args` 后移除原来的 `url` 字段，重新建立 Codex 会话以加载配置。工具、版本校验和配套 skill 合同在两种传输下保持一致。
+
+stdio 模式不监听端口；`stdout` 专用于逐行 MCP JSON-RPC，启动信息、日志及普通控制台输出转入 `stderr`。客户端关闭 stdin 后，进程关闭 MCP session 并释放 target runtime。`DEXCLUB_MCP_HOST`、`DEXCLUB_MCP_PORT` 和 `DEXCLUB_MCP_PATH` 只影响 HTTP 入口；stdio 采用本机文件访问策略。
 
 ## Target 定位方式
 
@@ -70,7 +99,7 @@ Android 资源：
 
 ## 查询与结果控制
 
-`find_classes`、`find_methods` 和 `find_fields` 的 `query` 参数是 JSON object，对应完整的 `FindClassQuery`、`FindMethodQuery` 和 `FindFieldQuery`。递归 matcher、字段定义和明确排除项见 [Dex 查询合同](../.docs/v4/dex-query-contract.md)。
+`find_classes`、`find_methods` 和 `find_fields` 通过 `query_file` 读取服务端可访问的绝对路径 JSON 文件。文件中的 `query` 对应完整的 `FindClassQuery`、`FindMethodQuery` 和 `FindFieldQuery`。文件 envelope、版本要求、递归 matcher、字段定义和明确排除项见 [Dex 查询合同](../.docs/v4/dex-query-contract.md)。
 
 Dex 查询支持 `offset`、`limit`、`brief` 和 `fields` 控制分页与投影。默认 `limit` 为 50，最大为 200。连续调用中应优先保留并复用查询返回的 handle，避免依赖展示文本重新定位实体。
 
@@ -102,6 +131,6 @@ Dex 查询支持 `offset`、`limit`、`brief` 和 `fields` 控制分页与投影
 ./gradlew :mcp-app:testStructured
 ```
 
-需要定点验证时可使用 `testSession`、`testDex`、`testResource`、`testModels` 和 `testSmoke`。`testSmoke` 包含 HTTP 启动与协议路径验证，因此不属于 `testFast`。
+需要定点验证时可使用 `testSession`、`testDex`、`testResource`、`testModels` 和 `testSmoke`。`testSmoke` 包含 HTTP 和 stdio 启动、协议路径及 stdio EOF 退出验证，因此不属于 `testFast`。
 
 返回[项目 README](../README.md)。
